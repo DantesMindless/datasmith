@@ -3,7 +3,7 @@
 version: '3.8'
 
 services:
-  backend:
+  django:
     build:
       context: ./backend
       dockerfile: Dockerfile
