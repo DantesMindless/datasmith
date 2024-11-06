@@ -8,6 +8,8 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 django = "^5.1.2"
+psycopg-binary = "^3.2.3"
+psycopg = {extras = ["binary"], version = "^3.2.3"}
 psycopg2-binary = "^2.9.10"
 
 
