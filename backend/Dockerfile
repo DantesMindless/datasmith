@@ -24,6 +24,10 @@ RUN poetry install --no-root
 # Copy project
 COPY . /app/
 
+# Collect static files
+RUN poetry run python manage.py collectstatic --noinput
+
+
 # Expose port 8000
 EXPOSE 8000
 
