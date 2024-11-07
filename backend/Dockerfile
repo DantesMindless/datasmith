@@ -32,4 +32,4 @@ RUN poetry run python manage.py collectstatic --noinput
 EXPOSE 8000
 
 # Run the Django development server
-CMD ["poetry", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["poetry", "run", "gunicorn", "--bind", "0.0.0.0:8000", "datasmith.wsgi:application", "--workers", "3"]
