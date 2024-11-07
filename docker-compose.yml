@@ -7,6 +7,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env.development
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
@@ -27,6 +29,8 @@ services:
 
   db:
     image: postgres:13
+    env_file:
+      - .env.development
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -39,9 +43,10 @@ services:
       volumes:
         - ./nginx:/etc/nginx/conf.d  
         - static_volume:/app/staticfiles
-        
+        - ./nginx/certs:/etc/nginx/certs
       ports:
-        - "80:80"  
+        - "80:80"
+        - "443:443"
       depends_on:
         - django
         - frontend
