@@ -1,5 +1,3 @@
-# backend/Dockerfile
-
 # Use the official Python image with a slim variant
 FROM python:3.12-slim
 
@@ -21,15 +19,18 @@ COPY pyproject.toml poetry.lock /app/
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-root
 
-# Copy project
+# Copy project files and entrypoint.sh
 COPY . /app/
+COPY entrypoint.sh /app/entrypoint.sh
 
 # Collect static files
 RUN poetry run python manage.py collectstatic --noinput
 
+# Make entrypoint executable
+RUN chmod +x /app/entrypoint.sh
 
 # Expose port 8000
 EXPOSE 8000
 
-# Run the Django development server
-CMD ["poetry", "run", "gunicorn", "--bind", "0.0.0.0:8000", "datasmith.wsgi:application", "--workers", "3"]
+# Set the entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
