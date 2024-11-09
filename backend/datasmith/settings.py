@@ -10,25 +10,26 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-from pathlib import Path
-from dotenv import load_dotenv
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 ENVIRONMENT = os.getenv('ENV', 'development')
 
-if ENVIRONMENT == 'production':
-    load_dotenv('.env.production')
+if ENVIRONMENT == "production":
+    load_dotenv(".env.production")
 else:
-    load_dotenv('.env.development')
+    load_dotenv(".env.development")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -45,8 +46,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # 3d party
     "rest_framework",
+    # apps
     "app",
+    "core",
 ]
 
 MIDDLEWARE = [
@@ -85,12 +89,12 @@ WSGI_APPLICATION = "datasmith.wsgi.application"
 
 DATABASES = {
     "default": {
-        'ENGINE': os.getenv('DB_ENGINE',''),
-        'NAME': os.getenv('DB_NAME', ''),
-        'USER': os.getenv('DB_USER', ''),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', ''),
+        "ENGINE": os.getenv("DB_ENGINE", ""),
+        "NAME": os.getenv("DB_NAME", ""),
+        "USER": os.getenv("DB_USER", ""),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", ""),
+        "PORT": os.getenv("DB_PORT", ""),
     }
 }
 
@@ -130,12 +134,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "/backend_static/"
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # If you have a 'static' directory in your app
+    os.path.join(BASE_DIR, "static"),  # If you have a 'static' directory in your app
 ]
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'mediafiles')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "mediafiles")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
