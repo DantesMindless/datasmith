@@ -1,4 +1,4 @@
-from typing import Iterable
+import uuid
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -21,6 +21,7 @@ class AuditModel(models.Model):
         verbose_name_plural (str): The human-readable plural name for the model.
     """
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     objects_id = models.PositiveIntegerField()
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     data = models.JSONField()
@@ -53,6 +54,7 @@ class BaseModel(models.Model):
         be used to create any database table.
     """
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     deleted = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="%(class)s_created_by"
