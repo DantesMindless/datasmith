@@ -21,16 +21,17 @@ RUN poetry install --no-root
 
 # Copy project files and entrypoint.sh
 COPY . /app/
-COPY entrypoint.sh /app/entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 
 # Collect static files
 RUN poetry run python manage.py collectstatic --noinput
 
 # Make entrypoint executable
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose port 8000
 EXPOSE 8000
 
 # Set the entrypoint
-ENTRYPOINT ["bash", "/app/entrypoint.sh"]
+
+ENTRYPOINT ["/entrypoint.sh"]

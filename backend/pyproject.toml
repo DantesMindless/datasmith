@@ -16,6 +16,7 @@ gunicorn = "^23.0.0"
 djangorestframework = "^3.15.2"
 dj-rest-auth = "^7.0.0"
 djangorestframework-simplejwt = "^5.3.1"
+pandasql = "^0.7.3"
 
 
 [build-system]
