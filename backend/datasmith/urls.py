@@ -20,8 +20,11 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("api/", include("app.urls")),  # Adjust 'app' to your actual app name
+
+    path('admin/', admin.site.urls),
+    path('api/', include('app.urls')),  
+    path('api/', include('userauth.urls'))
+
 ]
 
 urlpatterns += staticfiles_urlpatterns()
