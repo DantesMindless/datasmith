@@ -4,6 +4,8 @@
 set -e
 
 # Check the environment variable
+poetry install --no-root
+
 if [ "$ENV" = "development" ]; then
     echo "Running in development mode"
     # Run migrations in development

@@ -1,10 +1,15 @@
 import json
+import logging
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+from .mixins import VerifyImputsMixin
 
-class PostgresConnection:
+logger = logging.getLogger(__name__)
+
+
+class PostgresConnection(VerifyImputsMixin):
     def __init__(self, host, database, user, password, port=5432):
         self.host = host
         self.database = database
@@ -13,7 +18,7 @@ class PostgresConnection:
         self.port = port
         self.connection = None
 
-    def connect(self):
+    def connect(self) -> bool:
         try:
             self.connection = psycopg2.connect(
                 host=self.host,
@@ -22,13 +27,15 @@ class PostgresConnection:
                 password=self.password,
                 port=self.port,
             )
-        except psycopg2.Error as e:
-            print(f"Error connecting to PostgreSQL database: {e}")
+            return True
+        except psycopg2.Error:
+            logger.error("Failed to connect to the database.", exc_info=True)
             self.connection = None
+            return False
 
     def query(self, query, params=None):
         if self.connection is None:
-            print("No connection to the database.")
+            logger.error("No connection to the database.")
             return None
 
         try:
@@ -37,23 +44,9 @@ class PostgresConnection:
                 result = cursor.fetchall()
                 return json.dumps(result, default=str)
         except psycopg2.Error as e:
-            print(f"Error executing query: {e}")
+            logger.error("Failed to execute the query.", exc_info=True)
             return None
 
     def close(self):
         if self.connection:
             self.connection.close()
-
-
-# Example usage:
-if __name__ == "__main__":
-    conn = PostgresConnection(
-        host="your_host",
-        database="your_database",
-        user="your_user",
-        password="your_password",
-    )
-    conn.connect()
-    result = conn.query("SELECT * FROM your_table")
-    print(result)
-    conn.close()

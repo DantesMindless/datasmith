@@ -1,8 +1,10 @@
 import pandas as pd
 import pandasql as psql
 
+from .mixins import VerifyImputsMixin
 
-class PandasMySQLQueryEngine:
+
+class PandasMySQLQueryEngine(VerifyImputsMixin):
     def __init__(self, dataframe):
         self.dataframe = dataframe
 

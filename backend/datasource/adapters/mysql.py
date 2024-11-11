@@ -1,10 +1,15 @@
 import json
+import logging
 
 import mysql.connector
 from mysql.connector import Error
 
+from .mixins import VerifyImputsMixin
 
-class MySQLConnection:
+logger = logging.getLogger(__name__)
+
+
+class MySQLConnection(VerifyImputsMixin):
     def __init__(self, host, database, user, password, port=3306):
         self.host = host
         self.database = database
@@ -13,7 +18,7 @@ class MySQLConnection:
         self.port = port
         self.connection = None
 
-    def connect(self):
+    def connect(self) -> bool:
         try:
             self.connection = mysql.connector.connect(
                 host=self.host,
@@ -22,13 +27,15 @@ class MySQLConnection:
                 password=self.password,
                 port=self.port,
             )
-        except Error as e:
-            print(f"Error connecting to MySQL database: {e}")
+            return True
+        except Error:
+            logger.error("Failed to connect to the database.", exc_info=True)
             self.connection = None
+            return False
 
     def query(self, query, params=None):
         if self.connection is None:
-            print("No connection to the database.")
+            logger.error("No connection to the database.")
             return None
 
         try:
@@ -36,8 +43,8 @@ class MySQLConnection:
             cursor.execute(query, params)
             result = cursor.fetchall()
             return json.dumps(result, default=str)
-        except Error as e:
-            print(f"Error executing query: {e}")
+        except Error:
+            logger.error("Failed to execute the query.", exc_info=True)
             return None
         finally:
             cursor.close()
@@ -45,17 +52,3 @@ class MySQLConnection:
     def close(self):
         if self.connection:
             self.connection.close()
-
-
-# Example usage:
-if __name__ == "__main__":
-    conn = MySQLConnection(
-        host="your_host",
-        database="your_database",
-        user="your_user",
-        password="your_password",
-    )
-    conn.connect()
-    result = conn.query("SELECT * FROM your_table")
-    print(result)
-    conn.close()

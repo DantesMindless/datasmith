@@ -15,6 +15,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .logging import LOGGING
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -43,6 +45,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://datasmith.local',
 ]
 
+LOGGING = LOGGING
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -55,9 +59,12 @@ INSTALLED_APPS = [
     # 3d party
     "rest_framework",
     "rest_framework.authtoken",
-    "userauth",
+    "django_extensions",
+    # apps
     "app",
+    "userauth",
     "core",
+    "datasource",
 ]
 
 MIDDLEWARE = [
