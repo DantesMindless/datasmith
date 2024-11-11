@@ -8,8 +8,6 @@ services:
       MYSQL_PASSWORD: password
     ports:
       - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
 
   postgres:
     image: postgres:latest
@@ -18,9 +16,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: mydatabase
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "5433:5432"
 
   mongodb:
     image: mongo:latest
@@ -29,8 +25,6 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: password
     ports:
       - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
 
   minio:
     image: minio/minio:latest
@@ -38,10 +32,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"     # Console port
-      - "9001:9001"     # API port
-    volumes:
-      - minio_data:/data
+      - "9000:9000"
+      - "9001:9001"
     command: server /data --console-address ":9001"
 
 volumes:

@@ -1,7 +1,3 @@
-# docker-compose.yml
-
-version: '3.8'
-
 services:
   django:
     build:
@@ -10,7 +6,7 @@ services:
     env_file:
       - .env.development
     environment:
-      - ENV=development  
+      - ENV=development
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
@@ -50,7 +46,7 @@ services:
       environment:
         - ENV=development
       volumes:
-        - ./nginx:/etc/nginx/conf.d  
+        - ./nginx:/etc/nginx/conf.d
         - static_volume:/app/staticfiles
         - ./nginx/certs:/etc/nginx/certs
       ports:
