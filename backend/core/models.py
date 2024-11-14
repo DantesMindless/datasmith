@@ -1,6 +1,6 @@
 import uuid
 
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
@@ -26,7 +26,9 @@ class AuditModel(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     data = models.JSONField()
     created_by = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="%(class)s_created_by"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="%(class)s_created_by",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -57,7 +59,9 @@ class BaseModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     deleted = models.BooleanField(default=False)
     created_by = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="%(class)s_created_by"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="%(class)s_created_by",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now_add=True)
