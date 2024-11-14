@@ -4,6 +4,7 @@ from functools import cached_property
 from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.conf import settings
 
 from .constants.choices import DatasourceTypeChoices
 
@@ -27,7 +28,7 @@ class DataCluster(BaseModel):
 
     name = models.CharField(max_length=255)
     description = models.TextField()
-    user = models.ForeignKey("auth.User", on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     datasource = models.ForeignKey("DataSource", on_delete=models.CASCADE)
 
     class Meta:
@@ -58,7 +59,7 @@ class DataSource(BaseModel):
         default=DatasourceTypeChoices.POSTGRES,
     )
     description = models.TextField()
-    user = models.ForeignKey("auth.User", on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     credentials = models.JSONField()
 
     class Meta:
