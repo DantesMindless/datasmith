@@ -36,6 +36,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://datasmith.local',
+    'https://datasmith.local',
+]
 
 # Application definition
 
@@ -48,7 +54,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # 3d party
     "rest_framework",
-    # apps
+    "rest_framework.authtoken",
+    "userauth",
     "app",
     "core",
 ]
@@ -145,3 +152,5 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "mediafiles")
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+AUTH_USER_MODEL = 'userauth.CustomUser'

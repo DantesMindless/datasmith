@@ -33,4 +33,4 @@ RUN chmod +x /app/entrypoint.sh
 EXPOSE 8000
 
 # Set the entrypoint
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
