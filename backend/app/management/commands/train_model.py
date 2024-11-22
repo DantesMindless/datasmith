@@ -1,35 +1,98 @@
 from django.core.management.base import BaseCommand
 from app.models import NeuralNetworkModel
-from django.contrib.auth import get_user_model
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import json
+import os
 
-# Get the custom user model
-User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Create a sample neural network model'
+    help = "Train a neural network model with coefficients between 1 and 5"
 
     def handle(self, *args, **kwargs):
-        # Get or create a default custom user
-        user = User.objects.first()  # Adjust as needed
+        try:
+            nn_model = NeuralNetworkModel.objects.first()
+            if not nn_model:
+                self.stderr.write("No NeuralNetworkModel found in the database.")
+                return
+        except Exception as e:
+            self.stderr.write(f"Error fetching NeuralNetworkModel: {e}")
+            return
 
-        if not user:
-            # Create a default user if no users exist
-            user = User.objects.create_user(username='default_user', email='default@example.com', password='password')
 
-        NeuralNetworkModel.objects.create(
-            name="Quadratic Root Predictor",
-            num_layers=3,
-            layer_configurations=[
-                {"type": "dense", "in_features": 9, "out_features": 128, "activation": "relu"},
-                {"type": "dense", "in_features": 128, "out_features": 64, "activation": "relu"},
-                {"type": "dense", "in_features": 64, "out_features": 2, "activation": "linear"},
-            ],
-            input_shape="(9,)",
-            output_shape="(2,)",
-            learning_rate=0.001,
-            batch_size=32,
-            epochs=1000,
-            optimizer="adam",
-            created_by=user,  # Pass the custom user instance
-        )
-        self.stdout.write(self.style.SUCCESS("Neural network created successfully!"))
+        layer_configs = json.loads(json.dumps(nn_model.layer_configurations))
+
+        layers = []
+        input_size = eval(nn_model.input_shape)[0]
+        output_size = eval(nn_model.output_shape)[0]
+
+        last_size = input_size
+        for config in layer_configs:
+            layers.append(nn.Linear(config["in_features"], config["out_features"]))
+            if config["activation"] == "relu":
+                layers.append(nn.ReLU())
+            last_size = config["out_features"]
+        layers.append(nn.Linear(last_size, output_size))
+
+        model = nn.Sequential(*layers)
+
+        optimizer = optim.Adam(model.parameters(), lr=nn_model.learning_rate)
+        criterion = nn.MSELoss()
+
+        num_samples = 10000  
+        np.random.seed(42)  
+        a = np.random.uniform(1, 2, size=(num_samples, 1))
+        b = np.random.uniform(-5, 5, size=(num_samples, 1))
+        c = np.random.uniform(-5, 5, size=(num_samples, 1))
+
+        discriminant = b**2 - 4 * a * c
+        positive_discriminant = discriminant >= 0
+        a = a[positive_discriminant.flatten()]
+        b = b[positive_discriminant.flatten()]
+        c = c[positive_discriminant.flatten()]
+        discriminant = discriminant[positive_discriminant.flatten()]
+        sqrt_discriminant = np.sqrt(discriminant)
+
+        x1 = (-b + sqrt_discriminant) / (2 * a)
+        x2 = (-b - sqrt_discriminant) / (2 * a)
+
+        ab = a * b
+        ac = a * c
+        bc = b * c
+        a_squared = a ** 2
+        b_squared = b ** 2
+        c_squared = c ** 2
+
+        inputs = np.hstack([a, b, c, ab, ac, bc, a_squared, b_squared, c_squared])
+        outputs = np.hstack([x1, x2])
+
+        inputs_tensor = torch.from_numpy(inputs).float()
+        outputs_tensor = torch.from_numpy(outputs).float()
+
+        num_epochs = 5000  
+        batch_size = nn_model.batch_size
+        num_batches = inputs_tensor.size(0) // batch_size
+
+        for epoch in range(num_epochs):
+            model.train()
+            for i in range(num_batches):
+                batch_start = i * batch_size
+                batch_end = batch_start + batch_size
+                batch_inputs = inputs_tensor[batch_start:batch_end]
+                batch_outputs = outputs_tensor[batch_start:batch_end]
+
+                optimizer.zero_grad()
+                predictions = model(batch_inputs)
+                loss = criterion(predictions, batch_outputs)
+                loss.backward()
+                optimizer.step()
+
+            if (epoch + 1) % 100 == 0:
+                self.stdout.write(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.6f}")
+
+        # Save the trained model
+        temp_path = "/tmp/trained_model.pt"
+        torch.save(model.state_dict(), temp_path)
+        self.stdout.write(f"Model trained and saved at {temp_path}")

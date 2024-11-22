@@ -1,62 +1,73 @@
-import torch
-import numpy as np
-from app.models import NeuralNetworkModel
-from django.conf import settings
 from django.core.management.base import BaseCommand
-from storage import load_model_from_minio  # Utility for loading from MinIO
-
-# Example function to calculate quadratic roots using a trained neural network
-def predict_roots(model, scaler_inputs, scaler_outputs, a, b, c, device='cpu'):
-    # Ensure inputs are in the correct format
-    a = np.array([[a]])
-    b = np.array([[b]])
-    c = np.array([[c]])
-
-    # Calculate additional features
-    ab = a * b
-    ac = a * c
-    bc = b * c
-    a_squared = a ** 2
-    b_squared = b ** 2
-    c_squared = c ** 2
-
-    # Combine all features
-    inputs = np.hstack([a, b, c, ab, ac, bc, a_squared, b_squared, c_squared])
-
-    # Scale the inputs using the saved scaler
-    inputs_scaled = scaler_inputs.transform(inputs)
-
-    # Convert inputs to tensor
-    inputs_tensor = torch.from_numpy(inputs_scaled).float().to(device)
-
-    # Perform inference
-    model.eval()
-    with torch.no_grad():
-        outputs_scaled = model(inputs_tensor)
-
-    # Inverse transform the outputs to get the original scale
-    outputs = scaler_outputs.inverse_transform(outputs_scaled.cpu().numpy())
-    return outputs[0][0], outputs[0][1]  # Return roots x1, x2
+from app.models import NeuralNetworkModel
+import torch
+import torch.nn as nn
+import os
+import json
+import numpy as np
 
 
 class Command(BaseCommand):
-    help = "Test a trained neural network for quadratic root prediction"
+    help = "Test a trained neural network model by calculating quadratic roots"
+
+    def add_arguments(self, parser):
+        parser.add_argument("a", type=float, help="Coefficient a of the quadratic equation")
+        parser.add_argument("b", type=float, help="Coefficient b of the quadratic equation")
+        parser.add_argument("c", type=float, help="Coefficient c of the quadratic equation")
 
     def handle(self, *args, **kwargs):
-        # Load the neural network model from MinIO or local storage
-        model = load_model_from_minio("models", "Quadratic Root Predictor.pt")
+        a = kwargs["a"]
+        b = kwargs["b"]
+        c = kwargs["c"]
 
-        # Load scalers (assume they are saved locally or in MinIO)
-        import joblib
-        scaler_inputs = joblib.load("scaler_inputs.pkl")
-        scaler_outputs = joblib.load("scaler_outputs.pkl")
+        # Fetch the neural network model from the database
+        try:
+            nn_model = NeuralNetworkModel.objects.first()
+            if not nn_model:
+                self.stderr.write("No NeuralNetworkModel found in the database.")
+                return
+        except Exception as e:
+            self.stderr.write(f"Error fetching NeuralNetworkModel: {e}")
+            return
 
-        # Example coefficients (user input or test data)
-        a, b, c = 1, -3, 2
+        layer_configs = json.loads(json.dumps(nn_model.layer_configurations))
 
-        # Predict the roots
-        root1, root2 = predict_roots(model, scaler_inputs, scaler_outputs, a, b, c)
+        layers = []
+        input_size = eval(nn_model.input_shape)[0]
+        output_size = eval(nn_model.output_shape)[0]
 
-        # Output the results
-        print(f"For equation {a}x² + {b}x + {c} = 0:")
-        print(f"Predicted roots are: x1 = {root1}, x2 = {root2}")
+        last_size = input_size
+        for config in layer_configs:
+            layers.append(nn.Linear(config["in_features"], config["out_features"]))
+            if config["activation"] == "relu":
+                layers.append(nn.ReLU())
+            last_size = config["out_features"]
+        layers.append(nn.Linear(last_size, output_size))
+
+        model = nn.Sequential(*layers)
+
+        temp_path = "/tmp/trained_model.pt"
+        if not os.path.exists(temp_path):
+            self.stderr.write(f"Trained model file not found at {temp_path}. Please train the model first.")
+            return
+        model.load_state_dict(torch.load(temp_path))
+        model.eval()
+
+        ab = a * b
+        ac = a * c
+        bc = b * c
+        a_squared = a ** 2
+        b_squared = b ** 2
+        c_squared = c ** 2
+
+        input_features = np.array([[a, b, c, ab, ac, bc, a_squared, b_squared, c_squared]])
+        input_tensor = torch.from_numpy(input_features).float()
+
+        with torch.no_grad():
+            predictions = model(input_tensor)
+
+        x1, x2 = predictions[0].tolist()
+
+    
+        self.stdout.write(f"For the quadratic equation: {a}x² + {b}x + {c} = 0")
+        self.stdout.write(f"Predicted roots: x1 = {x1:.6f}, x2 = {x2:.6f}")
