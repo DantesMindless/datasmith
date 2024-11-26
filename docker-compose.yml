@@ -6,14 +6,20 @@ services:
     env_file:
       - .env.development
     environment:
-      - ENV=development
+      - ENV=development  
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=my-bucket
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
     ports:
       - "8000:8000"
     depends_on:
+      - minio
       - db
+    
 
   frontend:
     build:
@@ -40,7 +46,7 @@ services:
       POSTGRES_DB: datasmith
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-
+      
   nginx:
       image: nginx:latest
       environment:
@@ -58,3 +64,4 @@ services:
 volumes:
   postgres_data:
   static_volume:
+  minio_data:

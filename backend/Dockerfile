@@ -1,5 +1,5 @@
 # Use the official Python image with a slim variant
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
