@@ -17,7 +17,7 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - minio
+      # - minio
       - db
     
 
@@ -46,6 +46,8 @@ services:
       POSTGRES_DB: datasmith
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - 5432:5432
       
   nginx:
       image: nginx:latest
