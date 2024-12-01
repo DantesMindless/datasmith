@@ -1,6 +1,7 @@
 import logging
 
 import psycopg2
+from typing import Tuple
 from psycopg2.extras import RealDictCursor
 
 from .mixins import VerifyImputsMixin
@@ -32,10 +33,10 @@ class PostgresConnection(VerifyImputsMixin):
             self.connection = None
             return False
 
-    def query(self, query, params=None):
+    def query(self, query, params=None) -> Tuple[bool, dict | None]:
         if self.connection is None:
             logger.error("No connection to the database.")
-            return None
+            return False, None, "No connection to the database."
 
         cursor = self.connection.cursor(cursor_factory=RealDictCursor)
         try:
@@ -43,13 +44,13 @@ class PostgresConnection(VerifyImputsMixin):
 
             if cursor.description:
                 result = cursor.fetchall()
-                return result
+                return True, result, "No Data"
             else:
                 self.connection.commit()
-                return None
-        except Exception:
+                return True, None, "Success"
+        except Exception as e:
             logger.error("Failed to execute the query.", exc_info=True)
-            return None
+            return False, None, f"Failed to execute the query: {e}"
         finally:
             cursor.close()
 

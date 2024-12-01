@@ -42,14 +42,24 @@ class DataSourceView(APIView):
         if not (query := data.get("query")):
             return Response("Query not provided", status=status.HTTP_400_BAD_REQUEST)
         if datasource := DataSource.objects.filter(id=id).first():
-            result = datasource.query(query)
-            if result:
-                return Response(result)
-            elif result is None:
-                return Response("Query success")
-            return Response(
-                "Failed to execute the query", status=status.HTTP_400_BAD_REQUEST
-            )
+            success, data, message = datasource.query(query)
+            if success and data is not None:
+                return Response(data)
+            elif success:
+                return Response(message)
+            return Response(message, status=status.HTTP_400_BAD_REQUEST)
+        return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class DataSourceTablesMetadataView(APIView):
+    def get(self, request: HttpRequest, id: uuid, table_name: str) -> Response:
+        if datasource := DataSource.objects.filter(id=id).first():
+            success, data, message = datasource.related_tables(table_name)
+            if success and data is not None:
+                return Response(data)
+            elif success:
+                return Response(message)
+            return Response(message, status=status.HTTP_400_BAD_REQUEST)
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
 
 

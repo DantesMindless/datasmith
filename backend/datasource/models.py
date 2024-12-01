@@ -133,3 +133,31 @@ class DataSource(BaseModel):
                 raise ValidationError(f"Missing required credentials: {message}")
         else:
             raise ValidationError("Invalid credentials or datasource type")
+
+    def related_tables(self, table_name):
+        query = """
+        SELECT
+            tc.table_name AS related_table,
+            kcu.column_name AS related_column,
+            ccu.table_name AS target_table,
+            ccu.column_name AS target_column
+        FROM
+            information_schema.table_constraints AS tc
+        JOIN
+            information_schema.key_column_usage AS kcu
+        ON
+            tc.constraint_name = kcu.constraint_name
+        AND
+            tc.table_schema = kcu.table_schema
+        JOIN
+            information_schema.constraint_column_usage AS ccu
+        ON
+            ccu.constraint_name = tc.constraint_name
+        AND
+            ccu.table_schema = tc.table_schema
+        WHERE
+            tc.constraint_type = 'FOREIGN KEY'
+        AND
+            ccu.table_name = %s;
+        """
+        return self.query(query, [table_name])

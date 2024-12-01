@@ -1,5 +1,9 @@
 from django.urls import path
-from .views import DataSourceView, DataSourceTestConnectionView
+from .views import (
+    DataSourceView,
+    DataSourceTestConnectionView,
+    DataSourceTablesMetadataView,
+)
 
 urlpatterns = [
     path("datasource/", DataSourceView.as_view(), name="datasource-list"),
@@ -22,5 +26,10 @@ urlpatterns = [
         "datasource/test/<uuid:id>/",
         DataSourceTestConnectionView.as_view(),
         name="datasource-test",
+    ),
+    path(
+        "datasource-metadata/<uuid:id>/<str:table_name>/",
+        DataSourceTablesMetadataView.as_view(),
+        name="datasource-metadata",
     ),
 ]
