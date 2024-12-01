@@ -9,7 +9,6 @@ from rest_framework.views import APIView
 
 from datasource.models import DataSource
 from datasource.serializers import DataSourceSerializer
-import json
 
 User = get_user_model()
 
@@ -43,8 +42,14 @@ class DataSourceView(APIView):
         if not (query := data.get("query")):
             return Response("Query not provided", status=status.HTTP_400_BAD_REQUEST)
         if datasource := DataSource.objects.filter(id=id).first():
-            result = json.loads(datasource.query(query))
-            return Response(result)
+            result = datasource.query(query)
+            if result:
+                return Response(result)
+            elif result is None:
+                return Response("Query success")
+            return Response(
+                "Failed to execute the query", status=status.HTTP_400_BAD_REQUEST
+            )
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
 
 

@@ -1,4 +1,3 @@
-import json
 import logging
 
 import psycopg2
@@ -38,14 +37,21 @@ class PostgresConnection(VerifyImputsMixin):
             logger.error("No connection to the database.")
             return None
 
+        cursor = self.connection.cursor(cursor_factory=RealDictCursor)
         try:
-            with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(query, params)
+            cursor.execute(query, params)
+
+            if cursor.description:
                 result = cursor.fetchall()
-                return json.dumps(result, default=str)
-        except psycopg2.Error as e:
+                return result
+            else:
+                self.connection.commit()
+                return None
+        except Exception:
             logger.error("Failed to execute the query.", exc_info=True)
             return None
+        finally:
+            cursor.close()
 
     def close(self):
         if self.connection:
