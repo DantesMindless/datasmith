@@ -126,7 +126,10 @@ class DataSource(BaseModel):
         if self.credentials and self.type:
             keys = self.credentials.keys()
             adapter = DatasourceTypeChoices.get_adapter(self.type)
-            if adapter.verify_params(keys):
+            is_valid, message = adapter.verify_params(keys)
+            if is_valid:
                 super().save(*args, **kwargs)
+            else:
+                raise ValidationError(f"Missing required credentials: {message}")
         else:
             raise ValidationError("Invalid credentials or datasource type")

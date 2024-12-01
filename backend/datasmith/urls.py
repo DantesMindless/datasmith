@@ -20,11 +20,10 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path
 
 urlpatterns = [
-
-    path('admin/', admin.site.urls),
-    path('api/', include('app.urls')),  
-    path('api/', include('userauth.urls'))
-
+    path("admin/", admin.site.urls),
+    path("api/", include("app.urls")),
+    path("api/", include("userauth.urls")),
+    path("api/", include("datasource.urls")),
 ]
 
 urlpatterns += staticfiles_urlpatterns()

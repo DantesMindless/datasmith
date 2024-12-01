@@ -47,3 +47,7 @@ class DatasourceTypeChoices(models.TextChoices):
         # return PandasMySQLQueryEngine
         else:
             raise ValueError("Invalid datasource type")
+
+    @classmethod
+    def choices_list(cls):
+        return [choice[0] for choice in cls.choices]

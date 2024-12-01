@@ -39,10 +39,10 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
-    'http://datasmith.local',
-    'https://datasmith.local',
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://datasmith.local",
+    "https://datasmith.local",
 ]
 
 LOGGING = LOGGING
@@ -160,4 +160,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "mediafiles")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-AUTH_USER_MODEL = 'userauth.CustomUser'
+AUTH_USER_MODEL = "userauth.CustomUser"
+
+APPEND_SLASH = False
