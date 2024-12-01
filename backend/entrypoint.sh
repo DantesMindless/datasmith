@@ -9,7 +9,8 @@ poetry install --no-root
 if [ "$ENV" = "development" ]; then
     echo "Running in development mode"
     # Run migrations in development
-    poetry run python manage.py migrate
+    # poetry run python manage.py migrate  --database=default
+    # poetry run python manage.py migrate  --database=test
     # Start the Django development server
     exec poetry run python manage.py runserver 0.0.0.0:8000
 else

@@ -1,5 +1,6 @@
 from django.db import models
 from core.models import BaseModel
+from app.models.test import QuadraticTrainingData
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -134,15 +135,34 @@ class NeuralNetworkModel(BaseModel):
         layers.append(nn.Linear(last_size, output_size))
         return nn.Sequential(*layers)
 
-    def train_model(self, data):
+    def get_test_data(self):
         """
-        Train the model with provided data and upload it to MinIO.
+        Fetch test data from the QuadraticTrainingData table in the test database.
+        Returns:
+            inputs (np.array): Input data as a NumPy array.
+            outputs (np.array): Output data as a NumPy array.
         """
+        data = QuadraticTrainingData.objects.using("test").all()
+        inputs = []
+        outputs = []
+
+        for entry in data:
+            inputs.append(entry.input_data)  # Assuming input_data is JSON
+            outputs.append(entry.output_data)  # Assuming output_data is JSON
+
+        return np.array(inputs), np.array(outputs)
+
+    def train_model(self):
+        """
+        Train the model using data from the test database and upload it to MinIO.
+        """
+        # Fetch test data
+        inputs, outputs = self.get_test_data()
+
         model = self.create_model()
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
         criterion = nn.MSELoss()
 
-        inputs, outputs = data
         inputs_tensor = torch.from_numpy(inputs).float()
         outputs_tensor = torch.from_numpy(outputs).float()
 

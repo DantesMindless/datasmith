@@ -109,6 +109,14 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", ""),
         "HOST": os.getenv("DB_HOST", ""),
         "PORT": os.getenv("DB_PORT", ""),
+    },
+    "test": {
+        "ENGINE": os.getenv("TEST_DB_ENGINE", ""),
+        "NAME": os.getenv("TEST_DB_NAME", ""),
+        "USER": os.getenv("TEST_DB_USER", ""),
+        "PASSWORD": os.getenv("TEST_DB_PASSWORD", ""),
+        "HOST": os.getenv("TEST_DB_HOST", ""),
+        "PORT": os.getenv("TEST_DB_PORT", ""),
     }
 }
 
@@ -163,3 +171,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "userauth.CustomUser"
 
 APPEND_SLASH = False
+AUTH_USER_MODEL = 'userauth.CustomUser'
+
+DATABASE_ROUTERS = ["datasmith.db_router.DatabaseRouter"]
