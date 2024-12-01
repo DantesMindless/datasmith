@@ -105,7 +105,7 @@ class DataSource(BaseModel):
         Returns:
             bool: True if the connection is successful, False otherwise.
         """
-        return self.connection().test_conection()
+        return self.connection.test_conection()
 
     def save(self, *args, **kwargs) -> None:
         """
