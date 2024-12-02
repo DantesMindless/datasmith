@@ -136,33 +136,48 @@ class NeuralNetworkModel(BaseModel):
         layers.append(nn.Linear(last_size, output_size))
         return nn.Sequential(*layers)
 
-    def get_test_data(self):
+    def get_test_data(self, datasource_id, table_name):
         """
-        Fetch test data from the QuadraticTrainingData table in the test database.
+        Fetch test data from a DataSource.
+
+        Args:
+            datasource_id (str): The ID of the DataSource to query.
+            table_name (str): The name of the table to fetch data from.
+
         Returns:
-            inputs (np.array): Input data as a NumPy array.
-            outputs (np.array): Output data as a NumPy array.
+            tuple: A tuple containing inputs (numpy array) and outputs (numpy array).
         """
-        data = QuadraticTrainingData.objects.using("test").all()
-        inputs = []
-        outputs = []
+        datasource = DataSource.objects.get(id=datasource_id)
+        data = datasource.query(f"SELECT * FROM {table_name};")
 
-        for entry in data:
-            inputs.append(entry.input_data)  # Assuming input_data is JSON
-            outputs.append(entry.output_data)  # Assuming output_data is JSON
+        if not data:
+            raise ValueError(f"No data retrieved from table '{table_name}' in DataSource '{datasource.name}'.")
 
-        return np.array(inputs), np.array(outputs)
+        inputs = np.array([row["input_data"] for row in data])
+        outputs = np.array([row["output_data"] for row in data])
+
+        return inputs, outputs
+
 
     def train_model(self, datasource_id, table_name):
         """
         Train the model using data fetched from a DataSource.
+
+        Args:
+            datasource_id (str): The ID of the DataSource to query.
+            table_name (str): The name of the table to fetch data from.
         """
         datasource = DataSource.objects.get(id=datasource_id)
-        data = datasource.query(f"SELECT * FROM {table_name}")
+        data = datasource.query(f"SELECT * FROM {table_name};")
 
-        inputs = np.array([list(row[:-1]) for row in data])
-        outputs = np.array([row[-1] for row in data])
+        if not data:
+            raise ValueError(f"No data retrieved from table '{table_name}' in DataSource '{datasource.name}'.")
 
+        # Assuming `input_data` and `output_data` are columns in the table
+        inputs = np.array([row["input_data"] for row in data])
+        outputs = np.array([row["output_data"] for row in data])
+
+        # Prepare the PyTorch model and training process
         model = self.create_model()
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
         criterion = nn.MSELoss()
@@ -190,6 +205,8 @@ class NeuralNetworkModel(BaseModel):
                 print(f"Epoch {epoch + 1}/{self.epochs}, Loss: {loss.item():.6f}")
 
         self._save_trained_model(model)
+        print("Training completed successfully.")
+
         
     def predict(self, input_data):
         """
