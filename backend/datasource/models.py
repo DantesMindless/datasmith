@@ -5,7 +5,8 @@ from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
-
+from .adapters.postgres import PostgresConnection
+from .adapters.mysql import MySQLConnection
 from .constants.choices import DatasourceTypeChoices
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,20 @@ class DataCluster(BaseModel):
         verbose_name = "Data Cluster"
         verbose_name_plural = "Data Clusters"
 
+class DatasourceTypeChoices(models.TextChoices):
+    POSTGRES = 'postgres', 'PostgreSQL'
+    MYSQL = 'mysql', 'MySQL'
+    SQLITE = 'sqlite', 'SQLite'
+
+    @staticmethod
+    def get_adapter(db_type):
+        if db_type == DatasourceTypeChoices.POSTGRES:
+            return PostgresConnection
+        elif db_type == DatasourceTypeChoices.MYSQL:
+            return MySQLConnection
+        elif db_type == DatasourceTypeChoices.SQLITE:
+            return SQLiteAdapter
+        raise ValueError(f"Invalid datasource type: {db_type}")
 
 class DataSource(BaseModel):
     """
@@ -45,11 +60,7 @@ class DataSource(BaseModel):
         type (str): The type of the data source, chosen from predefined choices.
         description (str): A detailed description of the data source.
         user (ForeignKey): A reference to the user who owns this data source.
-        credentioals (JSONField): A JSON field to store credentials for accessing the data source.
-
-    Meta:
-        verbose_name (str): The human-readable name of the model.
-        verbose_name_plural (str): The human-readable plural name of the model.
+        credentials (JSONField): A JSON field to store credentials for accessing the data source.
     """
 
     name = models.CharField(max_length=255)
@@ -69,34 +80,19 @@ class DataSource(BaseModel):
     @cached_property
     def adapter(self):
         """
-        Returns the appropriate adapter class based on the datasource type.
+        Returns the appropriate adapter instance based on the datasource type.
 
         Returns:
-            class: The adapter class corresponding to the datasource type.
-
-        Raises:
-            ValueError: If the datasource type is invalid.
+            object: An instance of the adapter corresponding to the datasource type.
         """
-        return DatasourceTypeChoices.get_adapter(self.type)
-
-    @cached_property
-    def connection(self):
-        """
-        Establishes a connection using the adapter and credentials provided.
-
-        Returns:
-            object: A connection object created by the adapter.
-        """
-        return self.adapter(**self.credentials)
-
-    def query(self, query, params=None) -> list:
-        try:
-            self.connection.connect()
-            result = self.connection.query(query, params)
-            self.connection.close()
-            return result
-        except Exception:
-            logging.error("Failed to execute the query.", exc_info=True)
+        AdapterClass = DatasourceTypeChoices.get_adapter(self.type)
+        return AdapterClass(
+            host=self.credentials.get("host"),
+            database=self.credentials.get("database"),
+            user=self.credentials.get("user"),
+            password=self.credentials.get("password"),
+            port=self.credentials.get("port", 5432),
+        )
 
     def test_connection(self):
         """
@@ -105,36 +101,77 @@ class DataSource(BaseModel):
         Returns:
             bool: True if the connection is successful, False otherwise.
         """
-        return self.connection.test_conection()
+        try:
+            if self.adapter.connect():
+                logger.info(f"Connection to DataSource '{self.name}' successful.")
+                self.adapter.close()
+                return True
+            else:
+                logger.error(f"Connection to DataSource '{self.name}' failed.")
+                return False
+        except Exception as e:
+            logger.error(f"Error testing connection for DataSource '{self.name}': {e}", exc_info=True)
+            return False
 
-    def save(self, *args, **kwargs) -> None:
+    def query(self, query: str, params=None):
         """
-        Save the datasource instance after verifying the credentials and type.
-
-        This method overrides the default save method to include validation
-        of the datasource credentials and type before saving the instance.
-        If the credentials and type are valid, the instance is saved using
-        the superclass's save method. Otherwise, a ValidationError is raised.
+        Execute a query on the datasource.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            query (str): The SQL query to execute.
+            params (list, optional): Query parameters.
 
-        Raises:
-            ValidationError: If the credentials or datasource type are invalid.
+        Returns:
+            list: Query results if successful, otherwise None.
         """
-        if self.credentials and self.type:
-            keys = self.credentials.keys()
-            adapter = DatasourceTypeChoices.get_adapter(self.type)
-            is_valid, message = adapter.verify_params(keys)
-            if is_valid:
-                super().save(*args, **kwargs)
-            else:
-                raise ValidationError(f"Missing required credentials: {message}")
-        else:
-            raise ValidationError("Invalid credentials or datasource type")
+        try:
+            self.adapter.connect()
+            success, result, message = self.adapter.query(query, params)
+            self.adapter.close()
 
-    def related_tables(self, table_name):
+            if success:
+                return result
+            else:
+                logger.error(f"Query failed: {message}")
+                return None
+        except Exception as e:
+            logger.error(f"Query execution error: {e}", exc_info=True)
+            return None
+
+    def save(self, *args, **kwargs):
+        """
+        Save the datasource instance after verifying the credentials and type.
+        """
+        try:
+            if not self.credentials or not self.type:
+                raise ValidationError("Invalid credentials or datasource type.")
+
+            required_keys = {"host", "database", "user", "password"}
+            if not required_keys.issubset(self.credentials.keys()):
+                missing_keys = required_keys - self.credentials.keys()
+                raise ValidationError(f"Missing required credentials: {missing_keys}")
+
+            if not self.test_connection():
+                raise ValidationError(f"Cannot connect to the DataSource: {self.name}")
+
+            super().save(*args, **kwargs)
+        except ValidationError as e:
+            logger.error(f"Validation error while saving DataSource '{self.name}': {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error while saving DataSource '{self.name}': {e}", exc_info=True)
+            raise
+
+    def related_tables(self, table_name: str):
+        """
+        Retrieve related tables for a given table using foreign key constraints.
+
+        Args:
+            table_name (str): The table name to find related tables for.
+
+        Returns:
+            list: A list of related tables and columns.
+        """
         query = """
         SELECT
             tc.table_name AS related_table,
@@ -147,17 +184,14 @@ class DataSource(BaseModel):
             information_schema.key_column_usage AS kcu
         ON
             tc.constraint_name = kcu.constraint_name
-        AND
-            tc.table_schema = kcu.table_schema
+            AND tc.table_schema = kcu.table_schema
         JOIN
             information_schema.constraint_column_usage AS ccu
         ON
             ccu.constraint_name = tc.constraint_name
-        AND
-            ccu.table_schema = tc.table_schema
+            AND ccu.table_schema = tc.table_schema
         WHERE
             tc.constraint_type = 'FOREIGN KEY'
-        AND
-            ccu.table_name = %s;
+            AND ccu.table_name = %s;
         """
         return self.query(query, [table_name])

@@ -163,3 +163,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "userauth.CustomUser"
 
 APPEND_SLASH = False
+AUTH_USER_MODEL = 'userauth.CustomUser'
+
+DATABASE_ROUTERS = ["datasmith.db_router.DatabaseRouter"]

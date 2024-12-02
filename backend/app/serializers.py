@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import MyModel  # Replace with your actual model
+from .models.main import MyModel  # Replace with your actual model
 
 
 class MyModelSerializer(serializers.ModelSerializer):
