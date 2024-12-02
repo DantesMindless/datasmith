@@ -5,7 +5,7 @@ from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
-
+from .adapters.postgres import  PostgresConnection
 from .constants.choices import DatasourceTypeChoices
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,20 @@ class DataCluster(BaseModel):
         verbose_name = "Data Cluster"
         verbose_name_plural = "Data Clusters"
 
+class DatasourceTypeChoices(models.TextChoices):
+    POSTGRES = 'postgres', 'PostgreSQL'
+    MYSQL = 'mysql', 'MySQL'
+    SQLITE = 'sqlite', 'SQLite'
+
+    @staticmethod
+    def get_adapter(db_type):
+        if db_type == DatasourceTypeChoices.POSTGRES:
+            return PostgresConnection
+        # elif db_type == DatasourceTypeChoices.MYSQL:
+        #     return MySQLAdapter
+        # elif db_type == DatasourceTypeChoices.SQLITE:
+        #     return SQLiteAdapter
+        raise ValueError(f"Invalid datasource type: {db_type}")
 
 class DataSource(BaseModel):
     """
@@ -77,7 +91,7 @@ class DataSource(BaseModel):
         Raises:
             ValueError: If the datasource type is invalid.
         """
-        return DatasourceTypeChoices.get_adapter(self.type)
+        return DatasourceTypeChoices.get_adapter(self.type)(**self.credentials)
 
     @cached_property
     def connection(self):
@@ -91,12 +105,13 @@ class DataSource(BaseModel):
 
     def query(self, query, params=None) -> list:
         try:
-            self.connection.connect()
-            result = self.connection.query(query, params)
-            self.connection.close()
+            self.adapter.connect()
+            result = self.adapter.query(query, params)
+            self.adapter.close()
             return result
         except Exception:
-            logging.error("Failed to execute the query.", exc_info=True)
+            logging.error("Query execution failed.", exc_info=True)
+            return None
 
     def test_connection(self):
         """

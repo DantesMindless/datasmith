@@ -1,6 +1,7 @@
 from django.db import models
 from core.models import BaseModel
 from app.models.test import QuadraticTrainingData
+from datasource.models import DataSource
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -152,12 +153,15 @@ class NeuralNetworkModel(BaseModel):
 
         return np.array(inputs), np.array(outputs)
 
-    def train_model(self):
+    def train_model(self, datasource_id, table_name):
         """
-        Train the model using data from the test database and upload it to MinIO.
+        Train the model using data fetched from a DataSource.
         """
-        # Fetch test data
-        inputs, outputs = self.get_test_data()
+        datasource = DataSource.objects.get(id=datasource_id)
+        data = datasource.query(f"SELECT * FROM {table_name}")
+
+        inputs = np.array([list(row[:-1]) for row in data])
+        outputs = np.array([row[-1] for row in data])
 
         model = self.create_model()
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
@@ -166,17 +170,15 @@ class NeuralNetworkModel(BaseModel):
         inputs_tensor = torch.from_numpy(inputs).float()
         outputs_tensor = torch.from_numpy(outputs).float()
 
-        num_epochs = self.epochs
-        batch_size = self.batch_size
-        num_batches = inputs_tensor.size(0) // batch_size
+        num_batches = inputs_tensor.size(0) // self.batch_size
 
-        for epoch in range(num_epochs):
+        for epoch in range(self.epochs):
             model.train()
             for i in range(num_batches):
-                batch_start = i * batch_size
-                batch_end = batch_start + batch_size
-                batch_inputs = inputs_tensor[batch_start:batch_end]
-                batch_outputs = outputs_tensor[batch_start:batch_end]
+                start = i * self.batch_size
+                end = start + self.batch_size
+                batch_inputs = inputs_tensor[start:end]
+                batch_outputs = outputs_tensor[start:end]
 
                 optimizer.zero_grad()
                 predictions = model(batch_inputs)
@@ -184,23 +186,11 @@ class NeuralNetworkModel(BaseModel):
                 loss.backward()
                 optimizer.step()
 
-            if (epoch + 1) % 100 == 0:
-                print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.6f}")
+            if (epoch + 1) % 10 == 0:
+                print(f"Epoch {epoch + 1}/{self.epochs}, Loss: {loss.item():.6f}")
 
-        # Serialize the model to an in-memory buffer
-        buffer = io.BytesIO()
-        torch.save(model.state_dict(), buffer)
-        buffer.seek(0)  # Reset the buffer position
-
-        # Upload the model to MinIO
-        bucket_name = "models"
-        key = f"{self.name}_trained_model.pt"
-        self._upload_to_minio(buffer, bucket_name, key)
-
-        # Update the `trained_model_path` to the MinIO key
-        self.trained_model_path = key
-        self.save()
-
+        self._save_trained_model(model)
+        
     def predict(self, input_data):
         """
         Use the trained model to make predictions.
@@ -221,7 +211,17 @@ class NeuralNetworkModel(BaseModel):
         with torch.no_grad():
             predictions = model(input_tensor)
         return predictions
-
+    def _save_trained_model(self, model):
+            """
+            Save the trained model to MinIO.
+            """
+            buffer = io.BytesIO()
+            torch.save(model.state_dict(), buffer)
+            buffer.seek(0)
+            self._upload_to_minio(buffer, bucket_name="models", key=f"{self.name}_trained_model.pt")
+            self.trained_model_path = f"{self.name}_trained_model.pt"
+            self.save()
+            print("Model saved and uploaded to MinIO.")
     ### MinIO Helpers ###
 
     def _upload_to_minio(self, buffer, bucket_name, key):
