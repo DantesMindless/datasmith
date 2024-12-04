@@ -7,6 +7,10 @@ from ..adapters import (
     PostgresConnection,
 )
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class DatasourceTypeChoices(models.TextChoices):
     """
@@ -46,7 +50,8 @@ class DatasourceTypeChoices(models.TextChoices):
         # elif self == DatasourceTypeChoices.PANDAS:
         # return PandasMySQLQueryEngine
         else:
-            raise ValueError("Invalid datasource type")
+            logger.error(f"Invalid datasource type: {self}")
+            return None
 
     @classmethod
     def choices_list(cls):

@@ -62,6 +62,12 @@ class DataSourceTablesMetadataView(APIView):
             return Response(message, status=status.HTTP_400_BAD_REQUEST)
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
 
+    def put(self, request: HttpRequest, id: uuid) -> Response:
+        if datasource := DataSource.objects.filter(id=id).first():
+            data = datasource.update_metadata()
+            return Response(data)
+        return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
+
 
 class DataSourceTestConnectionView(APIView):
     def get(self, request: HttpRequest, id: uuid) -> Response:

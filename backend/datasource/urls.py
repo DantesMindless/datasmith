@@ -32,4 +32,9 @@ urlpatterns = [
         DataSourceTablesMetadataView.as_view(),
         name="datasource-metadata",
     ),
+    path(
+        "datasource-metadata/update/<uuid:id>/",
+        DataSourceTablesMetadataView.as_view(),
+        name="datasource-metadata-update",
+    ),
 ]
