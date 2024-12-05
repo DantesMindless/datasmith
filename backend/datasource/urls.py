@@ -3,6 +3,8 @@ from .views import (
     DataSourceView,
     DataSourceTestConnectionView,
     DataSourceTablesMetadataView,
+    DataSourceSchemasMetadataView,
+    DataSourceDetailMetadataView,
 )
 
 urlpatterns = [
@@ -28,12 +30,27 @@ urlpatterns = [
         name="datasource-test",
     ),
     path(
-        "datasource-metadata/<uuid:id>/<str:table_name>/",
-        DataSourceTablesMetadataView.as_view(),
+        "datasource-metadata/tables/<uuid:id>/",
+        DataSourceDetailMetadataView.as_view(),
         name="datasource-metadata",
     ),
     path(
-        "datasource-metadata/update/<uuid:id>/",
+        "datasource-metadata/tables/<uuid:id>/<str:table_name>/",
+        DataSourceDetailMetadataView.as_view(),
+        name="datasource-metadata",
+    ),
+    path(
+        "datasource-metadata/tables/<uuid:id>/",
+        DataSourceDetailMetadataView.as_view(),
+        name="datasource-metadata-update",
+    ),
+    path(
+        "datasource-metadata/schemas/<uuid:id>/",
+        DataSourceSchemasMetadataView.as_view(),
+        name="datasource-metadata-update",
+    ),
+    path(
+        "datasource-metadata/schemas/<uuid:id>/<str:schema>/",
         DataSourceTablesMetadataView.as_view(),
         name="datasource-metadata-update",
     ),

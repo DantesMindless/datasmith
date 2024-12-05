@@ -129,12 +129,23 @@ class DataSource(BaseModel):
             adapter = DatasourceTypeChoices.get_adapter(self.type)
             is_valid, message = adapter.verify_params(keys)
             if is_valid:
-                self.update_metadata()
                 super().save(*args, **kwargs)
             else:
                 raise ValidationError(f"Missing required credentials: {message}")
         else:
             raise ValidationError("Invalid credentials or datasource type")
+
+    def get_tables(self, schema: str = "public"):
+        self.connection.connect()
+        data = self.connection.get_tables(schema)
+        self.connection.close()
+        return data
+
+    def get_schemas(self):
+        self.connection.connect()
+        data = self.connection.get_schemas()
+        self.connection.close()
+        return data
 
     def update_metadata(self):
         self.connection.connect()

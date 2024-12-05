@@ -45,7 +45,7 @@ class PostgresConnection(VerifyImputsMixin):
 
             if cursor.description:
                 result = cursor.fetchall()
-                return True, result, "No Data"
+                return True, result, "Success"
             else:
                 self.connection.commit()
                 return True, None, "Success"
@@ -59,11 +59,21 @@ class PostgresConnection(VerifyImputsMixin):
         if self.connection:
             self.connection.close()
 
-    def get_tables(self):
+    def get_schemas(self):
         query = """
-        SELECT * FROM information_schema.tables as t WHERE t.table_schema = 'public';
+                SELECT schema_name
+                FROM information_schema.schemata;
+                """
+        success, data, message = self.query(query)
+        if data:
+            data = [schema["schema_name"] for schema in data]
+        return success, data, message
+
+    def get_tables(self, schema: str = "public"):
+        query = f"""
+        SELECT * FROM information_schema.tables as t WHERE t.table_schema = '{schema}';
         """
-        return self.query(query)[1]
+        return self.query(query)
 
     def related_tables(self, table_name):
         query = """
@@ -123,7 +133,7 @@ class PostgresConnection(VerifyImputsMixin):
         cache = LFUCache(maxsize=1024)
         tables = {}
         tables_relations = {}
-        tables_list = self.get_tables()
+        tables_list = self.get_tables()[1]
 
         def get_relationships(table_name, scanned_tables=None):
             if data := cache.get(table_name):

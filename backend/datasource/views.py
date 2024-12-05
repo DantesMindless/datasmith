@@ -51,21 +51,53 @@ class DataSourceView(APIView):
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
 
 
-class DataSourceTablesMetadataView(APIView):
-    def get(self, request: HttpRequest, id: uuid, table_name: str) -> Response:
+class DataSourceDetailMetadataView(APIView):
+    def get(self, request: HttpRequest, id: uuid, table_name: str = None) -> Response:
         if datasource := DataSource.objects.filter(id=id).first():
-            success, data, message = datasource.related_tables(table_name)
-            if success and data is not None:
-                return Response(data)
-            elif success:
-                return Response(message)
-            return Response(message, status=status.HTTP_400_BAD_REQUEST)
+            if table_name:
+                if metadata := datasource.metadata.get(table_name):
+                    return Response(metadata)
+                else:
+                    data = datasource.update_metadata()
+                    if table := data.get(table_name):
+                        return Response(table)
+                    return Response("Table not found", status=status.HTTP_404_NOT_FOUND)
+            else:
+                if datasource.metadata and (tables_list := datasource.metadata.keys()):
+                    return Response(tables_list)
+                else:
+                    data = datasource.update_metadata()
+                    if table := data.get(table_name):
+                        return Response(table)
+                    return Response("Table not found", status=status.HTTP_404_NOT_FOUND)
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request: HttpRequest, id: uuid) -> Response:
         if datasource := DataSource.objects.filter(id=id).first():
             data = datasource.update_metadata()
             return Response(data)
+        return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class DataSourceTablesMetadataView(APIView):
+    def get(self, request: HttpRequest, id: uuid, schema: str) -> Response:
+        if datasource := DataSource.objects.filter(id=id).first():
+            success, data, message = datasource.get_tables(schema)
+            if success:
+                return Response(data)
+            else:
+                return Response(message, status=status.HTTP_404_NOT_FOUND)
+        return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class DataSourceSchemasMetadataView(APIView):
+    def get(self, request: HttpRequest, id: uuid) -> Response:
+        if datasource := DataSource.objects.filter(id=id).first():
+            success, data, message = datasource.get_schemas()
+            if success:
+                return Response(data)
+            else:
+                return Response(message, status=status.HTTP_404_NOT_FOUND)
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
 
 
