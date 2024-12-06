@@ -27,9 +27,8 @@ class DatasourceTypeChoices(models.TextChoices):
     """
 
     POSTGRES = "POSTGRES", "Postgres"
-    MYSQL = "MYSQL", "MySQL"
-    MONGO = "MONGO", "MongoDB"
-    REDIS = "REDIS", "Redis"
+    MYSQL = "MYSQL", "Mysql" 
+    # MONGO = "MONGO", "MongoDB"
     # PANDAS = "PANDAS", "Pandas"
 
     def get_adapter(

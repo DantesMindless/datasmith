@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # 3d party
+    "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",
     "django_extensions",
@@ -71,8 +72,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.common.CommonMiddleware",
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -187,11 +188,11 @@ AUTH_USER_MODEL = "userauth.CustomUser"
 
 DATABASE_ROUTERS = ["datasmith.db_router.DatabaseRouter"]
 
+CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React frontend
     "http://127.0.0.1:3000",  # Alternate local frontend
-    "https://localhost",
-    "http://localhost",  # Local frontend
 ]
 
 CORS_ALLOW_METHODS = [
@@ -201,8 +202,3 @@ CORS_ALLOW_METHODS = [
     "DELETE",
     "OPTIONS",
 ]
-
-
-CELERY_BROKER_URL = (os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),)
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"

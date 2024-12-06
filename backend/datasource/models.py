@@ -6,13 +6,6 @@ from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
-from datasource.adapters import (
-    PostgresConnection,
-    MySQLConnection,
-    MongoDBConnection,
-    RedisConnection,
-)
-
 from .constants.choices import DatasourceTypeChoices
 
 logger = logging.getLogger(__name__)
