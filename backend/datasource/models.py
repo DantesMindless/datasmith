@@ -5,8 +5,6 @@ from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
-from .adapters.postgres import PostgresConnection
-from .adapters.mysql import MySQLConnection
 from .constants.choices import DatasourceTypeChoices
 
 logger = logging.getLogger(__name__)
@@ -36,20 +34,6 @@ class DataCluster(BaseModel):
         verbose_name = "Data Cluster"
         verbose_name_plural = "Data Clusters"
 
-class DatasourceTypeChoices(models.TextChoices):
-    POSTGRES = 'postgres', 'PostgreSQL'
-    MYSQL = 'mysql', 'MySQL'
-    SQLITE = 'sqlite', 'SQLite'
-
-    @staticmethod
-    def get_adapter(db_type):
-        if db_type == DatasourceTypeChoices.POSTGRES:
-            return PostgresConnection
-        elif db_type == DatasourceTypeChoices.MYSQL:
-            return MySQLConnection
-        elif db_type == DatasourceTypeChoices.SQLITE:
-            return SQLiteAdapter
-        raise ValueError(f"Invalid datasource type: {db_type}")
 
 class DataSource(BaseModel):
     """

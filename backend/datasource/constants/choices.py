@@ -23,7 +23,7 @@ class DatasourceTypeChoices(models.TextChoices):
     """
 
     POSTGRES = "POSTGRES", "Postgres"
-    MYSQL = "MYSQL", "MySQL"
+    MYSQL = "MYSQL", "Mysql" 
     # MONGO = "MONGO", "MongoDB"
     # PANDAS = "PANDAS", "Pandas"
 

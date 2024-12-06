@@ -10,8 +10,12 @@ class DataSourceSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_at", "updated_at"]
 
     def validate_type(self, value):
+        # Normalize to uppercase to match TextChoices
+        value = value.upper()
         if value not in DatasourceTypeChoices.choices_list():
-            raise serializers.ValidationError("Invalid datasource type")
+            raise serializers.ValidationError(
+                f"Invalid datasource type: '{value}'. Valid types are: {DatasourceTypeChoices.choices_list()}"
+            )
         return value
 
     def validate_credentials(self, value):
@@ -23,7 +27,6 @@ class DataSourceSerializer(serializers.ModelSerializer):
             adapter := DatasourceTypeChoices.get_adapter(self.initial_data.get("type"))
         ):
             raise serializers.ValidationError("Connection type")
-        print(adapter.verify_params(value))
         _, message = adapter.verify_params(value)
         if message:
             raise serializers.ValidationError(f"Missing credentials: {message}")
