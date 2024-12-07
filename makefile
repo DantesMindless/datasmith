@@ -1,0 +1,35 @@
+# Makefile for Flask + Vue.js Full-Stack Application in Development Containers
+#
+# Targets:
+#   start            Start the development containers using Docker Compose.
+#   db-upgrade       Apply the latest database schema migrations.
+#   migrate          Generate a new database migration.
+#   drop-all         Stop and remove all containers, networks, and volumes, and prune unused data.
+#   drop             Stop and remove all containers without pruning.
+#   seed             Seed the database with initial data.
+#   units            Run all backend tests.
+#   unit             Run unit tests for a specific test file. usage: make unit f=<test_file>
+#   shell            Run a shell in the API container.
+#   test-backend     Run all backend tests.
+#   help             Display Makefile targets.
+# Define variables
+DOCKER_COMPOSE_FILE := docker-compose.devcontainer.yml
+ENV_FILE := .env.dev
+API_CONTAINER := datasmith-django-1
+UI_CONTAINER := deep-web-ui-1
+# Targets
+.PHONY: start
+start: ## Start the development containers using Docker Compose.
+	docker compose up -d
+.PHONY: stop
+stop: ## Start the development containers using Docker Compose.
+	docker compose  stop
+.PHONY: migrate
+migrate: ## Upgrade the database schema to the latest revision.
+	docker exec -it $(API_CONTAINER) poetry run python manage.py migrate
+.PHONY: makemigrations
+makemigrations: ## Upgrade the database schema to the latest revision.
+	docker exec -it $(API_CONTAINER) poetry run python manage.py makemigrations
+.PHONY: test
+test: ## Upgrade the database schema to the latest revision.
+	docker exec -it $(API_CONTAINER) poetry run python manage.py test

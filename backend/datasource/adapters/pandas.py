@@ -1,4 +1,3 @@
-import pandas as pd
 import pandasql as psql
 
 from .mixins import VerifyImputsMixin

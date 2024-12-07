@@ -66,7 +66,7 @@ class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now_add=True)
 
-    def soft_delete(self):
+    def soft_delete(self) -> None:
         """
         Marks the object as deleted by setting the 'deleted' attribute to True and saves the change to the database.
         """

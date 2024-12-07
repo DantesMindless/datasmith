@@ -1,5 +1,6 @@
 import logging
 from functools import cached_property
+from typing import Any, Dict, List, Optional, Union
 
 from core.models import BaseModel
 from django.core.exceptions import ValidationError
@@ -13,17 +14,13 @@ logger = logging.getLogger(__name__)
 
 class DataCluster(BaseModel):
     """
-    DataCluster model represents a cluster of data associated with a user and a datasource.
+    Represents a cluster of data associated with a user and a datasource.
 
     Attributes:
-        name (CharField): The name of the data cluster, with a maximum length of 255 characters.
-        description (TextField): A detailed description of the data cluster.
-        user (ForeignKey): A reference to the user who owns the data cluster, linked to the auth.User model.
-        datasource (ForeignKey): A reference to the datasource associated with the data cluster, linked to the DataSource model.
-
-    Meta:
-        verbose_name (str): The singular name for the model in the admin interface.
-        verbose_name_plural (str): The plural name for the model in the admin interface.
+        name (str): The name of the data cluster.
+        description (str): A detailed description of the data cluster.
+        user (ForeignKey): Reference to the user who owns the data cluster.
+        datasource (ForeignKey): Reference to the associated data source.
     """
 
     name = models.CharField(max_length=255)
@@ -38,18 +35,15 @@ class DataCluster(BaseModel):
 
 class DataSource(BaseModel):
     """
-    DataSource model represents a data source configuration.
+    Represents a data source configuration.
 
     Attributes:
         name (str): The name of the data source.
-        type (str): The type of the data source, chosen from predefined choices.
+        type (str): The type of the data source (e.g., POSTGRES, MYSQL).
         description (str): A detailed description of the data source.
-        user (ForeignKey): A reference to the user who owns this data source.
-        credentioals (JSONField): A JSON field to store credentials for accessing the data source.
-
-    Meta:
-        verbose_name (str): The human-readable name of the model.
-        verbose_name_plural (str): The human-readable plural name of the model.
+        user (ForeignKey): Reference to the user who owns this data source.
+        credentials (Dict[str, Any]): Credentials for accessing the data source.
+        metadata (Optional[Dict[str, Any]]): Cached metadata about the data source.
     """
 
     name = models.CharField(max_length=255)
@@ -68,12 +62,12 @@ class DataSource(BaseModel):
         verbose_name_plural = "Data Sources"
 
     @cached_property
-    def adapter(self):
+    def adapter(self) -> Any:
         """
-        Returns the appropriate adapter class based on the datasource type.
+        Retrieve the adapter class for the current datasource type.
 
         Returns:
-            class: The adapter class corresponding to the datasource type.
+            Any: The adapter class corresponding to the datasource type.
 
         Raises:
             ValueError: If the datasource type is invalid.
@@ -81,45 +75,49 @@ class DataSource(BaseModel):
         return DatasourceTypeChoices.get_adapter(self.type)
 
     @cached_property
-    def connection(self):
+    def connection(self) -> Any:
         """
-        Establishes a connection using the adapter and credentials provided.
+        Establish a connection using the adapter and provided credentials.
 
         Returns:
-            object: A connection object created by the adapter.
+            Any: A connection object created by the adapter.
         """
         return self.adapter(**self.credentials)
 
-    def query(self, query, params=None) -> list:
+    def query(
+        self, query: str, params: Optional[Union[Dict[str, Any], List[Any]]] = None
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Execute a query against the datasource.
+
+        Args:
+            query (str): The SQL query to execute.
+            params (Optional[Union[Dict[str, Any], List[Any]]]): Query parameters.
+
+        Returns:
+            Optional[List[Dict[str, Any]]]: Query result or None if an error occurs.
+        """
         try:
             self.connection.connect()
             result = self.connection.query(query, params)
             self.connection.close()
             return result
-        except Exception:
-            logging.error("Failed to execute the query.", exc_info=True)
+        except Exception as e:
+            logger.error(f"Failed to execute the query: {e}", exc_info=True)
+            return None
 
-    def test_connection(self):
+    def test_connection(self) -> bool:
         """
-        Tests the connection to the datasource.
+        Test the connection to the datasource.
 
         Returns:
             bool: True if the connection is successful, False otherwise.
         """
-        return self.connection.test_conection()
+        return self.connection.test_connection()
 
-    def save(self, *args, **kwargs) -> None:
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """
-        Save the datasource instance after verifying the credentials and type.
-
-        This method overrides the default save method to include validation
-        of the datasource credentials and type before saving the instance.
-        If the credentials and type are valid, the instance is saved using
-        the superclass's save method. Otherwise, a ValidationError is raised.
-
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+        Save the datasource instance after validating credentials and type.
 
         Raises:
             ValidationError: If the credentials or datasource type are invalid.
@@ -135,19 +133,40 @@ class DataSource(BaseModel):
         else:
             raise ValidationError("Invalid credentials or datasource type")
 
-    def get_tables(self, schema: str = "public"):
+    def get_tables(self, schema: str = "public") -> Optional[List[Dict[str, Any]]]:
+        """
+        Retrieve tables within a specified schema.
+
+        Args:
+            schema (str): The schema to query (default: "public").
+
+        Returns:
+            Optional[List[Dict[str, Any]]]: List of tables or None if an error occurs.
+        """
         self.connection.connect()
         data = self.connection.get_tables(schema)
         self.connection.close()
         return data
 
-    def get_schemas(self):
+    def get_schemas(self) -> Optional[List[str]]:
+        """
+        Retrieve available schemas in the datasource.
+
+        Returns:
+            Optional[List[str]]: List of schema names or None if an error occurs.
+        """
         self.connection.connect()
         data = self.connection.get_schemas()
         self.connection.close()
         return data
 
-    def update_metadata(self):
+    def update_metadata(self) -> Optional[Dict[str, Any]]:
+        """
+        Update and save the metadata for the datasource.
+
+        Returns:
+            Optional[Dict[str, Any]]: The updated metadata or None if an error occurs.
+        """
         self.connection.connect()
         self.metadata = self.connection.get_metadata()
         self.connection.close()

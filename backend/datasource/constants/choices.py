@@ -1,9 +1,10 @@
 from django.db import models
+from typing import Type, Optional, List
 
 from ..adapters import (
-    #     MongoDBAdapter,
+    # MongoDBAdapter,
     MySQLConnection,
-    #     PandasMySQLQueryEngine,
+    # PandasMySQLQueryEngine,
     PostgresConnection,
 )
 
@@ -19,11 +20,10 @@ class DatasourceTypeChoices(models.TextChoices):
     Attributes:
         POSTGRES (str): Represents a PostgreSQL datasource.
         MYSQL (str): Represents a MySQL datasource.
-        MONGO (str): Represents a MongoDB datasource.
-        PANDAS (str): Represents a Pandas datasource.
 
     Methods:
-        get_adapter():
+        get_adapter(): Returns the appropriate adapter class based on the datasource type.
+        choices_list(): Returns a list of all available datasource types.
     """
 
     POSTGRES = "POSTGRES", "Postgres"
@@ -31,15 +31,13 @@ class DatasourceTypeChoices(models.TextChoices):
     # MONGO = "MONGO", "MongoDB"
     # PANDAS = "PANDAS", "Pandas"
 
-    def get_adapter(self):
+    def get_adapter(self) -> Optional[Type]:
         """
         Returns the appropriate adapter class based on the datasource type.
 
         Returns:
-            class: The adapter class corresponding to the datasource type.
-
-        Raises:
-            ValueError: If the datasource type is invalid.
+            Optional[Type]: The adapter class corresponding to the datasource type,
+                            or None if the type is invalid.
         """
         if self == DatasourceTypeChoices.POSTGRES:
             return PostgresConnection
@@ -48,11 +46,17 @@ class DatasourceTypeChoices(models.TextChoices):
         # elif self == DatasourceTypeChoices.MONGO:
         #     return MongoDBAdapter
         # elif self == DatasourceTypeChoices.PANDAS:
-        # return PandasMySQLQueryEngine
+        #     return PandasMySQLQueryEngine
         else:
             logger.error(f"Invalid datasource type: {self}")
             return None
 
     @classmethod
-    def choices_list(cls):
+    def choices_list(cls) -> List[str]:
+        """
+        Returns a list of all available datasource types.
+
+        Returns:
+            List[str]: A list of datasource type identifiers.
+        """
         return [choice[0] for choice in cls.choices]
