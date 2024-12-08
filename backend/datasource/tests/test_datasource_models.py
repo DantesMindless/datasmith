@@ -14,27 +14,41 @@ class DataSourceModelTestCase(TestCase):
         user: Any = User.objects.create_superuser(
             username="admin", email="admin@example.com", password="password"
         )
-        DataSource(
+        self.ds_OK = DataSource.objects.create(
             name="Postgres",
             type="POSTGRES",
             description="Test Postgres connection",
             created_by=user,
             user=user,
             credentials={
-                "host": "db",
+                "host": "postgres",
                 "port": 5432,
-                "database": "postgres",
+                "database": "mydatabase",
                 "user": "user",
-                "password": "datasmith",
+                "password": "password",
             },
-        ).save()
+        )
+        self.ds_BAD = DataSource.objects.create(
+            name="Postgres",
+            type="POSTGRES",
+            description="Test Postgres connection",
+            created_by=user,
+            user=user,
+            credentials={
+                "host": "postgres",
+                "port": 5432,
+                "database": "mydatabase",
+                "user": "user",
+                "password": "badpassword",
+            },
+        )
 
     def test_model_count(self) -> None:
         """
         Test that the DataSource model count matches the expected value.
         """
         count: int = DataSource.objects.count()
-        self.assertEqual(count, 1)
+        self.assertEqual(count, 2)
 
     def test_model_postgres_adapter(self) -> None:
         """
@@ -47,7 +61,14 @@ class DataSourceModelTestCase(TestCase):
         """
         Test that the DataSource adapter can successfully establish a connection.
         """
-        ds: DataSource = DataSource.objects.first()
-        self.assertTrue(ds.adapter)
-        if ds.adapter:
-            self.assertTrue(ds.test_connection())
+        self.assertTrue(self.ds_OK.adapter)
+        if self.ds_OK.adapter:
+            self.assertTrue(self.ds_OK.test_connection())
+
+    def test_model_postgres_connection_error_handling(self) -> None:
+        """
+        Test that the DataSource adapter can successfully establish a connection.
+        """
+        self.assertTrue(self.ds_BAD.adapter)
+        if self.ds_BAD.adapter:
+            self.assertFalse(self.ds_BAD.test_connection())
