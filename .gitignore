@@ -3,4 +3,4 @@
 /package-lock.json
 backend/staticfiles/
 backend/poetry.lock
-.rest
+*.rest
