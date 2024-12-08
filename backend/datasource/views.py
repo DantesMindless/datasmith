@@ -5,29 +5,34 @@ from django.contrib.auth import get_user_model
 from django.http import HttpRequest
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from datasource.models import DataSource
 from datasource.serializers import DataSourceSerializer
-from enum import Enum
+from enum import StrEnum
+from core.views import BaseAuthApiView
+from django.db.models import Q
 
 User = get_user_model()
 
 
-class DatasourceResponses(Enum):
+class DatasourceResponses(StrEnum):
     DS_NOT_FOUND = "Datasource not found"
     DS_CONNECTIONS_SUCCESS = "Connection successful"
     DS_CONNECTIONS_FAIL = "Connection Fail"
 
 
-class DataSourceView(APIView):
+class DataSourceView(BaseAuthApiView):
     def get(self, request: HttpRequest, id: Optional[UUID] = None) -> Response:
         if id:
-            if datasource := DataSource.objects.filter(id=id).first():
+            if (
+                datasource := DataSource.objects.filter(id=id)
+                .filter((Q(user_id=request.user.id) | Q(created_by=request.user.id)))
+                .first()
+            ):
                 serializer = DataSourceSerializer(datasource)
                 return Response(serializer.data)
             return Response(
-                DatasourceResponses.DS_NOT_FOUND.value, status=status.HTTP_404_NOT_FOUND
+                DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
             )
         else:
             datasources = DataSource.objects.all()
@@ -35,11 +40,11 @@ class DataSourceView(APIView):
             return Response(serializer.data)
 
     def post(self, request: HttpRequest) -> Response:
-        if not (user := User.objects.first()):
+        if not User.objects.first():
             return Response("User not found", status=status.HTTP_404_NOT_FOUND)
         data = request.data
-        data["user"] = user.id
-        data["created_by"] = user.id
+        data["user"] = request.user.id
+        data["created_by"] = request.user.id
         serializer = DataSourceSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -58,11 +63,11 @@ class DataSourceView(APIView):
                 return Response(message)
             return Response(message, status=status.HTTP_400_BAD_REQUEST)
         return Response(
-            DatasourceResponses.DS_NOT_FOUND.value, status=status.HTTP_404_NOT_FOUND
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
 
-class DataSourceDetailMetadataView(APIView):
+class DataSourceDetailMetadataView(BaseAuthApiView):
     def get(
         self, request: HttpRequest, id: UUID, table_name: Optional[str] = None
     ) -> Response:
@@ -85,7 +90,7 @@ class DataSourceDetailMetadataView(APIView):
                     data = datasource.update_metadata()
                     return Response(data)
         return Response(
-            DatasourceResponses.DS_NOT_FOUND.value, status=status.HTTP_404_NOT_FOUND
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
     def put(self, request: HttpRequest, id: UUID) -> Response:
@@ -93,11 +98,11 @@ class DataSourceDetailMetadataView(APIView):
             data = datasource.update_metadata()
             return Response(data)
         return Response(
-            DatasourceResponses.DS_NOT_FOUND.value, status=status.HTTP_404_NOT_FOUND
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
 
-class DataSourceTablesMetadataView(APIView):
+class DataSourceTablesMetadataView(BaseAuthApiView):
     def get(self, request: HttpRequest, id: UUID, schema: str) -> Response:
         """
         Retrieve tables lists
@@ -108,11 +113,11 @@ class DataSourceTablesMetadataView(APIView):
                 return Response(data)
             return Response(message, status=status.HTTP_404_NOT_FOUND)
         return Response(
-            DatasourceResponses.DS_NOT_FOUND.value, status=status.HTTP_404_NOT_FOUND
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
 
-class DataSourceSchemasMetadataView(APIView):
+class DataSourceSchemasMetadataView(BaseAuthApiView):
     def get(self, request: HttpRequest, id: UUID) -> Response:
         """
         Retrieve database schemas
@@ -123,35 +128,35 @@ class DataSourceSchemasMetadataView(APIView):
                 return Response(data)
             return Response(message, status=status.HTTP_404_NOT_FOUND)
         return Response(
-            DatasourceResponses.DS_NOT_FOUND.value, status=status.HTTP_404_NOT_FOUND
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
 
-class DataSourceTestConnectionView(APIView):
+class DataSourceTestConnectionView(BaseAuthApiView):
     def get(self, request: HttpRequest, id: UUID) -> Response:
         """
         Connections test for existing DS
         """
         if datasource := DataSource.objects.filter(id=id).first():
             if datasource.test_connection():
-                return Response(DatasourceResponses.DS_CONNECTIONS_SUCCESS.value)
+                return Response(DatasourceResponses.DS_CONNECTIONS_SUCCESS)
             return Response(
-                DatasourceResponses.DS_CONNECTIONS_FAIL.value,
+                DatasourceResponses.DS_CONNECTIONS_FAIL,
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(
-            DatasourceResponses.DS_NOT_FOUND.value, status=status.HTTP_404_NOT_FOUND
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
     def post(self, request: HttpRequest) -> Response:
         """
         Connections test before DS creation
         """
-        if not (user := User.objects.first()):
+        if not User.objects.first():
             return Response("User not found", status=status.HTTP_404_NOT_FOUND)
         data = request.data
-        data["user"] = user.id
-        data["created_by"] = user.id
+        data["user"] = request.user.id
+        data["created_by"] = request.user.id
         serializer = DataSourceSerializer(data=data)
         if serializer.is_valid():
             data_source = DataSource(
@@ -159,9 +164,9 @@ class DataSourceTestConnectionView(APIView):
                 credentials=serializer.data.get("credentials"),
             )
             if data_source.test_connection():
-                return Response(DatasourceResponses.DS_CONNECTIONS_SUCCESS.value)
+                return Response(DatasourceResponses.DS_CONNECTIONS_SUCCESS)
             return Response(
-                DatasourceResponses.DS_CONNECTIONS_FAIL.value,
+                DatasourceResponses.DS_CONNECTIONS_FAIL,
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

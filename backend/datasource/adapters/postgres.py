@@ -57,7 +57,7 @@ class PostgresConnection(VerifyInputsMixin):
             return False
 
     def query(
-        self, query: str, params: Optional[Tuple[Any, ...]] = None
+        self, query: str, params: Optional[Tuple[Any]] = None
     ) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Execute a SQL query and return the result.
@@ -98,12 +98,12 @@ class PostgresConnection(VerifyInputsMixin):
         if self.connection:
             self.connection.close()
 
-    def get_schemas(self) -> Tuple[bool, Optional[List[str]], str]:
+    def get_schemas(self) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Retrieve a list of schemas in the database.
 
         Returns:
-            Tuple[bool, Optional[List[str]], str]:
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]:
                 - Success status,
                 - List of schema names or None,
                 - Message.
@@ -221,7 +221,7 @@ class PostgresConnection(VerifyInputsMixin):
         Returns:
             Dict[str, Any]: Metadata for tables.
         """
-        cache: LFUCache = LFUCache(maxsize=1024)
+        cache: LFUCache[str, Any] = LFUCache(maxsize=1024)
         tables: Dict[str, Any] = {}
         tables_relations: Dict[str, List[Dict[str, Any]]] = {}
         tables_list = self.get_tables()[1]
@@ -229,8 +229,9 @@ class PostgresConnection(VerifyInputsMixin):
         def get_relationships(
             table_name: str, scanned_tables: Optional[Set[str]] = None
         ) -> Dict[str, Any]:
-            if data := cache.get(table_name):
-                return data
+            data: Optional[Dict[str, Any]] = None
+            if data := cache.get(table_name, None):
+                return data if isinstance(data, dict) else {}
             if scanned_tables is None:
                 scanned_tables = set()
             table_relations: Dict[str, Any] = {}

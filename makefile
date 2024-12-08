@@ -33,3 +33,12 @@ makemigrations: ## Upgrade the database schema to the latest revision.
 .PHONY: test
 test: ## Upgrade the database schema to the latest revision.
 	docker exec -it $(API_CONTAINER) poetry run python manage.py test
+.PHONY: requirements
+requirements: ## Upgrade the database schema to the latest revision.
+	docker exec -it $(API_CONTAINER) poetry export --without-hashes --format=requirements.txt > requirements.txt
+.PHONY: lint
+lint: ## lint backend code
+	ruff check . --fix
+.PHONY: superuser
+superuser: ## lint backend code
+	docker exec -it $(API_CONTAINER) poetry run python manage.py create_superuser

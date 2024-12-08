@@ -1,10 +1,8 @@
 from django.db import models
-from typing import Type, Optional, List
+from typing import List, Optional, Type
 
 from ..adapters import (
     # MongoDBAdapter,
-    MySQLConnection,
-    # PandasMySQLQueryEngine,
     PostgresConnection,
 )
 
@@ -31,7 +29,7 @@ class DatasourceTypeChoices(models.TextChoices):
     # MONGO = "MONGO", "MongoDB"
     # PANDAS = "PANDAS", "Pandas"
 
-    def get_adapter(self) -> Optional[Type]:
+    def get_adapter(self) -> Optional[Type[PostgresConnection]]:
         """
         Returns the appropriate adapter class based on the datasource type.
 
@@ -41,8 +39,8 @@ class DatasourceTypeChoices(models.TextChoices):
         """
         if self == DatasourceTypeChoices.POSTGRES:
             return PostgresConnection
-        elif self == DatasourceTypeChoices.MYSQL:
-            return MySQLConnection
+        # elif self == DatasourceTypeChoices.MYSQL:
+        #     return MySQLConnection
         # elif self == DatasourceTypeChoices.MONGO:
         #     return MongoDBAdapter
         # elif self == DatasourceTypeChoices.PANDAS:

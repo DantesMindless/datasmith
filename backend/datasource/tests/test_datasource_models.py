@@ -48,4 +48,6 @@ class DataSourceModelTestCase(TestCase):
         Test that the DataSource adapter can successfully establish a connection.
         """
         ds: DataSource = DataSource.objects.first()
-        self.assertTrue(ds.adapter.test_connection)
+        self.assertTrue(ds.adapter)
+        if ds.adapter:
+            self.assertTrue(ds.test_connection())

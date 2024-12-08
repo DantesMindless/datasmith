@@ -1,11 +1,12 @@
 import logging
 from functools import cached_property
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Type, Tuple
 
 from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
+from datasource.adapters import PostgresConnection
 
 from .constants.choices import DatasourceTypeChoices
 
@@ -62,8 +63,8 @@ class DataSource(BaseModel):
         verbose_name_plural = "Data Sources"
 
     @cached_property
-    def adapter(self) -> Any:
-        """
+    def adapter(self) -> Optional[Type[PostgresConnection]]:
+        """]
         Retrieve the adapter class for the current datasource type.
 
         Returns:
@@ -75,7 +76,7 @@ class DataSource(BaseModel):
         return DatasourceTypeChoices.get_adapter(self.type)
 
     @cached_property
-    def connection(self) -> Any:
+    def connection(self) -> PostgresConnection:
         """
         Establish a connection using the adapter and provided credentials.
 
@@ -85,8 +86,8 @@ class DataSource(BaseModel):
         return self.adapter(**self.credentials)
 
     def query(
-        self, query: str, params: Optional[Union[Dict[str, Any], List[Any]]] = None
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, query: str, params: Optional[Tuple[Any]] = None
+    ) -> Optional[Tuple[bool, Optional[List[Dict[str, Any]]], str]]:
         """
         Execute a query against the datasource.
 
@@ -95,7 +96,7 @@ class DataSource(BaseModel):
             params (Optional[Union[Dict[str, Any], List[Any]]]): Query parameters.
 
         Returns:
-            Optional[List[Dict[str, Any]]]: Query result or None if an error occurs.
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]: Query result or None if an error occurs.
         """
         try:
             self.connection.connect()
@@ -125,6 +126,8 @@ class DataSource(BaseModel):
         if self.credentials and self.type:
             keys = self.credentials.keys()
             adapter = DatasourceTypeChoices.get_adapter(self.type)
+            if adapter is None:
+                raise ValidationError("Invalid datasource type")
             is_valid, message = adapter.verify_params(keys)
             if is_valid:
                 super().save(*args, **kwargs)
@@ -133,7 +136,9 @@ class DataSource(BaseModel):
         else:
             raise ValidationError("Invalid credentials or datasource type")
 
-    def get_tables(self, schema: str = "public") -> Optional[List[Dict[str, Any]]]:
+    def get_tables(
+        self, schema: str = "public"
+    ) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Retrieve tables within a specified schema.
 
@@ -144,19 +149,23 @@ class DataSource(BaseModel):
             Optional[List[Dict[str, Any]]]: List of tables or None if an error occurs.
         """
         self.connection.connect()
-        data = self.connection.get_tables(schema)
+        data: Tuple[bool, Optional[List[Dict[str, Any]]], str] = (
+            self.connection.get_tables(schema)
+        )
         self.connection.close()
         return data
 
-    def get_schemas(self) -> Optional[List[str]]:
+    def get_schemas(self) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Retrieve available schemas in the datasource.
 
         Returns:
-            Optional[List[str]]: List of schema names or None if an error occurs.
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]: List of schema names or None if an error occurs.
         """
         self.connection.connect()
-        data = self.connection.get_schemas()
+        data: Tuple[bool, Optional[List[Dict[str, Any]]], str] = (
+            self.connection.get_schemas()
+        )
         self.connection.close()
         return data
 
@@ -171,4 +180,5 @@ class DataSource(BaseModel):
         self.metadata = self.connection.get_metadata()
         self.connection.close()
         self.save()
-        return self.metadata
+        metadata: Optional[Dict[str, Any]] = self.metadata
+        return metadata
