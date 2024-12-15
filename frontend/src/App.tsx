@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState } from "react";
 import { CssVarsProvider } from "@mui/joy/styles";
 import CssBaseline from "@mui/joy/CssBaseline";
 import Box from "@mui/joy/Box";
@@ -9,20 +10,24 @@ import Typography from "@mui/joy/Typography";
 
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 
 import Sidebar from "./components/Sidebar";
-import OrderTable from "./components/DataSourcesTables";
-import OrderList from "./components/DataSourcesList";
+import DataSourcesTables from "./components/DataSourcesTables";
+import DataSourcesList from "./components/DataSourcesList";
 import Header from "./components/Header";
+import { pageComponents } from "./utils/constants";
 
 export default function JoyOrderDashboardTemplate() {
+  const [pageComponent, setPageComponent] = useState(
+    pageComponents.listConnections,
+  );
+
   return (
     <CssVarsProvider disableTransitionOnChange>
       <CssBaseline />
       <Box sx={{ display: "flex", minHeight: "100dvh" }}>
         <Header />
-        <Sidebar />
+        <Sidebar setPageComponent={setPageComponent} />
         <Box
           component="main"
           className="MainContent"
@@ -87,16 +92,8 @@ export default function JoyOrderDashboardTemplate() {
             <Typography level="h2" component="h1">
               Connections
             </Typography>
-            <Button
-              color="primary"
-              startDecorator={<DownloadRoundedIcon />}
-              size="sm"
-            >
-              Download PDF
-            </Button>
           </Box>
-          <OrderTable />
-          <OrderList />
+          <pageComponent.component/>
         </Box>
       </Box>
     </CssVarsProvider>
