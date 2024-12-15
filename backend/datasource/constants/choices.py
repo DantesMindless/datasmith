@@ -4,6 +4,7 @@ from typing import List, Optional, Type
 from ..adapters import (
     # MongoDBAdapter,
     PostgresConnection,
+    MySQLConnection
 )
 
 import logging
@@ -39,8 +40,8 @@ class DatasourceTypeChoices(models.TextChoices):
         """
         if self == DatasourceTypeChoices.POSTGRES:
             return PostgresConnection
-        # elif self == DatasourceTypeChoices.MYSQL:
-        #     return MySQLConnection
+        elif self == DatasourceTypeChoices.MYSQL:
+            return MySQLConnection
         # elif self == DatasourceTypeChoices.MONGO:
         #     return MongoDBAdapter
         # elif self == DatasourceTypeChoices.PANDAS:

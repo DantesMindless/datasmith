@@ -177,7 +177,13 @@ class PostgresConnection(VerifyInputsMixin):
         AND
             ccu.table_name = %s;
         """
-        return self.query(query, (table_name,))
+        success, data, message = self.query(query, (table_name,))
+        if success and data:
+            return True, data, "Related tables retrieved successfully."
+        elif success:
+            return False, None, f"No related tables found for table '{table_name}'."
+        else:
+            return False, None, message
 
     def get_table_columns(self, table_name: str) -> Optional[List[Dict[str, Any]]]:
         """

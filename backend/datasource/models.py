@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
 from datasource.adapters import PostgresConnection
+from datasource.adapters import MySQLConnection
 
 from .constants.choices import DatasourceTypeChoices
 
