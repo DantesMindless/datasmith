@@ -333,22 +333,20 @@ export default function OrderTable() {
                 <tr key={uuidv4()}>
                   {rowData}
                   <td>
-                  <Grid item xs={8}>
-                    <Button
-                      size="sm"
-                      variant="solid"
-                      color="primary"
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        width: "100%",
+                      }}
                     >
-                      View
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="solid"
-                      color="danger"
-                    >
-                      Delete
-                    </Button>
-                    </Grid>
+                      <Button size="sm" variant="solid" color="primary">
+                        View
+                      </Button>
+                      <Button size="sm" variant="solid" color="danger">
+                        Delete
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ); // Wrap the rowData in a <tr>

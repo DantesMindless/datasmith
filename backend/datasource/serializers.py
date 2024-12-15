@@ -4,6 +4,30 @@ from .models import DataSource
 from .constants.choices import DatasourceTypeChoices
 
 
+class DatasourceViewSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DataSource
+        fields = [
+            "id",
+            "name",
+            "type",
+            "user",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_user(self, obj: DataSource) -> str:
+        return obj.user.username or "System"
+
+    def get_created_by(self, obj: DataSource) -> str:
+        return obj.created_by.username or "System"
+
+
 class DataSourceSerializer(serializers.ModelSerializer):
     """
     Serializer for the DataSource model.

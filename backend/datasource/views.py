@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from datasource.models import DataSource
-from datasource.serializers import DataSourceSerializer
+from datasource.serializers import DataSourceSerializer, DatasourceViewSerializer
 from enum import StrEnum
 from core.views import BaseAuthApiView
 from django.db.models import Q
@@ -29,14 +29,14 @@ class DataSourceView(BaseAuthApiView):
                 .filter((Q(user_id=request.user.id) | Q(created_by=request.user.id)))
                 .first()
             ):
-                serializer = DataSourceSerializer(datasource)
+                serializer = DatasourceViewSerializer(datasource)
                 return Response(serializer.data)
             return Response(
                 DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
             )
         else:
             datasources = DataSource.objects.all()
-            serializer = DataSourceSerializer(datasources, many=True)
+            serializer = DatasourceViewSerializer(datasources, many=True)
             return Response(serializer.data)
 
     def post(self, request: HttpRequest) -> Response:

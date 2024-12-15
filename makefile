@@ -22,6 +22,9 @@ UI_CONTAINER := deep-web-ui-1
 .PHONY: start
 start: ## Start the development containers using Docker Compose.
 	docker compose up -d
+.PHONY: start-db
+start-db: ## Start the development containers using Docker Compose.
+	docker compose -f=docker-compose-db.yml up -d
 .PHONY: stop
 stop: ## Start the development containers using Docker Compose.
 	docker compose  stop
