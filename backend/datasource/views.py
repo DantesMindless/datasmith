@@ -11,6 +11,7 @@ from datasource.serializers import DataSourceSerializer, DatasourceViewSerialize
 from enum import StrEnum
 from core.views import BaseAuthApiView
 from django.db.models import Q
+from .constants.choices import DatasourceTypeChoices
 
 User = get_user_model()
 
@@ -170,3 +171,23 @@ class DataSourceTestConnectionView(BaseAuthApiView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DataSourceConnectionTypesView(BaseAuthApiView):
+    def get(self, request: HttpRequest) -> Response:
+        """
+        Retrieve Supported Connection Adapters
+        """
+        return Response(
+            DatasourceTypeChoices.supported_adapers(), status=status.HTTP_200_OK
+        )
+
+
+class DataSourceConnectionTypesFormFieldsView(BaseAuthApiView):
+    def get(self, request: HttpRequest, id: DatasourceTypeChoices) -> Response:
+        """
+        Retrieve Supported Connection Adapters
+        """
+        if datasource := DatasourceTypeChoices.get_adapter(id):
+            return Response(datasource.get_initial_params(), status=status.HTTP_200_OK)
+        return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)

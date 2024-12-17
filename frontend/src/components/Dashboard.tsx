@@ -293,64 +293,9 @@ export default function OrderTable() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, rowIndex) => {
-              const rowData = Object.values(row).map((element, colIndex) => {
-                if (skipIndexes.includes(colIndex)) {
-                  return;
-                }
-                let value;
-                if (typeof element === "string") {
-                  // Check if string can be parsed as a valid date
-                  if (
-                    element.includes("2024-") === true &&
-                    element.includes(":") === true
-                  ) {
-                    const parsedDate = Date.parse(element);
-                    if (!isNaN(parsedDate)) {
-                      // Format as a human-readable date
-                      value = new Date(parsedDate).toLocaleDateString();
-                    } else {
-                      value = element; // Return the string as-is
-                    }
-                  } else {
-                    value = element;
-                  }
-                } else if (typeof element === "boolean") {
-                  value = element ? "Yes" : "No"; // Handle booleans
-                } else if (typeof element === "object") {
-                  value = " "; // Handle objects (return space)
-                } else {
-                  value = element; // Default case for other types (e.g., numbers)
-                }
-
-                return (
-                  <td key={colIndex} style={{ textAlign: "center" }}>
-                    {value}
-                  </td>
-                ); // Render the value in a table cell
-              });
-              return (
-                <tr key={uuidv4()}>
-                  {rowData}
-                  <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        width: "100%",
-                      }}
-                    >
-                      <Button size="sm" variant="solid" color="primary">
-                        View
-                      </Button>
-                      <Button size="sm" variant="solid" color="danger">
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ); // Wrap the rowData in a <tr>
-            })}
+            <tr>
+              <td>Test data</td>
+            </tr>
           </tbody>
         </Table>
       </Sheet>

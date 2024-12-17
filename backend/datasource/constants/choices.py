@@ -1,11 +1,7 @@
 from django.db import models
-from typing import List, Optional, Type
+from typing import List, Optional, Union
 
-from ..adapters import (
-    # MongoDBAdapter,
-    PostgresConnection,
-    MySQLConnection
-)
+from ..adapters import PostgresConnection, MySQLConnection
 
 import logging
 
@@ -30,7 +26,9 @@ class DatasourceTypeChoices(models.TextChoices):
     # MONGO = "MONGO", "MongoDB"
     # PANDAS = "PANDAS", "Pandas"
 
-    def get_adapter(self) -> Optional[Type[PostgresConnection]]:
+    def get_adapter(
+        self,
+    ) -> Optional[Union[PostgresConnection, MySQLConnection]]:
         """
         Returns the appropriate adapter class based on the datasource type.
 
@@ -59,3 +57,13 @@ class DatasourceTypeChoices(models.TextChoices):
             List[str]: A list of datasource type identifiers.
         """
         return [choice[0] for choice in cls.choices]
+
+    @classmethod
+    def supported_adapers(cls) -> List[str]:
+        """
+        Returns a list of all available datasource types.
+
+        Returns:
+            List[str]: A list of datasource type identifiers.
+        """
+        return [{"value": choice[0], "title": choice[1]} for choice in cls.choices]

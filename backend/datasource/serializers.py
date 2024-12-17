@@ -71,10 +71,10 @@ class DataSourceSerializer(serializers.ModelSerializer):
                 f"Supported types are: {', '.join(DatasourceTypeChoices.choices_list())}."
             )
 
-        is_valid, missing_params = adapter.verify_params(list(value.keys()))
+        is_valid, missing_params = adapter.verify_params(value)
         if not is_valid:
             raise serializers.ValidationError(
-                f"Missing required credentials: {missing_params}"
+                detail=missing_params, code="missing_required_credentials"
             )
 
         return value

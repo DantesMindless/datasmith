@@ -1,6 +1,6 @@
 import DataSourcesTables from "../components/DataSourcesTables";
 import Dashboard from "../components/Dashboard";
-
+import CreateConnection from "../components/CreateConnection";
 
 export const pageComponents = {
   home: {
@@ -13,10 +13,15 @@ export const pageComponents = {
   },
   createConnection: {
     name: "Create Connection",
-    component: DataSourcesTables,
+    component: CreateConnection,
   },
   listConnections: {
     name: "List Connections",
     component: DataSourcesTables,
   },
+};
+
+export const fieldTypes = {
+  // CharField:
+  // InteggerField:
 };

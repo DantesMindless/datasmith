@@ -7,7 +7,21 @@ import json
 from .mixins import VerifyInputsMixin
 from cachetools import LFUCache
 
+from rest_framework import serializers
+
 logger = logging.getLogger(__name__)
+
+
+class MySQLConnectionSerializer(VerifyInputsMixin, serializers.Serializer):
+    host = serializers.CharField(max_length=255)
+    database = serializers.CharField(max_length=255)
+    user = serializers.CharField(max_length=255)
+    password = serializers.CharField(max_length=255, write_only=True)
+    port = serializers.IntegerField(default=3306, min_value=1, max_value=65535)
+
+    def validate_host(self, value: str) -> Tuple[bool, Optional[str]]:
+        return super().validate_host(value)
+
 
 class MySQLConnection(VerifyInputsMixin):
     def __init__(
@@ -57,7 +71,7 @@ class MySQLConnection(VerifyInputsMixin):
             return False
 
     def query(
-            self, query: str, params: Optional[Union[Dict[str, Any], List[Any]]] = None
+        self, query: str, params: Optional[Union[Dict[str, Any], List[Any]]] = None
     ) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Execute a query on the database and fetch results.
@@ -111,7 +125,9 @@ class MySQLConnection(VerifyInputsMixin):
         except Exception as e:
             return False, None, f"Error retrieving schemas: {str(e)}"
 
-    def get_tables(self, schema: str = "public") -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+    def get_tables(
+        self, schema: str = "public"
+    ) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Retrieve a list of tables within a schema.
 
@@ -125,8 +141,8 @@ class MySQLConnection(VerifyInputsMixin):
                 - Message.
         """
         query = """
-        SELECT * 
-        FROM information_schema.tables 
+        SELECT *
+        FROM information_schema.tables
         WHERE table_schema = %s;
         """
         success, data, message = self.query(query, (schema,))
@@ -138,7 +154,7 @@ class MySQLConnection(VerifyInputsMixin):
             return False, None, message
 
     def related_tables(
-            self, table_name: str
+        self, table_name: str
     ) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Retrieve related tables for the specified table.
@@ -198,14 +214,14 @@ class MySQLConnection(VerifyInputsMixin):
             Optional[List[Dict[str, Any]]]: A list of column details or None if the query fails.
         """
         query = """
-        SELECT 
-            column_name, 
-            data_type, 
-            character_maximum_length, 
-            is_nullable 
-        FROM 
-            information_schema.columns 
-        WHERE 
+        SELECT
+            column_name,
+            data_type,
+            character_maximum_length,
+            is_nullable
+        FROM
+            information_schema.columns
+        WHERE
             table_name = %s;
         """
         result = self.query(query, (table_name,))
@@ -226,7 +242,7 @@ class MySQLConnection(VerifyInputsMixin):
         tables_list = self.get_tables()
 
         def get_relationships(
-                table_name: str, scanned_tables: Optional[Set[str]] = None
+            table_name: str, scanned_tables: Optional[Set[str]] = None
         ) -> Dict[str, Any]:
             data: Optional[Dict[str, Any]] = None
             if data := cache.get(table_name, None):
@@ -244,7 +260,7 @@ class MySQLConnection(VerifyInputsMixin):
                         }
                     )
                     if sub_relations := get_relationships(
-                            related_table["related_table"], scanned_tables
+                        related_table["related_table"], scanned_tables
                     ):
                         table_relations[related_table["related_table"]][
                             "relations"
@@ -273,4 +289,3 @@ class MySQLConnection(VerifyInputsMixin):
 
         self.close()
         return tables
-

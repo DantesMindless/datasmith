@@ -3,13 +3,27 @@ from typing import Optional, Tuple, List, Dict, Any, Set
 from psycopg2.extras import RealDictCursor
 import psycopg2
 
-from .mixins import VerifyInputsMixin
+from .mixins import VerifyInputsMixin, SerializerVerifyInputsMixin
 from cachetools import LFUCache
+from rest_framework import serializers
 
 logger = logging.getLogger(__name__)
 
 
+class PostgresConnectionSerializer(SerializerVerifyInputsMixin, serializers.Serializer):
+    host = serializers.CharField(max_length=255)
+    database = serializers.CharField(max_length=255)
+    user = serializers.CharField(max_length=255)
+    password = serializers.CharField(max_length=255, write_only=True)
+    port = serializers.IntegerField(default=5432, min_value=1, max_value=65535)
+
+    def validate_host(self, value: str) -> str:
+        return super().validate_host(value)
+
+
 class PostgresConnection(VerifyInputsMixin):
+    serializer_class = PostgresConnectionSerializer
+
     def __init__(
         self,
         host: str,

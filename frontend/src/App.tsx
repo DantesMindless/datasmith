@@ -93,7 +93,7 @@ export default function JoyOrderDashboardTemplate() {
               Connections
             </Typography>
           </Box>
-          <pageComponent.component/>
+          <pageComponent.component />
         </Box>
       </Box>
     </CssVarsProvider>

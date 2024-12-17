@@ -1,13 +1,12 @@
 import logging
 from functools import cached_property
-from typing import Any, Dict, List, Optional, Type, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union, Type
 
 from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
-from datasource.adapters import PostgresConnection
-from datasource.adapters import MySQLConnection
+from datasource.adapters import PostgresConnection, MySQLConnection
 
 from .constants.choices import DatasourceTypeChoices
 
@@ -64,7 +63,9 @@ class DataSource(BaseModel):
         verbose_name_plural = "Data Sources"
 
     @cached_property
-    def adapter(self) -> Optional[Type[PostgresConnection]]:
+    def adapter(
+        self,
+    ) -> Optional[Union[PostgresConnection, MySQLConnection]]:
         """]
         Retrieve the adapter class for the current datasource type.
 
@@ -77,7 +78,7 @@ class DataSource(BaseModel):
         return DatasourceTypeChoices.get_adapter(self.type)
 
     @cached_property
-    def connection(self) -> PostgresConnection:
+    def connection(self) -> Union[PostgresConnection, MySQLConnection]:
         """
         Establish a connection using the adapter and provided credentials.
 
@@ -125,11 +126,10 @@ class DataSource(BaseModel):
             ValidationError: If the credentials or datasource type are invalid.
         """
         if self.credentials and self.type:
-            keys = self.credentials.keys()
             adapter = DatasourceTypeChoices.get_adapter(self.type)
             if adapter is None:
                 raise ValidationError("Invalid datasource type")
-            is_valid, message = adapter.verify_params(keys)
+            is_valid, message = adapter.verify_params(self.credentials)
             if is_valid:
                 super().save(*args, **kwargs)
             else:
