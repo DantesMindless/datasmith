@@ -65,7 +65,7 @@ class DataSource(BaseModel):
     @cached_property
     def adapter(
         self,
-    ) -> Optional[Union[PostgresConnection, MySQLConnection]]:
+    ) -> Optional[Union[Type[PostgresConnection], Type[MySQLConnection]]]:
         """]
         Retrieve the adapter class for the current datasource type.
 

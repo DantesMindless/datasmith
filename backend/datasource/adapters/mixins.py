@@ -28,8 +28,8 @@ class VerifyInputsMixin:
             params (Dict[str, Any]): The parameters to be verified.
 
         Returns:
-            Tuple[bool, Optional[Any]]: A tuple where the first element is a boolean indicating 
-            whether the parameters are valid, and the second element is None if valid, or the 
+            Tuple[bool, Optional[Any]]: A tuple where the first element is a boolean indicating
+            whether the parameters are valid, and the second element is None if valid, or the
             serializer errors if invalid.
 
         Raises:

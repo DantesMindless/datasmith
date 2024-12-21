@@ -4,7 +4,7 @@ import mysql.connector
 from mysql.connector import Error
 import json
 
-from .mixins import VerifyInputsMixin
+from .mixins import VerifyInputsMixin, SerializerVerifyInputsMixin
 from cachetools import LFUCache
 
 from rest_framework import serializers
@@ -12,18 +12,22 @@ from rest_framework import serializers
 logger = logging.getLogger(__name__)
 
 
-class MySQLConnectionSerializer(VerifyInputsMixin, serializers.Serializer):
+class MySQLConnectionSerializer(
+    VerifyInputsMixin, SerializerVerifyInputsMixin, serializers.Serializer
+):
     host = serializers.CharField(max_length=255)
     database = serializers.CharField(max_length=255)
     user = serializers.CharField(max_length=255)
     password = serializers.CharField(max_length=255, write_only=True)
     port = serializers.IntegerField(default=3306, min_value=1, max_value=65535)
 
-    def validate_host(self, value: str) -> Tuple[bool, Optional[str]]:
+    def validate_host(self, value: str) -> str:
         return super().validate_host(value)
 
 
 class MySQLConnection(VerifyInputsMixin):
+    serializer_class = MySQLConnectionSerializer
+
     def __init__(
         self,
         host: str,
@@ -119,7 +123,7 @@ class MySQLConnection(VerifyInputsMixin):
         try:
             result = self.query(query)
             if result:
-                schemas = [row["schema_name"] for row in json.loads(result)]
+                schemas = [row["schema_name"] for row in json.loads(result[1])]
                 return True, schemas, "Schemas retrieved successfully."
             return False, None, "No schemas found."
         except Exception as e:
