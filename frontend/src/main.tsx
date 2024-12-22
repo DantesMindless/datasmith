@@ -6,10 +6,10 @@ import { AlertProvider } from "./providers/AlertProvider";
 import AlertBanner from "./components/helpers/AlertBanner"
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
+  // <StrictMode>
     <AlertProvider>
       <AlertBanner/>
       <App />
     </AlertProvider>
-  </StrictMode>
+  // </StrictMode>
 );

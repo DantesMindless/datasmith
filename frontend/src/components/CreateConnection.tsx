@@ -12,16 +12,15 @@ import Select from "@mui/joy/Select";
 import Option from "@mui/joy/Option";
 import Sheet from "@mui/joy/Sheet";
 import httpfetch from "../utils/axios";
-import { Box, Button } from "@mui/joy";
-import AlertSnackbar from "./helpers/AlertBanner"
+import { Box, Button, ButtonGroup, FormHelperText } from "@mui/joy";
 import { useAlert } from "../providers/UseAlert"
-import { AxiosResponse } from 'axios';
+import { AxiosError, AxiosResponse } from 'axios';
 import CheckCircleOutlineTwoToneIcon from '@mui/icons-material/CheckCircleOutlineTwoTone';
 import ErrorTwoToneIcon from '@mui/icons-material/ErrorTwoTone';
+import { colors } from "@mui/material";
 
 type ConnectionSuccessType = null | boolean
 
-// Types for API responses
 interface ConnectionType {
   value: string;
   title: string;
@@ -48,13 +47,11 @@ const fetchRows = async (): Promise<ConnectionType[]> => {
       auth: { username: "u@u.com", password: "password" },
     });
     return response.data;
-  } catch (error) {
-    console.error("Error fetching connection types:", error);
-    return [];
+  } catch (error: unknown) {
+    return Promise.reject(error);
   }
 };
 
-// Function to fetch form fields for selected connection type
 const fetchFormFields = async (
   connectionType: string,
 ): Promise<CredentialsForm> => {
@@ -67,12 +64,10 @@ const fetchFormFields = async (
     );
     return response.data;
   } catch (error) {
-    console.error("Error fetching form fields:", error);
-    return {};
+    return Promise.reject(error);
   }
 };
 
-// Function to save connection data
 const saveConnection = async (
   data: ConnectionDataRequest,
   test: boolean,
@@ -86,6 +81,7 @@ const saveConnection = async (
     return Promise.reject(error);
   }
 };
+
 const CreateConnection: React.FC = () => {
   const { showAlert } = useAlert();
   const formRef = useRef<HTMLFormElement>(null);
@@ -94,37 +90,49 @@ const CreateConnection: React.FC = () => {
   const [credentialsForm, setCredentialsForm] = useState<CredentialsForm>({});
   const [connectionSuccess, setConnectionsSuccess] = useState<ConnectionSuccessType>(null);
   const [isFormValid, setIsFormValid] = useState(false); // State to track form validity
+  const [formErrors, setFormErrors] = useState({
+    name: "",
+    description: ""
+  })
+
+  const fetchConnectionTypes = async () => {
+    const data = await fetchRows();
+    setRows(data);
+  };
+
+  useEffect(()=>{
+    fetchConnectionTypes();
+  }, [])
 
   useEffect(() => {
-    // Fetch form fields when a new connection type is selected
-    const fetchConnectionTypes = async () => {
-      const data = await fetchRows();
-      setRows(data);
-    };
-
-    fetchConnectionTypes();
     if (selectedConnectionType !== "all") {
       const fetchCredentials = async () => {
         const data = await fetchFormFields(selectedConnectionType);
         setCredentialsForm(data);
+        const credentialsFormKeys = Object.keys(data)
+        if(credentialsFormKeys.length > 0){
+          const errorsMap = credentialsFormKeys.reduce((acc, key) => {
+              acc[key] = ""
+            return acc
+          }, {})
+          setFormErrors(errorsMap)
+        }
       };
-
       fetchCredentials();
     }
   }, [selectedConnectionType]);
 
   useEffect(() => {
-    // Check form validity whenever the form changes
     const handleFormChange = () => {
       if (!formRef.current) return;
       setIsFormValid(isFormFilled());
+      setConnectionsSuccess(null);
     };
 
     const form = formRef.current;
     if (form) {
       form.addEventListener("input", handleFormChange);
     }
-
     return () => {
       if (form) {
         form.removeEventListener("input", handleFormChange);
@@ -148,9 +156,8 @@ const CreateConnection: React.FC = () => {
     return Object.values(data).every((value) => value.toString().trim() !== "");
   };
 
-  const getConnectionData: ConnectionDataRequest = () => {
-    if (!formRef.current) return;
-
+  const getConnectionData = (): ConnectionDataRequest | null => {
+    if (!formRef.current) return null;
     const formData = new FormData(formRef.current);
     const data = Object.fromEntries(formData.entries());
 
@@ -167,15 +174,29 @@ const CreateConnection: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent, test: boolean = false) => {
     e.preventDefault();
-    if (getConnectionData() != null) {
+    const connectionData = getConnectionData();
+    if (connectionData) {
       try {
-        await saveConnection(getConnectionData(), test);
+        await saveConnection(connectionData, test);
         if (test) {
           setConnectionsSuccess(true);
         }
       } catch (error: unknown) {
+        if(error instanceof(AxiosError)){
+          if (error?.response?.data != undefined){
+            if ("credentials" in error.response.data){
+              const errorsList = error.response.data.credentials
+             Object.keys(error.response.data.credentials).forEach((key) => {
+              setFormErrors((prevErrors) => ({
+                ...prevErrors,
+                [key]: errorsList[key],
+              }));
+            });
+            }
+          }
+        }
         setConnectionsSuccess(false);
-        showAlert(error.response.data);
+        showAlert("Error submittion connection");
       }
     } else {
       showAlert("Some connection credentials are missing");
@@ -183,20 +204,22 @@ const CreateConnection: React.FC = () => {
   };
 
   const renderCredentialFields = useMemo(() => {
-    return Object.entries(credentialsForm).map(([key, field]) => {
+    const form = Object.entries(credentialsForm).map(([key, field]) => {
       const title = key.charAt(0).toUpperCase() + key.slice(1);
       return (
-        <FormControl key={key}>
+        <FormControl key={key} error={formErrors[key]}>
           <FormLabel>{title}</FormLabel>
           <Input
             name={key}
             type={field.type === "CharField" ? "text" : "number"}
             required={field.required}
           />
+          <FormHelperText>{key in formErrors ? formErrors[key]: ""}</FormHelperText>
         </FormControl>
       );
     });
-  }, [credentialsForm]);
+    return form
+  }, [credentialsForm, formErrors]);
 
   return (
     <React.Fragment>
@@ -229,7 +252,7 @@ const CreateConnection: React.FC = () => {
           </FormControl>
           {renderCredentialFields}
           {selectedConnectionType !== "all" && (
-            <div>
+            <ButtonGroup>
               <Button
                 type="submit"
                 variant="outlined"
@@ -254,7 +277,7 @@ const CreateConnection: React.FC = () => {
                   <ErrorTwoToneIcon color="warning" />
                 )}
               </Button>
-            </div>
+            </ButtonGroup>
           )}
         </Box>
       </Sheet>
