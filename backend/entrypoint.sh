@@ -3,12 +3,18 @@
 # Exit script on any error
 set -e
 
+# Update lock file if needed
+echo "Updating poetry.lock..."
+poetry lock --no-update
+
 # Check the environment variable
 poetry install --no-root
 
 if [ "$ENV" = "development" ]; then
     echo "Running in development mode"
     # Run migrations in development
+    poetry run python manage.py migrate
+    poetry run python manage.py create_superuser
     # poetry run python manage.py migrate  --database=default
     # poetry run python manage.py migrate  --database=test
     # Start the Django development server

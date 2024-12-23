@@ -15,8 +15,16 @@
 # Define variables
 DOCKER_COMPOSE_FILE := docker-compose.devcontainer.yml
 ENV_FILE := .env.dev
-API_CONTAINER := datasmith-django-1
-# API_CONTAINER := datasmith_django_1 # temporary, resolves the ubuntu issue
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+    API_CONTAINER := datasmith_django_1
+else ifeq ($(UNAME_S),Darwin) # macOS
+    API_CONTAINER := datasmith-django-1
+else # Assume Windows for other cases
+    API_CONTAINER := datasmith-django-1
+endif
+
 UI_CONTAINER := deep-web-ui-1
 # Targets
 .PHONY: start

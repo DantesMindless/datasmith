@@ -20,6 +20,7 @@ services:
       # - minio
       - db
       # - postgres
+      - mongodb
 
 
   frontend:
