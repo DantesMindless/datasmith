@@ -6,7 +6,7 @@ from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
-from datasource.adapters import PostgresConnection, MySQLConnection
+from datasource.adapters import PostgresConnection, MySQLConnection, MongoDBConnection
 
 from .constants.choices import DatasourceTypeChoices
 
@@ -65,7 +65,7 @@ class DataSource(BaseModel):
     @cached_property
     def adapter(
         self,
-    ) -> Optional[Union[Type[PostgresConnection], Type[MySQLConnection]]]:
+    ) -> Optional[Union[Type[PostgresConnection], Type[MySQLConnection], Type[MongoDBConnection]]]:
         """]
         Retrieve the adapter class for the current datasource type.
 
@@ -78,7 +78,7 @@ class DataSource(BaseModel):
         return DatasourceTypeChoices.get_adapter(self.type)
 
     @cached_property
-    def connection(self) -> Union[PostgresConnection, MySQLConnection]:
+    def connection(self) -> Union[PostgresConnection, MySQLConnection, MongoDBConnection]:
         """
         Establish a connection using the adapter and provided credentials.
 
