@@ -180,21 +180,7 @@ class MongoDBConnection(VerifyInputsMixin):
         if self.client:
             self.client.close()
 
-    # def get_databases(self) -> Tuple[bool, Optional[List[str]], str]:
-    #     """
-    #     Retrieve a list of databases in the MongoDB server.
-    #
-    #     Returns:
-    #         Tuple[bool, Optional[List[str]], str]: Success status, list of database names, and message.
-    #     """
-    #     try:
-    #         if self.client:
-    #             databases = self.client.list_database_names()
-    #             return True, databases, "Databases retrieved successfully."
-    #         return False, None, "No connection to the server."
-    #     except Exception as e:
-    #         return False, None, f"Error retrieving databases: {str(e)}"
-    #
+
     # def get_collections(self) -> Tuple[bool, Optional[List[str]], str]:
     #     """
     #     Retrieve a list of collections in the current database.

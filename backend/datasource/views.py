@@ -189,5 +189,15 @@ class DataSourceConnectionTypesFormFieldsView(BaseAuthApiView):
         Retrieve Supported Connection Adapters
         """
         if datasource := DatasourceTypeChoices.get_adapter(id):
-            return Response(datasource.get_initial_params(), status=status.HTTP_200_OK)
+            init_params = datasource.get_initial_params()
+
+            PORTS_BY_TYPE = {
+                DatasourceTypeChoices.POSTGRES: 5432,
+                DatasourceTypeChoices.MYSQL: 3306,
+                DatasourceTypeChoices.MONGO: 27017,
+            }
+            default_port = PORTS_BY_TYPE.get(id, None)
+            if default_port is not None:
+                init_params["port"]["initial"] = default_port
+            return Response(init_params, status=status.HTTP_200_OK)
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)

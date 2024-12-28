@@ -36,11 +36,11 @@ interface ConnectionDataRequest {
 interface CredentialField {
   type: string;
   required: boolean;
+  initial: string | number;
 }
 
 type CredentialsForm = Record<string, CredentialField>;
 
-// Function to fetch connection types
 const fetchRows = async (): Promise<ConnectionType[]> => {
   try {
     const response: AxiosResponse = await httpfetch.get("datasource/connection-types/", {
@@ -89,11 +89,13 @@ const CreateConnection: React.FC = () => {
   const [selectedConnectionType, setSelectedConnectionType] = useState<string>("all");
   const [credentialsForm, setCredentialsForm] = useState<CredentialsForm>({});
   const [connectionSuccess, setConnectionsSuccess] = useState<ConnectionSuccessType>(null);
-  const [isFormValid, setIsFormValid] = useState(false); // State to track form validity
+  const [isFormValid, setIsFormValid] = useState(false);
   const [formErrors, setFormErrors] = useState({
     name: "",
     description: ""
-  })
+  });
+  // Add a key to force re-render of credential fields
+  const [formKey, setFormKey] = useState(0);
 
   const fetchConnectionTypes = async () => {
     const data = await fetchRows();
@@ -102,20 +104,27 @@ const CreateConnection: React.FC = () => {
 
   useEffect(()=>{
     fetchConnectionTypes();
-  }, [])
+  }, []);
 
   useEffect(() => {
     if (selectedConnectionType !== "all") {
       const fetchCredentials = async () => {
         const data = await fetchFormFields(selectedConnectionType);
         setCredentialsForm(data);
-        const credentialsFormKeys = Object.keys(data)
+        setFormKey(prev => prev + 1); // Increment key to force re-render
+        
+        const credentialsFormKeys = Object.keys(data);
         if(credentialsFormKeys.length > 0){
           const errorsMap = credentialsFormKeys.reduce((acc, key) => {
-              acc[key] = ""
-            return acc
-          }, {})
-          setFormErrors(errorsMap)
+            acc[key] = "";
+            return acc;
+          }, {});
+          setFormErrors(errorsMap);
+        }
+
+        // Reset form if it exists
+        if (formRef.current) {
+          formRef.current.reset();
         }
       };
       fetchCredentials();
@@ -142,8 +151,12 @@ const CreateConnection: React.FC = () => {
 
   const handleChange = useCallback(
     (event: React.SyntheticEvent | null, newValue: string | null) => {
-      if (newValue && newValue !== "all") {
+      if (newValue) {
         setSelectedConnectionType(newValue);
+        setConnectionsSuccess(null);
+        if (formRef.current) {
+          formRef.current.reset();
+        }
       }
     },
     []
@@ -166,9 +179,11 @@ const CreateConnection: React.FC = () => {
       name: data.name as string,
       description: data.description as string,
       credentials: Object.keys(credentialsForm).reduce((acc, key) => {
-        acc[key] = data[key] as string;
+        const value = data[key] as string;
+        // Convert to number if the field type is IntegerField
+        acc[key] = credentialsForm[key].type === "IntegerField" ? Number(value) : value;
         return acc;
-      }, {} as Record<string, string>),
+      }, {} as Record<string, string | number>),
     };
   };
 
@@ -185,18 +200,18 @@ const CreateConnection: React.FC = () => {
         if(error instanceof(AxiosError)){
           if (error?.response?.data != undefined){
             if ("credentials" in error.response.data){
-              const errorsList = error.response.data.credentials
-             Object.keys(error.response.data.credentials).forEach((key) => {
-              setFormErrors((prevErrors) => ({
-                ...prevErrors,
-                [key]: errorsList[key],
-              }));
-            });
+              const errorsList = error.response.data.credentials;
+              Object.keys(error.response.data.credentials).forEach((key) => {
+                setFormErrors((prevErrors) => ({
+                  ...prevErrors,
+                  [key]: errorsList[key],
+                }));
+              });
             }
           }
         }
         setConnectionsSuccess(false);
-        showAlert("Error submittion connection");
+        showAlert("Error submitting connection");
       }
     } else {
       showAlert("Some connection credentials are missing");
@@ -207,24 +222,25 @@ const CreateConnection: React.FC = () => {
     const form = Object.entries(credentialsForm).map(([key, field]) => {
       const title = key.charAt(0).toUpperCase() + key.slice(1);
       return (
-        <FormControl key={key} error={formErrors[key]}>
+        <FormControl key={`${key}-${formKey}`} error={formErrors[key]}>
           <FormLabel>{title}</FormLabel>
           <Input
             name={key}
             type={field.type === "CharField" ? "text" : "number"}
             required={field.required}
+            defaultValue={field.initial}
           />
           <FormHelperText>{key in formErrors ? formErrors[key]: ""}</FormHelperText>
         </FormControl>
       );
     });
-    return form
-  }, [credentialsForm, formErrors]);
+    return form;
+  }, [credentialsForm, formErrors, formKey]);
 
   return (
     <React.Fragment>
       <Sheet>
-        <Box component="form" ref={formRef}>
+        <Box component="form" ref={formRef} key={formKey}>
           <FormControl size="sm">
             <FormLabel>Select Connection Type</FormLabel>
             <Select
