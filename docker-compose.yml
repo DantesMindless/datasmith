@@ -21,6 +21,7 @@ services:
       - db
       # - postgres
       - mongodb
+      - redis
 
 
   frontend:

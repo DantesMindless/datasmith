@@ -30,6 +30,7 @@ scikit-learn = "^1.5.2"
 cachetools = "^5.5.0"
 django-cors-headers = "^4.6.0"
 pymongo = "^4.6.1"
+redis = "^5.0.0"
 
 
 [build-system]
