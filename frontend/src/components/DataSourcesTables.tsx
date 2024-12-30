@@ -23,28 +23,11 @@ import Dropdown from "@mui/joy/Dropdown";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import SearchIcon from "@mui/icons-material/Search";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import httpfetch from "../utils/axios";
 import { v4 as uuidv4 } from "uuid";
 
-const uname = "u@u.com";
-const pass = "password";
 const exludeFields = ["id"];
 
-// Function to fetch orders
-const fetchRows = async () => {
-  try {
-    const response = await httpfetch.get("datasource/", {
-      auth: {
-        username: uname,
-        password: pass,
-      },
-    });
-    return response.data; // Returning fetched data
-  } catch (error) {
-    console.error("Error fetching orders:", error);
-    return []; // Returning an empty array in case of error
-  }
-};
+import { useAppContext } from "../providers/useAppContext";
 
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
   if (b[orderBy] < a[orderBy]) {
@@ -107,39 +90,34 @@ export default function OrderTable() {
       </FormControl>
     </React.Fragment>
   );
-
-  const [rows, setRows] = useState([]);
   const [skipIndexes, setSkipIndexes] = useState([]);
   const [headers, setHeaders] = useState([]);
+  const { connections } = useAppContext();
 
   useEffect(() => {
     let isMounted = true;
-    const fetchAndSetOrders = async () => {
-      const data = await fetchRows();
-      if (isMounted) {
-        const tableHeaders = [];
-        const indexesToSkip = [];
-        Object.keys(data[0]).forEach((key, index) => {
-          if (exludeFields.includes(key)) {
-            indexesToSkip.push(index);
-          }
-          const transformedKey = key
-            .split("_")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-          tableHeaders.push({ title: transformedKey, key });
-        });
-        setSkipIndexes(indexesToSkip);
-        setHeaders(tableHeaders);
-        setRows(data);
-        console.log(rows);
-      }
-    };
-    fetchAndSetOrders();
+    if (isMounted) {
+      const tableHeaders:Record<string, string>[] = [];
+      const indexesToSkip:number[] = [];
+      if (connections && connections.length > 0){
+        console.log(connections[0])
+      Object.keys(connections[0]).forEach((key, index: number) => {
+        if (exludeFields.includes(key)) {
+          indexesToSkip.push(index);
+        }
+        const transformedKey = key
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+        tableHeaders.push({ title: transformedKey });
+      });
+      setSkipIndexes(indexesToSkip);
+      setHeaders(tableHeaders);
+    }
     return () => {
       isMounted = false;
     };
-  }, []);
+  }}, [connections]);
 
   return (
     <React.Fragment>
@@ -257,7 +235,7 @@ export default function OrderTable() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, rowIndex) => {
+            {connections ? connections.map((row, rowIndex) => {
               const rowData = Object.values(row).map((element, colIndex) => {
                 if (skipIndexes.includes(colIndex)) {
                   return;
@@ -286,7 +264,6 @@ export default function OrderTable() {
                 } else {
                   value = element; // Default case for other types (e.g., numbers)
                 }
-
                 return (
                   <td key={colIndex} style={{ textAlign: "center" }}>
                     {value}
@@ -314,7 +291,7 @@ export default function OrderTable() {
                   </td>
                 </tr>
               ); // Wrap the rowData in a <tr>
-            })}
+            }): ""}
           </tbody>
         </Table>
       </Sheet>

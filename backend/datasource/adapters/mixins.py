@@ -11,7 +11,14 @@ class SerializerVerifyInputsMixin:
         ip_regex = re.compile(
             r"^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$"
         )
-        if not any((hostname_regex.match(value), ip_regex.match(value))):
+        docker_regex = re.compile(r"^host\.docker\.internal(:\d{1,5})?$")
+        if not any(
+            (
+                hostname_regex.match(value),
+                ip_regex.match(value),
+                docker_regex.match(value),
+            )
+        ):
             raise serializers.ValidationError("Invalid hostname or IP address.")
         return value
 

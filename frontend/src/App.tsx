@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useState } from "react";
 import { CssVarsProvider } from "@mui/joy/styles";
 import CssBaseline from "@mui/joy/CssBaseline";
@@ -11,8 +10,6 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 
 import Sidebar from "./components/Sidebar";
-import DataSourcesTables from "./components/DataSourcesTables";
-import DataSourcesList from "./components/DataSourcesList";
 import Header from "./components/Header";
 import { pageComponents } from "./utils/constants";
 
@@ -26,7 +23,7 @@ export default function JoyOrderDashboardTemplate() {
       <CssBaseline />
       <Box sx={{ display: "flex", minHeight: "100dvh" }}>
         <Header />
-        <Sidebar setPageComponent={setPageComponent} />
+        <Sidebar activePageComponent={pageComponent} setPageComponent={setPageComponent} />
         <Box
           component="main"
           className="MainContent"

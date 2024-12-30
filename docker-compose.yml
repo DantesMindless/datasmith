@@ -17,10 +17,7 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      # - minio
       - db
-      # - postgres
-      - mongodb
 
 
   frontend:

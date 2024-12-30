@@ -171,7 +171,7 @@ export default function OrderTable() {
         console.log(rows);
       }
     };
-    fetchAndSetOrders();
+    // fetchAndSetOrders();
     return () => {
       isMounted = false;
     };

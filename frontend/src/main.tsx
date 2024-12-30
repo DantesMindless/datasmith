@@ -1,15 +1,15 @@
+import App from "./App.tsx";
+import AlertBanner from "./components/helpers/AlertBanner.tsx";
+import { ContextProvider } from "./providers/Providers.tsx";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import App from "./App.tsx";
-import { AlertProvider } from "./providers/AlertProvider";
-import AlertBanner from "./components/helpers/AlertBanner"
 
 createRoot(document.getElementById("root")!).render(
-  // <StrictMode>
-    <AlertProvider>
+  <StrictMode>
+    <ContextProvider>
       <AlertBanner/>
       <App />
-    </AlertProvider>
-  // </StrictMode>
+    </ContextProvider>
+  </StrictMode>
 );

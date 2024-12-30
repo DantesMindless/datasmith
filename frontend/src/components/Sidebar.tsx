@@ -1,22 +1,27 @@
 import * as React from "react";
-import GlobalStyles from "@mui/joy/GlobalStyles";
+import { useEffect, useState } from 'react';
+
 import Avatar from "@mui/joy/Avatar";
 import Box from "@mui/joy/Box";
 import Divider from "@mui/joy/Divider";
+import GlobalStyles from "@mui/joy/GlobalStyles";
 import IconButton from "@mui/joy/IconButton";
 import List from "@mui/joy/List";
 import ListItem from "@mui/joy/ListItem";
 import ListItemButton, { listItemButtonClasses } from "@mui/joy/ListItemButton";
 import ListItemContent from "@mui/joy/ListItemContent";
-import Typography from "@mui/joy/Typography";
 import Sheet from "@mui/joy/Sheet";
-import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
-import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
+import Typography from "@mui/joy/Typography";
 
+import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+
+import { useAppContext } from '../providers/useAppContext';
 import ColorSchemeToggle from "./ColorSchemeToggle";
 import { closeSidebar } from "../utils";
-
 import { pageComponents } from "../utils/constants";
+import Link from "@mui/joy/Link";
+import { getDatabasesList, getDatabaseTablesList } from "../utils/requests";
 
 function Toggler({
   defaultExpanded = false,
@@ -52,8 +57,80 @@ function Toggler({
   );
 }
 
-export default function Sidebar({ setPageComponent }) {
-  return (
+export default function Sidebar({activePageComponent, setPageComponent }) {
+
+  const { connections, updateConnections, activeConnection, setActiveConnection } = useAppContext();
+  const [ tablesList, setTablesList ] = useState([]);
+  const [ activeDatabase, setActiveDatabase ] = useState('');
+  const [ databasesList, setDatabasesList ] = useState([]);
+
+  useEffect(()=>{
+    if (connections === null){
+      updateConnections();
+    }
+  }, [connections, updateConnections])
+
+  useEffect(()=>{
+    if(activeConnection != null){
+      (async () =>{
+        const databases = await getDatabasesList(activeConnection)
+        if (databases.length > 0){
+          setDatabasesList(databases)
+        }
+      })()
+    }
+  }, [activeConnection, setDatabasesList])
+
+  useEffect(() => {
+    if(activeConnection != null && activeDatabase != ''){
+        (async () =>{
+          const databases = await getDatabaseTablesList(activeConnection, activeDatabase)
+          if (databases.length > 0){
+            setTablesList(databases)
+          }
+        })()
+    }},[activeDatabase, activeConnection]
+  )
+
+  function RenderTables(){
+    return (
+      <Box>
+      <Divider/>
+        <h4>Active Connection</h4>
+        <List>
+        {tablesList.map((row)=>
+          <ListItem >
+              {row.table_name}
+            </ListItem>
+        )}
+        </List>
+        <Divider/>
+      </Box>
+    )
+  }
+
+  function RenderDatabases(){
+    if (databasesList.length > 0){
+    return (
+      <Box>
+      <Divider/>
+        <h4>Active Connection</h4>
+        <List>
+        {databasesList.map((row)=>
+          <ListItem >
+            <Link overlay onClick={ () => setActiveDatabase(row)}>
+              {row}
+            </Link>
+            </ListItem>
+        )}
+        </List>
+        <Divider/>
+      </Box>
+    )
+  }
+  }
+
+   return (
     <Sheet
       className="Sidebar"
       sx={{
@@ -114,7 +191,6 @@ export default function Sidebar({ setPageComponent }) {
         <Typography level="title-lg">DataSmith</Typography>
         <ColorSchemeToggle sx={{ ml: "auto" }} />
       </Box>
-
       <Box
         sx={{
           minHeight: 0,
@@ -135,6 +211,18 @@ export default function Sidebar({ setPageComponent }) {
             "--ListItem-radius": (theme) => theme.vars.radius.sm,
           }}
         >
+          <Divider/>
+          {connections ? connections.map((row)=> (
+          <ListItem>
+            <Link overlay onClick={() => {setActiveConnection(row.id)}} underline="none">
+              { row.name }
+            </Link>
+          </ListItem>
+          )) : ""}
+          <Divider/>
+          {RenderDatabases()}
+          <h4>Tables list for active database {activeDatabase} </h4>
+          {RenderTables()}
           {Object.keys(pageComponents).map((key, index) => (
             <ListItem key={index}>
               <ListItemButton

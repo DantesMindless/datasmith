@@ -89,7 +89,8 @@ class DataSourceDetailMetadataView(BaseAuthApiView):
                     return Response(tables_list)
                 else:
                     data = datasource.update_metadata()
-                    return Response(data)
+                    tables_list = datasource.metadata.keys()
+                    return Response(tables_list)
         return Response(
             DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
