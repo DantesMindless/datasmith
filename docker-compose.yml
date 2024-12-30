@@ -19,7 +19,6 @@ services:
     depends_on:
       - db
 
-
   frontend:
     build:
       context: ./frontend
@@ -62,6 +61,7 @@ services:
       depends_on:
         - django
         - frontend
+
 volumes:
   postgres_data:
   static_volume:
