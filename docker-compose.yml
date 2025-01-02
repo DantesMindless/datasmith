@@ -19,7 +19,6 @@ services:
     depends_on:
       - db
 
-
   frontend:
     build:
       context: ./frontend

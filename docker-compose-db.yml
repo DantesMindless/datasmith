@@ -33,6 +33,25 @@ services:
       - mongodb_data:/data/db
       - ./mongo_test/init:/docker-entrypoint-initdb.d
 
+  redis:
+    image: redis:latest
+    environment:
+      REDIS_USER: redis  # Redis 6+ supports ACLs with usernames
+      REDIS_PASSWORD: redis    
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis_test/users.acl:/etc/redis/users.acl
+      - ./redis_test/init:/docker-entrypoint-initdb.d
+    command: >
+      sh -c "
+      redis-server --aclfile /etc/redis/users.acl --bind 0.0.0.0 &
+      sleep 5 &&
+      /docker-entrypoint-initdb.d/init.sh &&
+      wait"
+
+
   minio:
     image: minio/minio:latest
     environment:
@@ -47,4 +66,5 @@ volumes:
   mysql_data:
   postgres_data:
   mongodb_data:
+  redis_data:
   minio_data:

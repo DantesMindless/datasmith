@@ -196,6 +196,7 @@ class DataSourceConnectionTypesFormFieldsView(BaseAuthApiView):
                 DatasourceTypeChoices.POSTGRES: 5432,
                 DatasourceTypeChoices.MYSQL: 3306,
                 DatasourceTypeChoices.MONGO: 27017,
+                DatasourceTypeChoices.REDIS: 6379,
             }
             default_port = PORTS_BY_TYPE.get(id, None)
             if default_port is not None:

@@ -158,7 +158,17 @@ const CreateConnection: React.FC = () => {
     if (!formRef.current) return false;
     const formData = new FormData(formRef.current);
     const data = Object.fromEntries(formData.entries());
-    return Object.values(data).every((value) => value.toString().trim() !== "");
+    const isRedisConnection = selectedConnectionType === "REDIS";
+
+  
+    return Object.entries(data).every(([key, value]) => {
+      // Skip validation for database and user fields if it's a Redis connection
+      if (isRedisConnection && (key === "database" || key === "user")) {
+        return true;
+      }
+      
+      return value.toString().trim() !== "";
+    });
   };
 
   const getConnectionData = (): ConnectionDataRequest | null => {
