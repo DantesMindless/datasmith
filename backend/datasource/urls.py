@@ -32,28 +32,23 @@ urlpatterns = [
         name="datasource-test",
     ),
     path(
-        "datasource-metadata/tables/<uuid:id>/",
-        DataSourceDetailMetadataView.as_view(),
-        name="datasource-metadata",
-    ),
-    path(
         "datasource-metadata/tables/<uuid:id>/<str:table_name>/",
         DataSourceDetailMetadataView.as_view(),
-        name="datasource-metadata",
+        name="datasource-metadata-for-table",
+    ),
+    path(
+        "datasource-schema-metadata/<uuid:id>/<str:schema>/",
+        DataSourceTablesMetadataView.as_view(),
+        name="datasource-metadata-for-schema",
     ),
     path(
         "datasource-metadata/tables/<uuid:id>/",
         DataSourceDetailMetadataView.as_view(),
-        name="datasource-metadata-update",
+        name="datasource-metadata",
     ),
     path(
         "datasource-metadata/schemas/<uuid:id>/",
         DataSourceSchemasMetadataView.as_view(),
-        name="datasource-metadata-update",
-    ),
-    path(
-        "datasource-metadata/schemas/<uuid:id>/<str:schema>/",
-        DataSourceTablesMetadataView.as_view(),
         name="datasource-metadata-update",
     ),
     path(

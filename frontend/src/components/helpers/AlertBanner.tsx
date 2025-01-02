@@ -1,11 +1,11 @@
 import React, { SyntheticEvent } from 'react';
-import { useAlert } from '../../providers/UseAlert';
-import { Snackbar, Alert } from '@mui/joy';
+import { useAppContext } from '../../providers/useAppContext';
+import { Snackbar } from '@mui/joy';
 import Button from '@mui/joy/Button';
 import Dangerous from '@mui/icons-material/Dangerous';
 
 const AlertBanner: React.FC = () => {
-    const { alert } = useAlert();
+    const { alert } = useAppContext();
     const [open, setOpen] = React.useState(false);
 
     React.useEffect(() => {

@@ -1,19 +1,31 @@
 import { ReactNode } from 'react';
 
-interface AlertProviderProps {
+interface ProviderProps {
     children: ReactNode;
 }
-
-// interface AlertData extends Record<string, any> {}
 
 interface Alert {
     message: string;
     type: 'error' | 'success' | 'info' | 'warning';
 }
 
-interface AlertContextType {
-    alert: Alert | null;
-    showAlert: (message: string, type?: 'error' | 'success' | 'info' | 'warning') => void;
+interface Connection {
+    id: string;
+    name: string;
+    description: string;
+    type: string;
+    credentials?: Record<string, string | number>;
 }
 
-export type {AlertContextType, AlertProviderProps, Alert }
+type Connections = Connection[] | null
+
+interface ContextType {
+    alert: Alert | null;
+    showAlert: (message: string, type?: 'error' | 'success' | 'info' | 'warning') => void;
+    connections: Connections | null;
+    updateConnections: () => Promise<void>;
+    activeConnection: string | null;
+    setActiveConnection: () => Promise<void>;
+}
+
+export type {ContextType, ProviderProps, Alert, Connections, Connection }

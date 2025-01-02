@@ -13,11 +13,12 @@ import Option from "@mui/joy/Option";
 import Sheet from "@mui/joy/Sheet";
 import httpfetch from "../utils/axios";
 import { Box, Button, ButtonGroup, FormHelperText } from "@mui/joy";
-import { useAlert } from "../providers/UseAlert"
+import { useAppContext } from '../providers/useAppContext';
 import { AxiosError, AxiosResponse } from 'axios';
 import CheckCircleOutlineTwoToneIcon from '@mui/icons-material/CheckCircleOutlineTwoTone';
 import ErrorTwoToneIcon from '@mui/icons-material/ErrorTwoTone';
-import { colors } from "@mui/material";
+import { getConnectionTypes } from '../utils/requests'
+
 
 type ConnectionSuccessType = null | boolean
 
@@ -41,16 +42,7 @@ interface CredentialField {
 
 type CredentialsForm = Record<string, CredentialField>;
 
-const fetchRows = async (): Promise<ConnectionType[]> => {
-  try {
-    const response: AxiosResponse = await httpfetch.get("datasource/connection-types/", {
-      auth: { username: "u@u.com", password: "password" },
-    });
-    return response.data;
-  } catch (error: unknown) {
-    return Promise.reject(error);
-  }
-};
+
 
 const fetchFormFields = async (
   connectionType: string,
@@ -83,7 +75,7 @@ const saveConnection = async (
 };
 
 const CreateConnection: React.FC = () => {
-  const { showAlert } = useAlert();
+  const { showAlert } = useAppContext();
   const formRef = useRef<HTMLFormElement>(null);
   const [rows, setRows] = useState<ConnectionType[]>([]);
   const [selectedConnectionType, setSelectedConnectionType] = useState<string>("all");
@@ -98,7 +90,7 @@ const CreateConnection: React.FC = () => {
   const [formKey, setFormKey] = useState(0);
 
   const fetchConnectionTypes = async () => {
-    const data = await fetchRows();
+    const data = await getConnectionTypes();
     setRows(data);
   };
 

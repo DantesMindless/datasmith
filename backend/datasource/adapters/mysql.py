@@ -5,7 +5,6 @@ from mysql.connector import Error
 import json
 
 from .mixins import VerifyInputsMixin, SerializerVerifyInputsMixin
-from cachetools import LFUCache
 
 from rest_framework import serializers
 
@@ -240,7 +239,7 @@ class MySQLConnection(VerifyInputsMixin):
         Returns:
             Dict[str, Any]: Metadata for tables.
         """
-        cache: LFUCache[str, Any] = LFUCache(maxsize=1024)
+        # cache: LFUCache[str, Any] = LFUCache(maxsize=1024)
         tables: Dict[str, Any] = {}
         tables_relations: Dict[str, List[Dict[str, Any]]] = {}
         tables_list = self.get_tables()
@@ -248,9 +247,9 @@ class MySQLConnection(VerifyInputsMixin):
         def get_relationships(
             table_name: str, scanned_tables: Optional[Set[str]] = None
         ) -> Dict[str, Any]:
-            data: Optional[Dict[str, Any]] = None
-            if data := cache.get(table_name, None):
-                return data if isinstance(data, dict) else {}
+            # data: Optional[Dict[str, Any]] = None
+            # if data := cache.get(table_name, None):
+            #     return data if isinstance(data, dict) else {}
             if scanned_tables is None:
                 scanned_tables = set()
             table_relations: Dict[str, Any] = {}
@@ -270,7 +269,7 @@ class MySQLConnection(VerifyInputsMixin):
                             "relations"
                         ].append(sub_relations)
                     scanned_tables.add(related_table["related_table"])
-            cache[table_name] = table_relations
+            # cache[table_name] = table_relations
             return table_relations
 
         if tables_list:
