@@ -1,16 +1,9 @@
 import { useState } from "react";
-import { CssVarsProvider } from "@mui/joy/styles";
-import CssBaseline from "@mui/joy/CssBaseline";
-import Box from "@mui/joy/Box";
-import Breadcrumbs from "@mui/joy/Breadcrumbs";
-import Link from "@mui/joy/Link";
-import Typography from "@mui/joy/Typography";
-
-import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
-import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-
+import Box from "@mui/material/Box";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
+import Tabs from "./components/Tabs"
+
 import { pageComponents } from "./utils/constants";
 
 export default function JoyOrderDashboardTemplate() {
@@ -19,11 +12,9 @@ export default function JoyOrderDashboardTemplate() {
   );
 
   return (
-    <CssVarsProvider disableTransitionOnChange>
-      <CssBaseline />
       <Box sx={{ display: "flex", minHeight: "100dvh" }}>
-        <Header />
-        <Sidebar activePageComponent={pageComponent} setPageComponent={setPageComponent} />
+        {/* <Header /> */}
+        <Sidebar />
         <Box
           component="main"
           className="MainContent"
@@ -41,57 +32,9 @@ export default function JoyOrderDashboardTemplate() {
             minWidth: 0,
             height: "100dvh",
             gap: 1,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Breadcrumbs
-              size="sm"
-              aria-label="breadcrumbs"
-              separator={<ChevronRightRoundedIcon fontSize="sm" />}
-              sx={{ pl: 0 }}
-            >
-              <Link
-                underline="none"
-                color="neutral"
-                href="#some-link"
-                aria-label="Home"
-              >
-                <HomeRoundedIcon />
-              </Link>
-              <Link
-                underline="hover"
-                color="neutral"
-                href="#some-link"
-                sx={{ fontSize: 12, fontWeight: 500 }}
-              >
-                Dashboard
-              </Link>
-              <Typography
-                color="primary"
-                sx={{ fontWeight: 500, fontSize: 12 }}
-              >
-                Connections
-              </Typography>
-            </Breadcrumbs>
-          </Box>
-          <Box
-            sx={{
-              display: "flex",
-              mb: 1,
-              gap: 1,
-              flexDirection: { xs: "column", sm: "row" },
-              alignItems: { xs: "start", sm: "center" },
-              flexWrap: "wrap",
-              justifyContent: "space-between",
-            }}
-          >
-            <Typography level="h2" component="h1">
-              Connections
-            </Typography>
-          </Box>
-          <pageComponent.component />
+          }}>
+          <Tabs />
         </Box>
       </Box>
-    </CssVarsProvider>
   );
 }

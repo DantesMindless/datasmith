@@ -1,27 +1,59 @@
 import * as React from "react";
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-import Avatar from "@mui/joy/Avatar";
-import Box from "@mui/joy/Box";
-import Divider from "@mui/joy/Divider";
-import GlobalStyles from "@mui/joy/GlobalStyles";
-import IconButton from "@mui/joy/IconButton";
-import List from "@mui/joy/List";
-import ListItem from "@mui/joy/ListItem";
-import ListItemButton, { listItemButtonClasses } from "@mui/joy/ListItemButton";
-import ListItemContent from "@mui/joy/ListItemContent";
-import Sheet from "@mui/joy/Sheet";
-import Typography from "@mui/joy/Typography";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Divider from "@mui/material/Divider";
+import IconButton from "@mui/material/IconButton";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemText from "@mui/material/ListItemText";
+import Typography from "@mui/material/Typography";
 
 import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import PowerIcon from "@mui/icons-material/Power";
 
-import { useAppContext } from '../providers/useAppContext';
-import ColorSchemeToggle from "./ColorSchemeToggle";
-import { closeSidebar } from "../utils";
-import { pageComponents } from "../utils/constants";
-import Link from "@mui/joy/Link";
-import { getDatabasesList, getDatabaseTablesList } from "../utils/requests";
+import { useAppContext } from "../providers/useAppContext";
+import { getDatabasesList, getSchemaTablesList } from "../utils/requests";
+
+import AddBoxIcon from '@mui/icons-material/AddBox';
+import IndeterminateCheckBoxIcon from '@mui/icons-material/IndeterminateCheckBox';
+import SvgIcon, { SvgIconProps } from '@mui/material/SvgIcon';
+import { styled } from '@mui/material/styles';
+import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
+import { TreeItem, treeItemClasses } from '@mui/x-tree-view/TreeItem';
+import { Connection } from "../providers/constants";
+
+const CustomTreeItem = styled(TreeItem)({
+  [`& .${treeItemClasses.iconContainer}`]: {
+    '& .close': {
+      opacity: 0.3,
+    },
+  },
+});
+
+function CloseSquare(props: SvgIconProps) {
+  return (
+    <SvgIcon
+      className="close"
+      fontSize="inherit"
+      style={{ width: 14, height: 14 }}
+      {...props}
+    >
+      {/* tslint:disable-next-line: max-line-length */}
+      <path d="M13.5 2c-5.629 0-10.212 4.436-10.475 10h-3.025l4.537 5.917 4.463-5.917h-2.975c.26-3.902 3.508-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.876-2.854l-1.847 2.449c1.919 2.088 4.664 3.405 7.723 3.405 5.798 0 10.5-4.702 10.5-10.5s-4.702-10.5-10.5-10.5z"/>
+    </SvgIcon>
+  );
+}
+
+interface ActiveConnection extends Connection {
+  id: string;
+  schemas: Record<string, string[]>;
+}
+
+interface ActiveConnections extends Record<string, ActiveConnection> {}
 
 function Toggler({
   defaultExpanded = false,
@@ -37,112 +69,101 @@ function Toggler({
 }) {
   const [open, setOpen] = React.useState(defaultExpanded);
   return (
-    <React.Fragment>
+    <>
       {renderToggle({ open, setOpen })}
       <Box
-        sx={[
-          {
-            display: "grid",
-            transition: "0.2s ease",
-            "& > *": {
-              overflow: "hidden",
-            },
+        sx={{
+          display: "grid",
+          transition: "0.2s ease",
+          "& > *": {
+            overflow: "hidden",
           },
-          open ? { gridTemplateRows: "1fr" } : { gridTemplateRows: "0fr" },
-        ]}
+          gridTemplateRows: open ? "1fr" : "0fr",
+        }}
       >
         {children}
       </Box>
-    </React.Fragment>
+    </>
   );
 }
 
-export default function Sidebar({activePageComponent, setPageComponent }) {
-
-  const { connections, updateConnections, activeConnection, setActiveConnection } = useAppContext();
-  const [ tablesList, setTablesList ] = useState([]);
-  const [ activeDatabase, setActiveDatabase ] = useState('');
-  const [ databasesList, setDatabasesList ] = useState([]);
-
-  useEffect(()=>{
-    if (connections === null){
-      updateConnections();
-    }
-  }, [connections, updateConnections])
-
-  useEffect(()=>{
-    if(activeConnection != null){
-      (async () =>{
-        const databases = await getDatabasesList(activeConnection)
-        if (databases.length > 0){
-          setDatabasesList(databases)
-        }
-      })()
-    }
-  }, [activeConnection, setDatabasesList])
+export default function Sidebar() {
+  const { connections, updateConnections } = useAppContext();
+  const [activeConnections, setActiveConnections] = useState<ActiveConnections>({});
 
   useEffect(() => {
-    if(activeConnection != null && activeDatabase != ''){
-        (async () =>{
-          const databases = await getDatabaseTablesList(activeConnection, activeDatabase)
-          if (databases.length > 0){
-            setTablesList(databases)
-          }
-        })()
-    }},[activeDatabase, activeConnection]
-  )
+    if (connections === null) {
+      updateConnections();
+    }
+  }, [connections, updateConnections]);
 
-  function RenderTables(){
-    return (
-      <Box>
-      <Divider/>
-        <h4>Active Connection</h4>
-        <List>
-        {tablesList.map((row)=>
-          <ListItem >
-              {row.table_name}
-            </ListItem>
-        )}
-        </List>
-        <Divider/>
-      </Box>
-    )
+  async function addActiveConnection(connection : Connection) {
+    const databasesList = await getDatabasesList(connection.id);
+    const connectionCopy: ActiveConnection = {
+      ...connection,
+      schemas: {}
+    }
+    connectionCopy["schemas"] = databasesList.reduce((acc: Record<string, []>, value: string) => {
+      acc[value] = [];
+      return acc;
+    }, {});
+    activeConnections[connection.name] = connectionCopy;
+    setActiveConnections({ ...activeConnections });
   }
 
-  function RenderDatabases(){
-    if (databasesList.length > 0){
-    return (
-      <Box>
-      <Divider/>
-        <h4>Active Connection</h4>
-        <List>
-        {databasesList.map((row)=>
-          <ListItem >
-            <Link overlay onClick={ () => setActiveDatabase(row)}>
-              {row}
-            </Link>
-            </ListItem>
-        )}
-        </List>
-        <Divider/>
-      </Box>
-    )
-  }
+  async function addSchemaTables(connection: Connection, schema: string) {
+
+    if (schema in activeConnections[connection.name].schemas && activeConnections[connection.name].schemas[schema].length === 0){
+      const schemaTables = await getSchemaTablesList(connection.id, schema);
+      activeConnections[connection.name].schemas[schema] = schemaTables;
+      setActiveConnections({ ...activeConnections });
+    }
   }
 
-   return (
-    <Sheet
-      className="Sidebar"
+  function RenderSchemas() {
+    if (activeConnections) {
+      return (
+        <SimpleTreeView
+          defaultExpandedItems={['grid']}
+          slots={{
+            expandIcon: AddBoxIcon,
+            collapseIcon: IndeterminateCheckBoxIcon,
+            endIcon: CloseSquare,
+          }}
+        >
+          {Object.keys(activeConnections).map((key) =>
+            Object.keys(activeConnections[key].schemas).map((schema) => (
+              <CustomTreeItem
+                key={`schema_${key}_${schema}`}
+                onClick={() => addSchemaTables(activeConnections[key], schema)}
+                itemId={`id_${key}_${schema}`}
+                label={schema}
+              >
+                {activeConnections[key].schemas[schema].map((row) => (
+                  <TreeItem
+                    key={`table_${key}_${schema}_${row.table_name}`}
+                    itemId={`id_${key}_${schema}_${row.table_name}`}
+                    label={row.table_name}
+                  />
+                ))}
+              </CustomTreeItem>
+            ))
+          )}
+        </SimpleTreeView>
+      );
+    } else {
+      return null;
+    }
+  }
+
+
+  return (
+    <Box
       sx={{
         position: { xs: "fixed", md: "sticky" },
-        transform: {
-          xs: "translateX(calc(100% * (var(--SideNavigation-slideIn, 0) - 1)))",
-          md: "none",
-        },
-        transition: "transform 0.4s, width 0.4s",
         zIndex: 10000,
-        height: "100dvh",
-        width: "var(--Sidebar-width)",
+        height: "100vh",
+        width: "240px",
         top: 0,
         p: 2,
         flexShrink: 0,
@@ -151,108 +172,60 @@ export default function Sidebar({activePageComponent, setPageComponent }) {
         gap: 2,
         borderRight: "1px solid",
         borderColor: "divider",
+        bgcolor: "background.default",
       }}
     >
-      <GlobalStyles
-        styles={(theme) => ({
-          ":root": {
-            "--Sidebar-width": "220px",
-            [theme.breakpoints.up("lg")]: {
-              "--Sidebar-width": "240px",
-            },
-          },
-        })}
-      />
-
       <Box
-        className="Sidebar-overlay"
         sx={{
-          position: "fixed",
-          zIndex: 9998,
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          opacity: "var(--SideNavigation-slideIn)",
-          backgroundColor: "var(--joy-palette-background-backdrop)",
-          transition: "opacity 0.4s",
-          transform: {
-            xs: "translateX(calc(100% * (var(--SideNavigation-slideIn, 0) - 1) + var(--SideNavigation-slideIn, 0) * var(--Sidebar-width, 0px)))",
-            lg: "translateX(-100%)",
-          },
+          display: "flex",
+          gap: 1,
+          alignItems: "center",
         }}
-        onClick={() => closeSidebar()}
-      />
-
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-        <IconButton variant="soft" color="primary" size="sm">
+      >
+        <IconButton color="primary">
           <BrightnessAutoRoundedIcon />
         </IconButton>
-        <Typography level="title-lg">DataSmith</Typography>
-        <ColorSchemeToggle sx={{ ml: "auto" }} />
+        <Typography variant="h6">DataSmith</Typography>
       </Box>
+
       <Box
         sx={{
-          minHeight: 0,
-          overflow: "hidden auto",
+          overflowY: "auto",
           flexGrow: 1,
           display: "flex",
           flexDirection: "column",
-          [`& .${listItemButtonClasses.root}`]: {
-            gap: 1.5,
-          },
         }}
       >
-        <List
-          size="sm"
-          sx={{
-            gap: 1,
-            "--List-nestedInsetStart": "30px",
-            "--ListItem-radius": (theme) => theme.vars.radius.sm,
-          }}
-        >
-          <Divider/>
-          {connections ? connections.map((row)=> (
-          <ListItem>
-            <Link overlay onClick={() => {setActiveConnection(row.id)}} underline="none">
-              { row.name }
-            </Link>
-          </ListItem>
-          )) : ""}
-          <Divider/>
-          {RenderDatabases()}
-          <h4>Tables list for active database {activeDatabase} </h4>
-          {RenderTables()}
-          {Object.keys(pageComponents).map((key, index) => (
-            <ListItem key={index}>
-              <ListItemButton
-                onClick={() => setPageComponent(pageComponents[key])}
-              >
-                <ListItemContent>
-                  <Typography level="title-sm">
-                    {pageComponents[key].name}
-                  </Typography>
-                </ListItemContent>
-              </ListItemButton>
-            </ListItem>
-          ))}
+        <List>
+          <Divider />
+          {connections &&
+            connections.map((row) => (
+              <ListItem key={`connection_${row.id}`}>
+                <PowerIcon />
+                <ListItemButton onClick={() => addActiveConnection(row)}>
+                  <ListItemText primary={row.name} />
+                </ListItemButton>
+              </ListItem>
+            ))}
         </List>
+        {RenderSchemas()}
       </Box>
-      <Divider />
+
       <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <Avatar
-          variant="outlined"
-          size="sm"
           src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=286"
+          alt="Avatar"
         />
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography level="title-sm">Siriwat K.</Typography>
-          <Typography level="body-xs">siriwatk@test.com</Typography>
+        <Box>
+          <Typography variant="body1">Siriwat K.</Typography>
+          <Typography variant="body2" color="textSecondary">
+            siriwatk@test.com
+          </Typography>
         </Box>
-        <IconButton size="sm" variant="plain" color="neutral">
+        <IconButton>
           <LogoutRoundedIcon />
         </IconButton>
       </Box>
-    </Sheet>
+    </Box>
   );
 }

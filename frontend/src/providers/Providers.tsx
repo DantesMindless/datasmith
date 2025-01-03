@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Alert, Connections } from './constants';
+import type { Alert, Connections, Tab } from './constants';
 import type { ProviderProps } from './constants';
 import { getConnections } from '../utils/requests';
 import { Context } from './context'
@@ -7,7 +7,8 @@ import { Context } from './context'
 export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     const [alert, setAlert] = useState<Alert | null>(null);
     const [connections, setConnections] = useState<Connections | null>(null);
-    const [activeConnection, setActiveConnection] = useState<React.FC | null>(null)
+    const [activeConnections, setActiveConnections] = useState<string[] | null>(null)
+    const [tabs, setTabs] = useState<Tab[] | null>(null)
 
     const showAlert = (message: string, type: 'error' | 'success' | 'info' | 'warning' = 'error') => {
         setAlert({ message, type });
@@ -25,7 +26,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     };
 
     return (
-        <Context.Provider value={{ alert, showAlert, connections, updateConnections, activeConnection, setActiveConnection}}>
+        <Context.Provider value={{ alert, showAlert, connections, updateConnections, activeConnections, setActiveConnections, tabs, setTabs}}>
             {children}
         </Context.Provider>
     );

@@ -23,7 +23,7 @@ export const getConnections = async () => {
   return getData("datasource/")
 };
 
-export const getDatabaseTablesList = async (uuid : UUIDTypes, tableName:string) => {
+export const getSchemaTablesList = async (uuid : UUIDTypes, tableName:string) => {
   return getData(`datasource-schema-metadata/${uuid}/${tableName}/`)
 };
 
