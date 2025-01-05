@@ -17,7 +17,7 @@ import ErrorTwoToneIcon from "@mui/icons-material/ErrorTwoTone";
 import { useAppContext } from "../providers/useAppContext";
 import httpfetch from "../utils/axios";
 import { AxiosError, AxiosResponse } from "axios";
-import { getConnectionTypes } from "../utils/requests";
+import { getConnections, getConnectionTypes } from "../utils/requests";
 
 type ConnectionSuccessType = null | boolean;
 
@@ -75,7 +75,7 @@ const saveConnection = async (
 };
 
 const CreateConnection: React.FC = () => {
-  const { showAlert } = useAppContext();
+  const { showAlert, showInfo, updateConnections } = useAppContext();
   const formRef = useRef<HTMLFormElement>(null);
   const [rows, setRows] = useState<ConnectionType[]>([]);
   const [selectedConnectionType, setSelectedConnectionType] = useState<string>(
@@ -179,6 +179,10 @@ const CreateConnection: React.FC = () => {
         await saveConnection(connectionData, test);
         if (test) {
           setConnectionsSuccess(true);
+        } else {
+          // Update the connections list after successful save
+          await updateConnections();
+          showInfo("Connection saved successfully");
         }
       } catch (error: unknown) {
         if (error instanceof AxiosError && error?.response?.data?.credentials) {

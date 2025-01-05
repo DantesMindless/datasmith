@@ -9,6 +9,10 @@ interface Alert {
     type: 'error' | 'success' | 'info' | 'warning';
 }
 
+interface Info {
+    message: string;
+}
+
 interface Connection {
     id: string;
     name: string;
@@ -34,6 +38,8 @@ type Connections = Connection[] | null
 interface ContextType {
     alert: Alert | null;
     showAlert: (message: string, type?: 'error' | 'success' | 'info' | 'warning') => void;
+    info: Info | null;
+    showInfo: (message: string) => void;
     connections: Connections | null;
     updateConnections:  ()=> void
     setActiveConnections:  React.Dispatch<React.SetStateAction<string[] | null>>
@@ -42,4 +48,4 @@ interface ContextType {
     setTabs: React.Dispatch<React.SetStateAction<Tab[] | null>>
 }
 
-export type {ContextType, ProviderProps, Alert, ActiveConnection, Connections, Connection }
+export type {ContextType, ProviderProps, Alert, Info, ActiveConnection, Connections, Connection }
