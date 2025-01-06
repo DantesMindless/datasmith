@@ -24,6 +24,8 @@ import { v4 as uuidv4 } from "uuid";
 const excludeFields = ["id", "schemas"];
 
 import { useAppContext } from "../providers/useAppContext";
+import httpfetch from "../utils/axios";
+import { AxiosResponse } from "axios";
 
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
   if (b[orderBy] < a[orderBy]) {
@@ -85,6 +87,11 @@ function RowMenu() {
 
 export default function OrderTable() {
   const [open, setOpen] = React.useState(false);
+  const [skipIndexes, setSkipIndexes] = useState<number[]>([]);
+  const [headers, setHeaders] = useState<{ title: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { connections, setConnections, showAlert, showInfo, updateConnections } = useAppContext();
+
   const renderFilters = () => (
     <React.Fragment>
       <FormControl fullWidth size="small">
@@ -102,9 +109,23 @@ export default function OrderTable() {
     </React.Fragment>
   );
 
-  const [skipIndexes, setSkipIndexes] = useState<number[]>([]);
-  const [headers, setHeaders] = useState<{ title: string }[]>([]);
-  const { connections } = useAppContext();
+  const handleDelete = async (id: string) => {
+    try {
+      const response: AxiosResponse = await httpfetch.delete(
+        `datasource/detail/${id}/`,
+        {
+        auth: { username: "u@u.com", password: "password" },
+      }
+      );
+      if (response.status === 204 || response.status === 200) {
+        await updateConnections();
+        showInfo("DataSource deleted successfully");
+      };
+    } catch (error: any) {
+      console.error("Error details:", error.response?.data || error.message);
+      showAlert(`Failed to delete DataSource: ${error.response?.data?.detail || error.message}`);
+    }
+  };
 
   useEffect(() => {
     if (connections && connections.length > 0) {
@@ -160,7 +181,9 @@ export default function OrderTable() {
                         <Button size="small" variant="contained" color="primary">
                           View
                         </Button>
-                        <Button size="small" variant="contained" color="error">
+                        <Button size="small" variant="contained" color="error"
+                        disabled={loading} // Lock the button during the request
+                          onClick={() => handleDelete(row.id)}>
                           Delete
                         </Button>
                       </Box>

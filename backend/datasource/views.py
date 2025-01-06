@@ -52,6 +52,22 @@ class DataSourceView(BaseAuthApiView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def delete(self, request: HttpRequest, id: UUID) -> Response:
+        if datasource := DataSource.objects.filter(id=id).first():
+            if datasource.user_id == request.user.id or datasource.created_by == request.user.id:
+                datasource.delete()
+                return Response(
+                    f"Datasource with id {id} deleted successfully",
+                    status=status.HTTP_200_OK,
+                )
+            return Response(
+                "You do not have permission to delete this datasource",
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
+        )
+
     def put(self, request: HttpRequest, id: UUID) -> Response:
         data = request.data
         if not (query := data.get("query")):
