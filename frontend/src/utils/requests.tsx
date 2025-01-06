@@ -19,6 +19,21 @@ async function getData(url: string){
   }
 }
 
+async function putData(url: string, body: Record<string, string>){
+  try {
+    const response = await httpfetch.put(url, body,  {
+      auth: {
+        username: uname,
+        password: pass,
+      },
+    });
+    return response.data; // Returning fetched data
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return [];
+  }
+}
+
 export const getConnections = async () => {
   return getData("datasource/")
 };
@@ -38,3 +53,10 @@ export const getDatabasesList = async (uuid : UUIDTypes) => {
 export const getConnectionTypes = async () => {
   return getData("datasource/connection-types/")
 };
+
+export const queryTab = (tab) => {
+  const getQuery = () => {
+    return `SELECT * FROM ${tab.schema}.${tab.table} LIMIT ${tab.perPage};`;
+  }
+  return putData(`datasource/query/${tab.ID}/`, {query: getQuery()})
+}
