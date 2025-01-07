@@ -176,6 +176,7 @@ const CreateConnection: React.FC = () => {
     const connectionData = getConnectionData();
     if (connectionData) {
       try {
+        showInfo("Connection saved successfully");
         await saveConnection(connectionData, test);
         if (test) {
           setConnectionsSuccess(true);

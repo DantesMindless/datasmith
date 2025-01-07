@@ -40,7 +40,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
 
   const showAlert = (
     message: string,
-    type: "error" | "success" | "info" | "warning" = "error"
+    type: "error" | "success" | "warning" = "error"
   ) => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 5000);
@@ -116,6 +116,8 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         activeTab,
         alert,
         showAlert,
+        info,
+        showInfo,
         connections,
         updateConnections,
         activeConnections,

@@ -6,7 +6,7 @@ interface ProviderProps {
 
 interface Alert {
     message: string;
-    type: 'error' | 'success' | 'info' | 'warning';
+    type: 'error' | 'success' | 'warning';
 }
 
 interface Info {
