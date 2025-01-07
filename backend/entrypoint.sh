@@ -3,7 +3,6 @@
 # Exit script on any error
 set -e
 
-# Update lock file if needed
 echo "Updating poetry.lock..."
 poetry lock
 

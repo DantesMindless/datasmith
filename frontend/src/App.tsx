@@ -1,14 +1,12 @@
-import React from "react";
 import Box from "@mui/material/Box";
 import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
 import Tabs from "./components/Tabs";
 import { useAppContext } from "./providers/useAppContext";
 
 import { pageComponents } from "./utils/constants";
 
 export default function JoyOrderDashboardTemplate() {
-  const { activeTab, activePage } = useAppContext();
+  const { activePage } = useAppContext();
 
   const renderActivePage = () => {
     const activePageConfig = pageComponents[activePage];
@@ -20,7 +18,7 @@ export default function JoyOrderDashboardTemplate() {
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100dvh" }}>
+    <Box sx={{ display: "flex", minHeight: "100dvh", width: '100dvw'}}>
       {/* <Header /> */}
       <Sidebar />
       <Box

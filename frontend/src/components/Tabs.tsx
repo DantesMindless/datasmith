@@ -12,7 +12,7 @@ export default function TabsSegmentedControls() {
   const { tabs, removeTab, updateActiveTab, setActivePage } = useAppContext();
 
   return (
-    <Box component={"div"} sx={{ width: "100%", bgcolor: "background.default" }}>
+    <Box component={"div"} sx={{ bgcolor: "background.default" }}>
       <Grid container spacing={0.5}>
         {Object.keys(pageComponents).filter((key) => !pageComponents[key].skip).map((key, index) =>
         (

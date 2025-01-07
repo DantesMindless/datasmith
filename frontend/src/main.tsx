@@ -1,6 +1,5 @@
 import App from "./App.tsx";
 import AlertBanner from "./components/helpers/AlertBanner.tsx";
-import InfoBanner from "./components/helpers/InfoBanner.tsx";
 import { ContextProvider } from "./providers/Providers.tsx";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -17,8 +16,7 @@ root.render(
   <StrictMode>
     <ContextProvider>
       <AlertBanner />
-      <InfoBanner />
-      <ThemeProvider theme={theme}>
+      <ThemeProvider theme={theme()}>
         <CssBaseline />
         <App />
       </ThemeProvider>

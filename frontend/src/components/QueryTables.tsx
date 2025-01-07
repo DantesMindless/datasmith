@@ -69,9 +69,8 @@ export default function DynamicTable() {
 
   return (
     <Box sx={{ width: "100%" }}>
-      <Paper sx={{ width: "100%", mb: 2 }}>
         <TableContainer>
-          <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size="medium">
+          <Table sx={{ minWidth: 750, overflowX: "scroll" }} aria-labelledby="tableTitle" size="medium">
             {/* Dynamic Table Header */}
             <TableHead>
               <TableRow>
@@ -113,7 +112,6 @@ export default function DynamicTable() {
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-      </Paper>
     </Box>
   );
 }
