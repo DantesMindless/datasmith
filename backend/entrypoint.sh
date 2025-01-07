@@ -5,7 +5,7 @@ set -e
 
 # Update lock file if needed
 echo "Updating poetry.lock..."
-poetry lock --no-update
+poetry lock
 
 # Check the environment variable
 poetry install --no-root
