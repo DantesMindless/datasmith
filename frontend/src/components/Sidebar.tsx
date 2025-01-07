@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -53,46 +53,12 @@ interface ActiveConnection extends Connection {
   schemas: Record<string, string[]>;
 }
 
-interface ActiveConnections extends Record<string, ActiveConnection> {}
-
-function Toggler({
-  defaultExpanded = false,
-  renderToggle,
-  children,
-}: {
-  defaultExpanded?: boolean;
-  children: React.ReactNode;
-  renderToggle: (params: {
-    open: boolean;
-    setOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  }) => React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(defaultExpanded);
-  return (
-    <>
-      {renderToggle({ open, setOpen })}
-      <Box
-        sx={{
-          display: "grid",
-          transition: "0.2s ease",
-          "& > *": {
-            overflow: "hidden",
-          },
-          gridTemplateRows: open ? "1fr" : "0fr",
-        }}
-      >
-        {children}
-      </Box>
-    </>
-  );
-}
 
 export default function Sidebar() {
-  const { connections, updateConnections } = useAppContext();
-  const [activeConnections, setActiveConnections] = useState<ActiveConnections>({});
+  const { connections, activeConnections, updateActiveConnections, updateConnections, addTableViewTab } = useAppContext();
 
   useEffect(() => {
-    if (connections === null) {
+    if (connections?.length === 0) {
       updateConnections();
     }
   }, [connections, updateConnections]);
@@ -108,15 +74,15 @@ export default function Sidebar() {
       return acc;
     }, {});
     activeConnections[connection.name] = connectionCopy;
-    setActiveConnections({ ...activeConnections });
+    updateActiveConnections(activeConnections);
+
   }
 
   async function addSchemaTables(connection: Connection, schema: string) {
-
     if (schema in activeConnections[connection.name].schemas && activeConnections[connection.name].schemas[schema].length === 0){
       const schemaTables = await getSchemaTablesList(connection.id, schema);
       activeConnections[connection.name].schemas[schema] = schemaTables;
-      setActiveConnections({ ...activeConnections });
+      updateActiveConnections(activeConnections);
     }
   }
 
@@ -141,6 +107,7 @@ export default function Sidebar() {
               >
                 {activeConnections[key].schemas[schema].map((row) => (
                   <TreeItem
+                    onClick={()=>{addTableViewTab(activeConnections[key], schema, row.table_name)}}
                     key={`table_${key}_${schema}_${row.table_name}`}
                     itemId={`id_${key}_${schema}_${row.table_name}`}
                     label={row.table_name}
@@ -155,7 +122,6 @@ export default function Sidebar() {
       return null;
     }
   }
-
 
   return (
     <Box
@@ -198,7 +164,8 @@ export default function Sidebar() {
       >
         <List>
           <Divider />
-          {connections &&
+          {
+          connections &&
             connections.map((row) => (
               <ListItem key={`connection_${row.id}`}>
                 <PowerIcon />

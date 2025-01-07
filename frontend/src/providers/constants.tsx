@@ -21,7 +21,7 @@ interface Connection {
     credentials?: Record<string, string | number>;
 }
 
-interface Tab{
+interface TableViewTab{
     ID: string  // datasource ID
     schema: string // database
     table: string // table name
@@ -44,8 +44,14 @@ interface ContextType {
     updateConnections:  ()=> void
     setActiveConnections:  React.Dispatch<React.SetStateAction<string[] | null>>
     activeConnections: string[] | null
-    tabs: Tab[] | null,
-    setTabs: React.Dispatch<React.SetStateAction<Tab[] | null>>
+    tabs: TableViewTab[] | null,
+    setTabs: React.Dispatch<React.SetStateAction<TableViewTab[] | null>>
+    addTableViewTab: (connection: Connection, schema: string, table: string) => void
+    removeTab: (index: number) => void
 }
 
-export type {ContextType, ProviderProps, Alert, Info, ActiveConnection, Connections, Connection }
+//<<<<<<< HEAD
+//export type {ContextType, ProviderProps, Alert, Info, ActiveConnection, Connections, Connection }
+//=======
+export type {ContextType, ProviderProps, Alert, Info, Connections, Connection, TableViewTab }
+//>>>>>>> master
