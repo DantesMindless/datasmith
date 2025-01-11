@@ -23,8 +23,14 @@ export default function DynamicTable() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-
   const { activeTab, tabs } = useAppContext();
+
+  const queryTableCellStyles = {
+    maxWidth: '150px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  };
 
   // Fetch table data
   useEffect(() => {
@@ -78,6 +84,7 @@ export default function DynamicTable() {
                   <TableCell
                     key={header}
                     sortDirection={orderBy === header ? order : false}
+                    sx={queryTableCellStyles}
                   >
                     <TableSortLabel
                       active={orderBy === header}
@@ -96,7 +103,11 @@ export default function DynamicTable() {
               {visibleRows.map((row, index) => (
                 <TableRow hover tabIndex={-1} key={index}>
                   {headers.map((header) => (
-                    <TableCell key={header}>{row[header]}</TableCell>
+                  <TableCell 
+                    key={header}
+                    sx={queryTableCellStyles}
+                    title={row[header]}>{row[header]}
+                  </TableCell>
                   ))}
                 </TableRow>
               ))}
