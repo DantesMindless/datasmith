@@ -1,5 +1,6 @@
 import httpfetch from './axios';
 import { UUIDTypes } from 'uuid';
+import { TableViewTab } from '../providers/constants';
 
 const uname = "u@u.com";
 const pass = "password";
@@ -42,10 +43,6 @@ export const getSchemaTablesList = async (uuid : UUIDTypes, tableName:string) =>
   return getData(`datasource-schema-metadata/${uuid}/${tableName}/`)
 };
 
-export const getTablesList = async (uuid : UUIDTypes) => {
-  return getData(`datasource-metadata/tables/${uuid}/`)
-};
-
 export const getDatabasesList = async (uuid : UUIDTypes) => {
   return getData(`datasource-metadata/schemas/${uuid}/`)
 };
@@ -54,9 +51,13 @@ export const getConnectionTypes = async () => {
   return getData("datasource/connection-types/")
 };
 
-export const queryTab = (tab) => {
+export const queryTab = (tab: TableViewTab) => {
   const getQuery = () => {
     return `SELECT * FROM ${tab.schema}.${tab.table} LIMIT ${tab.perPage};`;
   }
   return putData(`datasource/query/${tab.ID}/`, {query: getQuery()})
+}
+
+export const getJoins = (tab: TableViewTab) => {
+  return getData(`datasource-metadata/tables/${tab.ID}/${tab.schema}/${tab.table}/`,)
 }

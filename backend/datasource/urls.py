@@ -32,7 +32,7 @@ urlpatterns = [
         name="datasource-test",
     ),
     path(
-        "datasource-metadata/tables/<uuid:id>/<str:table_name>/",
+        "datasource-metadata/tables/<uuid:id>/<str:schema>/<str:table_name>/",
         DataSourceDetailMetadataView.as_view(),
         name="datasource-metadata-for-table",
     ),

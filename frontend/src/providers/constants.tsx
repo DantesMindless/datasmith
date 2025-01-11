@@ -26,11 +26,13 @@ interface TableViewTab{
     schema: string // database
     table: string // table name
     query: string
+    joins: Record<string, string>[]
     page:   number
     perPage: number
     maxItems: number
     name: string
     data: Record<string, string | number | null>[]
+    openedColumns: boolean
 }
 
 type Connections = Connection[] | null
@@ -50,8 +52,4 @@ interface ContextType {
     removeTab: (index: number) => void
 }
 
-//<<<<<<< HEAD
-//export type {ContextType, ProviderProps, Alert, Info, ActiveConnection, Connections, Connection }
-//=======
 export type {ContextType, ProviderProps, Alert, Info, Connections, Connection, TableViewTab }
-//>>>>>>> master

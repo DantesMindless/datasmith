@@ -9,10 +9,14 @@ import {
   TablePagination,
   TableRow,
   TableSortLabel,
-  Paper,
+  IconButton
 } from "@mui/material";
-import { queryTab } from "../utils/requests";
+import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
+import JoinsSidebar from "./JoinsSidebar";
+import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
+import { NIL } from "uuid";
+
 
 type Order = "asc" | "desc";
 
@@ -24,20 +28,45 @@ export default function DynamicTable() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const { activeTab, tabs } = useAppContext();
+  const { activeTab, tabs, setTabs } = useAppContext();
 
   // Fetch table data
   useEffect(() => {
-    const fetchData = async () => {
-      const result = await queryTab(tabs[activeTab]);
-      if (result && result.length > 0) {
-        setHeaders(Object.keys(result[0])); // Extract headers dynamically from the first row
-        setData(result);
-      }
-    };
+    if (tabs){
 
-    fetchData();
+      const fetchData = async () => {
+        const result = await queryTab(tabs[activeTab]);
+        if (result && result.length > 0) {
+          setHeaders(Object.keys(result[0])); // Extract headers dynamically from the first row
+          setData(result);
+        }
+      };
+      fetchData();
+    }
   }, [activeTab, tabs]);
+
+  useEffect(()=>{
+    if(tabs){
+    const tab = tabs[activeTab]
+    const fetchData = async () => {
+      const result = await getJoins(tab);
+      tabs[activeTab].joins = result
+      setTabs([...tabs])
+    };
+    if(tab.joins.length == 0){
+      fetchData();
+    }
+    }
+  }, [activeTab, tabs, setTabs])
+
+  const handleOpenColumns = () => {
+    if(tabs){
+      const tab = tabs[activeTab]
+      tab.openedColumns = tab.openedColumns ? false : true
+      tabs[activeTab] = tab
+      setTabs([...tabs])
+    }
+  }
 
   const handleRequestSort = (property: string) => {
     const isAsc = orderBy === property && order === "asc";
@@ -68,22 +97,35 @@ export default function DynamicTable() {
   const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%", overflowX: "scroll"}}>
+      {tabs != null && tabs.length > 0 && activeTab != null && (
+        <>
+          <JoinsSidebar />
+          <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
+            <IconButton onClick={handleOpenColumns}>
+              <KeyboardDoubleArrowRightIcon
+                sx={{rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", transition: "rotate 0.1s ease-in-out" }}
+              />
+            </IconButton>
+          </Box>
+        </>
+      )}
+      <Box>
         <TableContainer>
-          <Table sx={{ minWidth: 750, overflowX: "scroll" }} aria-labelledby="tableTitle" size="medium">
+          <Table aria-labelledby="tableTitle" size="medium">
             {/* Dynamic Table Header */}
             <TableHead>
               <TableRow>
                 {headers.map((header) => (
                   <TableCell
-                    key={header}
-                    sortDirection={orderBy === header ? order : false}
+                  key={header}
+                  sortDirection={orderBy === header ? order : false}
                   >
                     <TableSortLabel
                       active={orderBy === header}
                       direction={orderBy === header ? order : "asc"}
                       onClick={() => handleRequestSort(header)}
-                    >
+                      >
                       {header}
                     </TableSortLabel>
                   </TableCell>
@@ -111,7 +153,8 @@ export default function DynamicTable() {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+          />
+        </Box>
     </Box>
   );
 }

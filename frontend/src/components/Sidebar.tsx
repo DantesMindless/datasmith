@@ -26,13 +26,6 @@ import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem, treeItemClasses } from '@mui/x-tree-view/TreeItem';
 import { Connection } from "../providers/constants";
 
-const CustomTreeItem = styled(TreeItem)({
-  [`& .${treeItemClasses.iconContainer}`]: {
-    '& .close': {
-      opacity: 0.3,
-    },
-  },
-});
 
 function CloseSquare(props: SvgIconProps) {
   return (
@@ -90,6 +83,8 @@ export default function Sidebar() {
     if (activeConnections) {
       return (
         <SimpleTreeView
+        checkboxSelection
+
           defaultExpandedItems={['grid']}
           slots={{
             expandIcon: AddBoxIcon,
@@ -99,7 +94,7 @@ export default function Sidebar() {
         >
           {Object.keys(activeConnections).map((key) =>
             Object.keys(activeConnections[key].schemas).map((schema) => (
-              <CustomTreeItem
+              <TreeItem
                 key={`schema_${key}_${schema}`}
                 onClick={() => addSchemaTables(activeConnections[key], schema)}
                 itemId={`id_${key}_${schema}`}
@@ -113,7 +108,7 @@ export default function Sidebar() {
                     label={row.table_name}
                   />
                 ))}
-              </CustomTreeItem>
+              </TreeItem>
             ))
           )}
         </SimpleTreeView>

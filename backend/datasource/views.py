@@ -54,7 +54,10 @@ class DataSourceView(BaseAuthApiView):
 
     def delete(self, request: HttpRequest, id: UUID) -> Response:
         if datasource := DataSource.objects.filter(id=id).first():
-            if datasource.user_id == request.user.id or datasource.created_by == request.user.id:
+            if (
+                datasource.user_id == request.user.id
+                or datasource.created_by == request.user.id
+            ):
                 datasource.delete()
                 return Response(
                     f"Datasource with id {id} deleted successfully",
@@ -86,20 +89,24 @@ class DataSourceView(BaseAuthApiView):
 
 class DataSourceDetailMetadataView(BaseAuthApiView):
     def get(
-        self, request: HttpRequest, id: UUID, table_name: Optional[str] = None
+        self,
+        request: HttpRequest,
+        id: UUID,
+        schema: Optional[str],
+        table_name: Optional[str] = None,
     ) -> Response:
         """
         Retrieve metadata for a single table or tables
         """
         if datasource := DataSource.objects.filter(id=id).first():
-            if table_name:
-                if metadata := datasource.metadata.get(table_name):
-                    return Response(metadata)
-                else:
-                    data = datasource.update_metadata()
-                    if table := data.get(table_name):
-                        return Response(table)
-                    return Response("Table not found", status=status.HTTP_404_NOT_FOUND)
+            if schema and table_name:
+                # if datasource.metadata and (table := datasource.metadata.get(schema, {}).get(table_name, None)):
+                #     return Response(table)
+                # else:
+                data = datasource.update_metadata(schema)
+                if table := data.get(schema, {}).get(table_name, None):
+                    return Response(table)
+                return Response("Table not found", status=status.HTTP_404_NOT_FOUND)
             else:
                 if datasource.metadata and (tables_list := datasource.metadata.keys()):
                     return Response(tables_list)

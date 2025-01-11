@@ -247,6 +247,7 @@ class MySQLConnection(VerifyInputsMixin):
         def get_relationships(
             table_name: str, scanned_tables: Optional[Set[str]] = None
         ) -> Dict[str, Any]:
+            print(table_name)
             # data: Optional[Dict[str, Any]] = None
             # if data := cache.get(table_name, None):
             #     return data if isinstance(data, dict) else {}

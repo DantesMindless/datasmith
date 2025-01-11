@@ -6,6 +6,7 @@ import psycopg2
 from .mixins import VerifyInputsMixin, SerializerVerifyInputsMixin
 from cachetools import LFUCache
 from rest_framework import serializers
+from pprint import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +235,7 @@ class PostgresConnection(VerifyInputsMixin):
                 """
         return self.query(query)[1]
 
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self, schema: str) -> Dict[str, Any]:
         """
         Retrieve metadata for all tables.
 
@@ -244,7 +245,12 @@ class PostgresConnection(VerifyInputsMixin):
         cache: LFUCache[str, Any] = LFUCache(maxsize=1024)
         tables: Dict[str, Any] = {}
         tables_relations: Dict[str, List[Dict[str, Any]]] = {}
-        tables_list = self.get_tables()[1]
+        tables_list = self.get_tables(schema)[1]
+        table_relations = []
+
+        for table in tables_list:
+            table_relations.append(self.related_tables(table["table_name"])[1])
+        pprint(table_relations)
 
         def get_relationships(
             table_name: str, scanned_tables: Optional[Set[str]] = None
@@ -264,13 +270,14 @@ class PostgresConnection(VerifyInputsMixin):
                             ]
                         }
                     )
-                    if sub_relations := get_relationships(
-                        related_table["related_table"], scanned_tables
-                    ):
-                        table_relations[related_table["related_table"]][
-                            "relations"
-                        ].append(sub_relations)
-                    scanned_tables.add(related_table["related_table"])
+                    # TODO: figure out what is it doing here :)
+                    # if sub_relations := get_relationships(
+                    #     related_table["related_table"], scanned_tables
+                    # ):
+                    #     table_relations[related_table["related_table"]][
+                    #         "relations"
+                    #     ].append(sub_relations)
+                    # scanned_tables.add(related_table["related_table"])
             cache[table_name] = table_relations
             return table_relations
 
@@ -287,10 +294,10 @@ class PostgresConnection(VerifyInputsMixin):
                 )
                 if relations := self.related_tables(table_name)[1]:
                     tables_relations[table_name] = relations
-
         for table_name in tables:
             if tables_relations.get(table_name):
                 tables[table_name]["relations"].append(get_relationships(table_name))
 
         self.close()
+        pprint(tables)
         return tables

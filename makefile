@@ -39,7 +39,8 @@ stop: ## Start the development containers using Docker Compose.
 .PHONY: down
 down: ## Start the development containers using Docker Compose.
 	docker compose down
-	docker system prune -a --volumes
+	docker system prune -a -f
+	docker volume prune -f
 .PHONY: migrate
 migrate: ## Upgrade the database schema to the latest revision.
 	docker exec -it $(API_CONTAINER) poetry run python manage.py migrate

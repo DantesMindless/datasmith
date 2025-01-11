@@ -6,7 +6,12 @@ from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
-from datasource.adapters import PostgresConnection, MySQLConnection, MongoDBConnection, RedisConnection
+from datasource.adapters import (
+    PostgresConnection,
+    MySQLConnection,
+    MongoDBConnection,
+    RedisConnection,
+)
 
 from .constants.choices import DatasourceTypeChoices
 
@@ -65,7 +70,14 @@ class DataSource(BaseModel):
     @cached_property
     def adapter(
         self,
-    ) -> Optional[Union[Type[PostgresConnection], Type[MySQLConnection], Type[MongoDBConnection], Type[RedisConnection]]]:
+    ) -> Optional[
+        Union[
+            Type[PostgresConnection],
+            Type[MySQLConnection],
+            Type[MongoDBConnection],
+            Type[RedisConnection],
+        ]
+    ]:
         """]
         Retrieve the adapter class for the current datasource type.
 
@@ -78,7 +90,9 @@ class DataSource(BaseModel):
         return DatasourceTypeChoices.get_adapter(self.type)
 
     @cached_property
-    def connection(self) -> Union[PostgresConnection, MySQLConnection, MongoDBConnection]:
+    def connection(
+        self,
+    ) -> Union[PostgresConnection, MySQLConnection, MongoDBConnection]:
         """
         Establish a connection using the adapter and provided credentials.
 
@@ -170,7 +184,7 @@ class DataSource(BaseModel):
         self.connection.close()
         return data
 
-    def update_metadata(self) -> Optional[Dict[str, Any]]:
+    def update_metadata(self, schema: Optional[str]) -> Optional[Dict[str, Any]]:
         """
         Update and save the metadata for the datasource.
 
@@ -178,7 +192,9 @@ class DataSource(BaseModel):
             Optional[Dict[str, Any]]: The updated metadata or None if an error occurs.
         """
         self.connection.connect()
-        self.metadata = self.connection.get_metadata()
+        if self.metadata is None:
+            self.metadata = {}
+        self.metadata[schema] = self.connection.get_metadata(schema)
         self.connection.close()
         self.save()
         metadata: Optional[Dict[str, Any]] = self.metadata

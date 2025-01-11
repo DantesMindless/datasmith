@@ -11,7 +11,7 @@ import { getConnections } from "../utils/requests";
 import { Context } from "./context";
 
 function getDataStorage(objName: string, defaultValue: any = []): [] {
-  const storageObject: string | null = localStorage.getItem(objName);
+  const storageObject: string | null = sessionStorage.getItem(objName);
   if (!storageObject) {
     return defaultValue;
   }
@@ -20,7 +20,7 @@ function getDataStorage(objName: string, defaultValue: any = []): [] {
 
 function setDataStorage(objName: string, obj: any): any[] {
   const data = JSON.stringify(obj);
-  localStorage.setItem(objName, data);
+  sessionStorage.setItem(objName, data);
 }
 
 export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
@@ -65,10 +65,12 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       table: table,
       query: `SELECT * FROM ${schema}.${table} LIMIT 100;`,
       page: 1,
+      joins: [],
       perPage: 100,
       maxItems: 0,
       name: `${schema} - ${table} #${tabsCount.length}`,
-      data: []
+      data: [],
+      openedColumns: false
     };
     tabs.push(tabObj);
     setDataStorage("activeTabs", [...tabs]);
@@ -83,8 +85,13 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       tabs.splice(index, 1);
       setDataStorage("activeTabs", [...tabs]);
       setTabs([...tabs]);
-      setActiveTab(tabs.length - 1)
-      setActivePage("queryTab");
+      if (tabs.length > 0){
+        setActiveTab(tabs.length - 1)
+        setActivePage("queryTab");
+      }
+      else{
+        setActivePage("listConnections")
+      }
     }
   };
 
@@ -128,6 +135,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         removeTab,
         activePage,
         setActivePage,
+        setTabs
       }}
     >
       {children}
