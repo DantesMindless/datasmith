@@ -15,7 +15,6 @@ import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
-import { NIL } from "uuid";
 
 
 type Order = "asc" | "desc";
@@ -27,8 +26,15 @@ export default function DynamicTable() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-
   const { activeTab, tabs, setTabs } = useAppContext();
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
+
+  const getQueryTableCellStyles = (header: string) => ({
+    maxWidth: expandedColumns.has(header) ? 'none' : '150px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  });
 
   // Fetch table data
   useEffect(() => {
@@ -94,6 +100,18 @@ export default function DynamicTable() {
     setPage(0);
   };
 
+  const handleColumnClick = (header: string) => {
+    setExpandedColumns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(header)) {
+        newSet.delete(header);
+      } else {
+        newSet.add(header);
+      }
+      return newSet;
+    });
+  };
+
   const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
@@ -118,8 +136,9 @@ export default function DynamicTable() {
               <TableRow>
                 {headers.map((header) => (
                   <TableCell
-                  key={header}
-                  sortDirection={orderBy === header ? order : false}
+                    key={header}
+                    sortDirection={orderBy === header ? order : false}
+                    sx={getQueryTableCellStyles(header)}
                   >
                     <TableSortLabel
                       active={orderBy === header}
@@ -138,7 +157,16 @@ export default function DynamicTable() {
               {visibleRows.map((row, index) => (
                 <TableRow hover tabIndex={-1} key={index}>
                   {headers.map((header) => (
-                    <TableCell key={header}>{row[header]}</TableCell>
+                  <TableCell
+                    key={header}
+                    sx={getQueryTableCellStyles(header)}
+                    title={row[header]}
+                    onClick={(e) => {
+                      handleColumnClick(header);
+                    }}
+                  >
+                    {row[header]}
+                  </TableCell>
                   ))}
                 </TableRow>
               ))}
