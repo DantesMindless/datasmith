@@ -34,6 +34,7 @@ export default function DynamicTable() {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    border: "1px solid gray"
   });
 
   // Fetch table data
@@ -118,7 +119,7 @@ export default function DynamicTable() {
     for (let i = 1; i <= data.length; i++){
       indexes.push(
         <TableRow>
-          <TableCell>
+          <TableCell align="center">
             {i}
           </TableCell>
         </TableRow>
@@ -142,7 +143,7 @@ export default function DynamicTable() {
         <>
           <JoinsSidebar />
           <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-            <Button onClick={handleOpenColumns}>
+            <Button onClick={handleOpenColumns} sx={{height:"37px"}}>
               <KeyboardDoubleArrowRightIcon
                 sx={{rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", transition: "rotate 0.1s ease-in-out" }}
               />

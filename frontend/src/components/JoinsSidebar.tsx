@@ -5,7 +5,6 @@ import { useAppContext } from "../providers/useAppContext";
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { useState } from "react";
-import { v4 as uuid } from "uuid";
 
 function renderTreeItems(table, level: number, itemsCollector: string[]){
     const schema_name = Object.keys(table)[0]
@@ -19,7 +18,6 @@ function renderTreeItems(table, level: number, itemsCollector: string[]){
         })
     }
     itemsCollector.push(...childIds)
-
     return table_fields?.fields && table_fields.fields.length > 0 ?
     (
         <TreeItem itemId={rootId} label={schema_name} >
@@ -38,7 +36,6 @@ export default function JoinsSidebar() {
     const tab = tabs ? tabs[activeTab] : null;
     const [selectedItems, setSelectedItems] = useState<string[]>([])
     const treeItemsCollector: string[] = []
-
     const handleChecks = (event: any, checkedItems: string[]) => {
         const newSelectedParent = checkedItems.filter((item: string)=> selectedItems.length === 0 || (!selectedItems.includes(item) && item.includes("parent")))
         const newDeselectedParent = selectedItems.filter((item: string)=> (!checkedItems.includes(item) && item.includes("parent")))
