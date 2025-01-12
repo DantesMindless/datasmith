@@ -152,7 +152,7 @@ export default function DynamicTable() {
           </Box>
         </>
       )}
-      <Box>
+      <Box sx={{overflowX:'scroll'}}>
         <TableContainer>
           <Table aria-labelledby="tableTitle" size="small">
             {/* Dynamic Table Header */}
