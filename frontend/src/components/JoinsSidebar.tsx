@@ -24,11 +24,10 @@ function renderTreeItems(table){
 
 export default function JoinsSidebar() {
     const { activeTab, tabs } = useAppContext();
-    const tab = tabs[activeTab];
+    const tab = tabs ? tabs[activeTab] : null;
 
-
-    return (
-        <Box sx={{ border: "1px solid gray", maxWidth: tab.openedColumns ? "20px" : "20%" }}>
+    return tab ? (
+        <Box sx={{ border: "1px solid gray", maxWidth: tab.openedColumns ? 0 : "20%", minHeight: "100%" }}>
             <Box sx={{ overflow: "hidden", minHeight: "100%", transition: "max-width 0.5s ease-in-out" }}>
                 <SimpleTreeView
                     multiSelect
@@ -42,5 +41,5 @@ export default function JoinsSidebar() {
                 </SimpleTreeView>
             </Box>
         </Box>
-    );
+    ) : null;
 }

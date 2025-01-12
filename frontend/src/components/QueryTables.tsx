@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Table,
@@ -9,7 +9,7 @@ import {
   TablePagination,
   TableRow,
   TableSortLabel,
-  IconButton
+  Button
 } from "@mui/material";
 import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
@@ -39,12 +39,11 @@ export default function DynamicTable() {
   // Fetch table data
   useEffect(() => {
     if (tabs){
-
       const fetchData = async () => {
         const result = await queryTab(tabs[activeTab]);
         if (result && result.length > 0) {
           setHeaders(Object.keys(result[0])); // Extract headers dynamically from the first row
-          setData(result);
+          setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result]: [...data, ...result]);
         }
       };
       fetchData();
@@ -100,7 +99,7 @@ export default function DynamicTable() {
     setPage(0);
   };
 
-  const handleColumnClick = (header: string) => {
+  const handleColumnClick = async (header: string) => {
     setExpandedColumns(prev => {
       const newSet = new Set(prev);
       if (newSet.has(header)) {
@@ -112,25 +111,49 @@ export default function DynamicTable() {
     });
   };
 
-  const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const visibleRows = data
 
+  const renderIndexes = () => {
+    const indexes = []
+    for (let i = 1; i <= data.length; i++){
+      indexes.push(
+        <TableRow>
+          <TableCell>
+            {i}
+          </TableCell>
+        </TableRow>
+      )
+    }
+    return (
+      <TableContainer>
+          <Table size="small">
+        <TableBody>
+          {indexes}
+        </TableBody>
+      </Table>
+      </TableContainer>
+    )
+  }
+
+  const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%", overflowX: "scroll"}}>
+    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
       {tabs != null && tabs.length > 0 && activeTab != null && (
         <>
           <JoinsSidebar />
           <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-            <IconButton onClick={handleOpenColumns}>
+            <Button onClick={handleOpenColumns}>
               <KeyboardDoubleArrowRightIcon
                 sx={{rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", transition: "rotate 0.1s ease-in-out" }}
               />
-            </IconButton>
+            </Button>
+            {renderIndexesMemo}
           </Box>
         </>
       )}
       <Box>
         <TableContainer>
-          <Table aria-labelledby="tableTitle" size="medium">
+          <Table aria-labelledby="tableTitle" size="small">
             {/* Dynamic Table Header */}
             <TableHead>
               <TableRow>
