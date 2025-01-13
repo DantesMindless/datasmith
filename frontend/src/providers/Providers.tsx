@@ -76,6 +76,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     setDataStorage("activeTabs", [...tabs]);
     setTabs([...tabs]);
     setActiveTab(tabs.length -1)
+    setActivePage("queryTab");
   };
 
   const removeTab = async (index: number) => {
