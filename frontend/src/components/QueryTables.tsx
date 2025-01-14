@@ -6,7 +6,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TablePagination,
+  //TablePagination,
   TableRow,
   TableSortLabel,
   Button
@@ -34,12 +34,39 @@ export default function DynamicTable() {
   const [hasMore, setHasMore] = useState(true); // Флаг, есть ли ещё данные
 
 //
-  const getQueryTableCellStyles = (header: string) => ({
-    maxWidth: expandedColumns.has(header) ? 'none' : '150px',
+  // //const getQueryTableCellStyles = (header: string) => ({
+  // const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
+  //   maxWidth: expandedColumns.has(header) ? 'none' : '150px',
+  //   whiteSpace: 'nowrap',
+  //   overflow: 'hidden',
+  //   textOverflow: 'ellipsis',
+  //   border: "1px solid gray",
+  //   //
+  //   ...(isHeader && {
+  //     position: "sticky",
+  //     top: 0,
+  //     backgroundColor: "#fff", // Используем белый фон
+  //     zIndex: 2,
+  //     borderBottom: "2px solid #666", // Добавляем более заметную границу снизу
+  //     fontWeight: "bold"
+  //   })
+  //   //
+  // });
+
+  const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
+    ...(expandedColumns.has(header) 
+      ? { width: 'auto', maxWidth: 'none' }
+      : { width: '150px', maxWidth: '150px' }
+    ),
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    border: "1px solid gray"
+    border: "1px solid gray",
+    backgroundColor: isHeader ? "#f5f5f5" : "inherit",
+    position: isHeader ? "sticky" : "inherit",
+    top: isHeader ? 0 : "inherit",
+    zIndex: isHeader ? 1 : "inherit",
+    cursor: 'pointer'
   });
 
   // Fetch table data
@@ -160,79 +187,6 @@ export default function DynamicTable() {
 
   const MAX_ROWS = 700;
   return (
-  //   <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
-  //     {tabs != null && tabs.length > 0 && activeTab != null && (
-  //       <>
-  //         <JoinsSidebar />
-  //         <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-  //           <Button onClick={handleOpenColumns} sx={{height:"37px"}}>
-  //             <KeyboardDoubleArrowRightIcon
-  //               sx={{rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", transition: "rotate 0.1s ease-in-out" }}
-  //             />
-  //           </Button>
-  //           {renderIndexesMemo}
-  //         </Box>
-  //       </>
-  //     )}
-  //     <Box sx={{overflowX:'scroll'}}>
-  //       <TableContainer>
-  //         <Table aria-labelledby="tableTitle" size="small">
-  //           {/* Dynamic Table Header */}
-  //           <TableHead>
-  //             <TableRow>
-  //               {headers.map((header) => (
-  //                 <TableCell
-  //                   key={header}
-  //                   sortDirection={orderBy === header ? order : false}
-  //                   sx={getQueryTableCellStyles(header)}
-  //                 >
-  //                   <TableSortLabel
-  //                     active={orderBy === header}
-  //                     direction={orderBy === header ? order : "asc"}
-  //                     onClick={() => handleRequestSort(header)}
-  //                     >
-  //                     {header}
-  //                   </TableSortLabel>
-  //                 </TableCell>
-  //               ))}
-  //             </TableRow>
-  //           </TableHead>
-
-  //           {/* Dynamic Table Body */}
-  //           <TableBody>
-  //             {visibleRows.map((row, index) => (
-  //               <TableRow hover tabIndex={-1} key={index}>
-  //                 {headers.map((header) => (
-  //                 <TableCell
-  //                   key={header}
-  //                   sx={getQueryTableCellStyles(header)}
-  //                   title={row[header]}
-  //                   onClick={(e) => {
-  //                     handleColumnClick(header);
-  //                   }}
-  //                 >
-  //                   {row[header]}
-  //                 </TableCell>
-  //                 ))}
-  //               </TableRow>
-  //             ))}
-  //           </TableBody>
-  //         </Table>
-  //       </TableContainer>
-  //       </Box>
-  //       <TablePagination
-  //         rowsPerPageOptions={[5, 10, 25]}
-  //         component="div"
-  //         count={data.length}
-  //         rowsPerPage={rowsPerPage}
-  //         page={page}
-  //         onPageChange={handleChangePage}
-  //           onRowsPerPageChange={handleChangeRowsPerPage}
-  //           />
-  //   </Box>
-  // 
-
-
 /// NO PAGINATION
 //   <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
 //   {tabs != null && tabs.length > 0 && activeTab != null && (
@@ -296,81 +250,91 @@ export default function DynamicTable() {
 
 
 <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
-{tabs != null && tabs.length > 0 && activeTab != null && (
-  <>
-    <JoinsSidebar />
-    <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-      <Button onClick={handleOpenColumns} sx={{height:"37px"}}>
-        <KeyboardDoubleArrowRightIcon
-          sx={{rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", transition: "rotate 0.1s ease-in-out" }}
-        />
-      </Button>
-      {renderIndexesMemo}
-    </Box>
-  </>
-)}
+      {tabs != null && tabs.length > 0 && activeTab != null && (
+        <>
+          <JoinsSidebar />
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: "column", 
+            justifyContent: 'flex-start', 
+            border: "1px solid gray" 
+          }}>
+            <Button onClick={handleOpenColumns} sx={{height:"37px"}}>
+              <KeyboardDoubleArrowRightIcon
+                sx={{
+                  rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", 
+                  transition: "rotate 0.1s ease-in-out" 
+                }}
+              />
+            </Button>
+            {renderIndexesMemo}
+          </Box>
+        </>
+      )}
 
+      <Box
+        sx={{
+          overflowX: 'auto',
+          overflowY: 'auto',
+          maxHeight: '400px',
+          width: '100%'
+        }}
+        onScroll={handleScroll}
+      >
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              {headers.map((header) => (
+                <TableCell
+                  key={header}
+                  sortDirection={orderBy === header ? order : false}
+                  sx={getQueryTableCellStyles(header, true)}
+                  onClick={() => handleColumnClick(header)}
+                >
+                  <TableSortLabel
+                    active={orderBy === header}
+                    direction={orderBy === header ? order : "asc"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRequestSort(header);
+                    }}
+                  >
+                    {header}
+                  </TableSortLabel>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
 
-<Box
-  sx={{overflowX: 'scroll', overflowY: 'auto', maxHeight: '400px', width: '100%' }}
-  onScroll={handleScroll}
->
-  <TableContainer>
-    <Table aria-labelledby="tableTitle" size="small">
-      {/* Dynamic Table Header */}
-      <TableHead>
-        <TableRow>
-          {headers.map((header) => (
-            <TableCell
-              key={header}
-              sortDirection={orderBy === header ? order : false}
-              sx={{
-                ...getQueryTableCellStyles(header),
-                position: "sticky",
-                top: 0,
-                backgroundColor: "gray", // Чтобы заголовок был виден на фоне
-                zIndex: 1,
-              }}
-            >
-              <TableSortLabel
-                active={orderBy === header}
-                direction={orderBy === header ? order : "asc"}
-                onClick={() => handleRequestSort(header)}
-              >
-                {header}
-              </TableSortLabel>
-            </TableCell>
-          ))}
-        </TableRow>
-      </TableHead>
-
-      {/* Dynamic Table Body */}
-      <TableBody>
-        {data.map((row, index) => (
-          <TableRow hover tabIndex={-1} key={index}>
-            {headers.map((header) => (
-              <TableCell
-                //key={header}
-                key={`${index}-${header}`} // Уникальный ключ для каждой ячейки
-                sx={getQueryTableCellStyles(header)}
-                title={row[header]}
-                onClick={() => handleColumnClick(header)}
-              >
-                {row[header]}
-              </TableCell>
+          <TableBody>
+            {data.map((row, index) => (
+              <TableRow hover tabIndex={-1} key={index}>
+                {headers.map((header) => (
+                  <TableCell
+                    key={`${index}-${header}`}
+                    sx={getQueryTableCellStyles(header)}
+                    title={row[header]}
+                    onClick={() => handleColumnClick(header)}
+                  >
+                    {row[header]}
+                  </TableCell>
+                ))}
+              </TableRow>
             ))}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  </TableContainer>
-  {loading && (
-    <Box sx={{ textAlign: 'center', padding: '10px' }}>
-      <CircularProgress size={24} />
+          </TableBody>
+        </Table>
+        {loading && (
+          <Box sx={{ 
+            textAlign: 'center', 
+            padding: '10px',
+            position: 'sticky',
+            bottom: 0,
+            backgroundColor: '#fff'
+          }}>
+            <CircularProgress size={24} />
+          </Box>
+        )}
+      </Box>
     </Box>
-  )}
-</Box>
-
-</Box>
   );
 }
