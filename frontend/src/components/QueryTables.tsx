@@ -20,14 +20,16 @@ import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArro
 type Order = "asc" | "desc";
 
 export default function DynamicTable() {
+
+  const { activeTab, tabs, setTabs } = useAppContext();
   const [order, setOrder] = useState<Order>("asc");
   const [orderBy, setOrderBy] = useState<string>("");
   const [data, setData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const { activeTab, tabs, setTabs } = useAppContext();
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
+  const tab = tabs && activeTab != null ? tabs[activeTab] : null
 
   const getQueryTableCellStyles = (header: string) => ({
     maxWidth: expandedColumns.has(header) ? 'none' : '150px',
@@ -37,39 +39,65 @@ export default function DynamicTable() {
     border: "1px solid gray"
   });
 
-  // Fetch table data
+  function setColumnsIds(table, level: number, itemsCollector: string[]) {
+    console.log("table")
+    console.log(table)
+
+    const schema_name = Object.keys(table)[0]
+    console.log("schema_name")
+    console.log(schema_name)
+    const table_fields = table[schema_name]
+    console.log("table_fields")
+    console.log(table_fields)
+
+    console.log("table")
+    console.log(table)
+
+    const rootId = `parent_level_${level}^-^${schema_name}`
+    const childIds: string[] = []
+    itemsCollector.push(rootId)
+    console.log(table_fields?.fields)
+
+    if (table_fields?.fields && table_fields.fields.length > 0) {
+      table_fields.fields.forEach((row) => {
+        childIds.push(`level_${level}^-^${schema_name}.${row.column_name}`)
+      })
+      itemsCollector.push(...childIds)
+      // table_fields.relations.forEach((row) => {
+      //   setColumnsIds(row, level + 1, itemsCollector)
+      // })
+    }
+  }
+
   useEffect(() => {
-    if (tabs){
+    if (tabs && tab) {
       const fetchData = async () => {
-        const result = await queryTab(tabs[activeTab]);
-        if (result && result.length > 0) {
-          setHeaders(Object.keys(result[0])); // Extract headers dynamically from the first row
-          setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result]: [...data, ...result]);
+        const result = await queryTab(tab);
+        if (result) {
+          if (result?.length > 0){
+            setHeaders(Object.keys(result[0]));
+            setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result] : [...data, ...result]);
+          } else {
+            setData([])
+          }
         }
       };
+      const fetchJoins = async () => {
+        const result = await getJoins(tab);
+        tab.joins = result
+        setColumnsIds({[tab.table]: tab.joins}, 1, tab.columns)
+        tab.activeColumns = tab.columns.filter((item)=>item.includes("level_1"))
+      };
       fetchData();
-    }
-  }, [activeTab, tabs]);
-
-  useEffect(()=>{
-    if(tabs){
-    const tab = tabs[activeTab]
-    const fetchData = async () => {
-      const result = await getJoins(tab);
-      tabs[activeTab].joins = result
+      fetchJoins();
       setTabs([...tabs])
-    };
-    if(tab.joins.length == 0){
-      fetchData();
+
     }
-    }
-  }, [activeTab, tabs, setTabs])
+  }, [activeTab])
 
   const handleOpenColumns = () => {
-    if(tabs){
-      const tab = tabs[activeTab]
+    if (tabs && tab && activeTab !=null ) {
       tab.openedColumns = tab.openedColumns ? false : true
-      tabs[activeTab] = tab
       setTabs([...tabs])
     }
   }
@@ -85,8 +113,8 @@ export default function DynamicTable() {
             ? -1
             : 1
           : a[property] < b[property]
-          ? -1
-          : 1
+            ? -1
+            : 1
       )
     );
   };
@@ -116,7 +144,7 @@ export default function DynamicTable() {
 
   const renderIndexes = () => {
     const indexes = []
-    for (let i = 1; i <= data.length; i++){
+    for (let i = 1; i <= data.length; i++) {
       indexes.push(
         <TableRow>
           <TableCell align="center">
@@ -127,32 +155,33 @@ export default function DynamicTable() {
     }
     return (
       <TableContainer>
-          <Table size="small">
-        <TableBody>
-          {indexes}
-        </TableBody>
-      </Table>
+        <Table size="small">
+          <TableBody>
+            {indexes}
+          </TableBody>
+        </Table>
       </TableContainer>
     )
   }
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
-      {tabs != null && tabs.length > 0 && activeTab != null && (
+    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%" }}>
+      {tabs != null && tab ? (
         <>
-          <JoinsSidebar />
+          <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns}/>
           <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-            <Button onClick={handleOpenColumns} sx={{height:"37px"}}>
+            <Button onClick={handleOpenColumns} sx={{ height: "37px" }}>
               <KeyboardDoubleArrowRightIcon
-                sx={{rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", transition: "rotate 0.1s ease-in-out" }}
+                sx={{ rotate: tab?.openedColumns ? "180deg" : "0deg", transition: "rotate 0.1s ease-in-out" }}
               />
             </Button>
             {renderIndexesMemo}
           </Box>
         </>
-      )}
-      <Box sx={{overflowX:'scroll'}}>
+      ) : activeTab}
+      {data.length > 0 ?
+      (<Box sx={{ overflowX: 'scroll' }}>
         <TableContainer>
           <Table aria-labelledby="tableTitle" size="small">
             {/* Dynamic Table Header */}
@@ -168,7 +197,7 @@ export default function DynamicTable() {
                       active={orderBy === header}
                       direction={orderBy === header ? order : "asc"}
                       onClick={() => handleRequestSort(header)}
-                      >
+                    >
                       {header}
                     </TableSortLabel>
                   </TableCell>
@@ -181,16 +210,16 @@ export default function DynamicTable() {
               {visibleRows.map((row, index) => (
                 <TableRow hover tabIndex={-1} key={index}>
                   {headers.map((header) => (
-                  <TableCell
-                    key={header}
-                    sx={getQueryTableCellStyles(header)}
-                    title={row[header]}
-                    onClick={(e) => {
-                      handleColumnClick(header);
-                    }}
-                  >
-                    {row[header]}
-                  </TableCell>
+                    <TableCell
+                      key={header}
+                      sx={getQueryTableCellStyles(header)}
+                      title={row[header]}
+                      onClick={(e) => {
+                        handleColumnClick(header);
+                      }}
+                    >
+                      {row[header]}
+                    </TableCell>
                   ))}
                 </TableRow>
               ))}
@@ -205,8 +234,12 @@ export default function DynamicTable() {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          />
-        </Box>
+        />
+      </Box>):
+      <Box>
+      "No Data Found"
+      </Box>
+      }
     </Box>
   );
 }

@@ -12,7 +12,7 @@ const rootElement = document.getElementById('root') as HTMLElement;
 const root = createRoot(rootElement);
 
 root.render(
-  <StrictMode>
+
     <ContextProvider>
       <AlertBanner />
       <ThemeProvider theme={theme()}>
@@ -20,5 +20,5 @@ root.render(
         <App />
       </ThemeProvider>
     </ContextProvider>
-  </StrictMode>,
+
 );

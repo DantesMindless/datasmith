@@ -25,13 +25,13 @@ export default function JoyOrderDashboardTemplate() {
         component="main"
         className="MainContent"
         sx={{
-          px: { xs: 2, md: 6 },
+          // px: { xs: 1, md: 1 },
           pt: {
-            xs: "calc(12px + var(--Header-height))",
-            sm: "calc(12px + var(--Header-height))",
-            md: 3,
+            xs: "calc(4px + var(--Header-height))",
+            sm: "calc(4px + var(--Header-height))",
+            md: 1,
           },
-          pb: { xs: 2, sm: 2, md: 3 },
+          pb: { xs: 1, sm: 1, md: 1 },
           flex: 1,
           display: "flex",
           flexDirection: "column",

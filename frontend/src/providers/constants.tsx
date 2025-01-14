@@ -33,6 +33,11 @@ interface TableViewTab{
     name: string
     data: Record<string, string | number | null>[]
     openedColumns: boolean
+    columns: string[]
+    activeColumns: string[]
+    filters: string[]
+    initialLoad: boolean
+    headers : string[]
 }
 
 type Connections = Connection[] | null

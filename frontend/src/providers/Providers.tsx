@@ -70,10 +70,20 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       maxItems: 0,
       name: `${schema} - ${table} #${tabsCount.length}`,
       data: [],
-      openedColumns: false
+      openedColumns: false,
+      columns : [],
+      activeColumns:[],
+      filters: [],
+      initialLoad: true,
+      headers: []
     };
     tabs.push(tabObj);
-    setDataStorage("activeTabs", [...tabs]);
+    const tabsStorage = [...tabs]
+    tabsStorage.forEach((row)=>{
+      row.data.joins = {}
+      row.data.data = []
+    })
+    setDataStorage("activeTabs", [...tabsStorage]);
     setTabs([...tabs]);
     setActiveTab(tabs.length -1)
   };

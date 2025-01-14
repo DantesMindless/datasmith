@@ -11,6 +11,5 @@ class PandasMySQLQueryEngine(VerifyImputsMixin):
         try:
             result = psql.sqldf(sql_query, locals())
             return result
-        except Exception as e:
-            print(f"Error executing query: {e}")
+        except Exception:
             return None

@@ -6,7 +6,6 @@ import psycopg2
 from .mixins import VerifyInputsMixin, SerializerVerifyInputsMixin
 from cachetools import LFUCache
 from rest_framework import serializers
-from pprint import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +249,6 @@ class PostgresConnection(VerifyInputsMixin):
 
         for table in tables_list:
             table_relations.append(self.related_tables(table["table_name"])[1])
-        pprint(table_relations)
 
         def get_relationships(
             table_name: str, scanned_tables: Optional[Set[str]] = None
@@ -299,5 +297,4 @@ class PostgresConnection(VerifyInputsMixin):
                 tables[table_name]["relations"].append(get_relationships(table_name))
 
         self.close()
-        pprint(tables)
         return tables
