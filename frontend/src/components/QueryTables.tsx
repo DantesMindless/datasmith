@@ -69,6 +69,19 @@ export default function DynamicTable() {
     cursor: 'pointer'
   });
 
+  const getIndexCellStyles = (isHeader: boolean = false) => ({
+    width: '50px',
+    minWidth: '50px',
+    maxWidth: '50px',
+    padding: '6px',
+    textAlign: 'center',
+    border: "1px solid gray",
+    backgroundColor: isHeader ? "#f5f5f5" : "#f5f5f5",
+    position: isHeader ? "sticky" : "inherit",
+    top: isHeader ? 0 : "inherit",
+    zIndex: isHeader ? 1 : "inherit",
+  });
+
   // Fetch table data
   useEffect(() => {
     if (tabs){
@@ -185,156 +198,115 @@ export default function DynamicTable() {
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
 
-  const MAX_ROWS = 700;
   return (
-/// NO PAGINATION
-//   <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
-//   {tabs != null && tabs.length > 0 && activeTab != null && (
-//     <>
-//       <JoinsSidebar />
-//       <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-//         <Button onClick={handleOpenColumns} sx={{height:"37px"}}>
-//           <KeyboardDoubleArrowRightIcon
-//             sx={{rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", transition: "rotate 0.1s ease-in-out" }}
-//           />
-//         </Button>
-//         {renderIndexesMemo}
-//       </Box>
-//     </>
-//   )}
-//   <Box sx={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: `${MAX_ROWS}px`, width: '100%' }}>
-//     <TableContainer>
-//       <Table aria-labelledby="tableTitle" size="small">
-//         {/* Dynamic Table Header */}
-//         <TableHead>
-//           <TableRow>
-//             {headers.map((header) => (
-//               <TableCell
-//                 key={header}
-//                 sortDirection={orderBy === header ? order : false}
-//                 sx={getQueryTableCellStyles(header)}
-//               >
-//                 <TableSortLabel
-//                   active={orderBy === header}
-//                   direction={orderBy === header ? order : "asc"}
-//                   onClick={() => handleRequestSort(header)}
-//                 >
-//                   {header}
-//                 </TableSortLabel>
-//               </TableCell>
-//             ))}
-//           </TableRow>
-//         </TableHead>
-
-//         {/* Dynamic Table Body */}
-//         <TableBody>
-//           {data.map((row, index) => (
-//             <TableRow hover tabIndex={-1} key={index}>
-//               {headers.map((header) => (
-//                 <TableCell
-//                   key={header}
-//                   sx={getQueryTableCellStyles(header)}
-//                   title={row[header]}
-//                   onClick={() => handleColumnClick(header)}
-//                 >
-//                   {row[header]}
-//                 </TableCell>
-//               ))}
-//             </TableRow>
-//           ))}
-//         </TableBody>
-//       </Table>
-//     </TableContainer>
-//   </Box>
-// </Box>
-
-
-<Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
+      <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
       {tabs != null && tabs.length > 0 && activeTab != null && (
         <>
           <JoinsSidebar />
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: "column", 
-            justifyContent: 'flex-start', 
-            border: "1px solid gray" 
-          }}>
-            <Button onClick={handleOpenColumns} sx={{height:"37px"}}>
-              <KeyboardDoubleArrowRightIcon
-                sx={{
-                  rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg", 
-                  transition: "rotate 0.1s ease-in-out" 
-                }}
-              />
-            </Button>
-            {renderIndexesMemo}
+          <Box
+            sx={{
+              overflowX: 'auto',
+              overflowY: 'auto',
+              maxHeight: '400px',
+              width: '100%',
+              display: 'flex',
+              border: "1px solid gray"
+            }}
+            onScroll={handleScroll}
+          >
+            {/* Таблица с индексами */}
+            <Table size="small" sx={{ width: 'auto', flexShrink: 0 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={getIndexCellStyles(true)}>
+                    <Button 
+                      onClick={handleOpenColumns}
+                      sx={{
+                        minWidth: 'unset',
+                        padding: 0,
+                        width: '100%',
+                        height: '100%',
+                       
+                      }}
+                    >
+                      <KeyboardDoubleArrowRightIcon
+                        sx={{
+                          rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg",
+                          transition: "rotate 0.1s ease-in-out"
+                        }}
+                      />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell sx={getIndexCellStyles()}>
+                      {index + 1}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Основная таблица с данными */}
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {headers.map((header) => (
+                    <TableCell
+                      key={header}
+                      sortDirection={orderBy === header ? order : false}
+                      sx={getQueryTableCellStyles(header, true)}
+                      onClick={() => handleColumnClick(header)}
+                    >
+                      <TableSortLabel
+                        active={orderBy === header}
+                        direction={orderBy === header ? order : "asc"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRequestSort(header);
+                        }}
+                      >
+                        {header}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {data.map((row, index) => (
+                  <TableRow hover tabIndex={-1} key={index}>
+                    {headers.map((header) => (
+                      <TableCell
+                        key={`${index}-${header}`}
+                        sx={getQueryTableCellStyles(header)}
+                        title={row[header]}
+                        onClick={() => handleColumnClick(header)}
+                      >
+                        {row[header]}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Box>
         </>
       )}
-
-      <Box
-        sx={{
-          overflowX: 'auto',
-          overflowY: 'auto',
-          maxHeight: '400px',
-          width: '100%'
-        }}
-        onScroll={handleScroll}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              {headers.map((header) => (
-                <TableCell
-                  key={header}
-                  sortDirection={orderBy === header ? order : false}
-                  sx={getQueryTableCellStyles(header, true)}
-                  onClick={() => handleColumnClick(header)}
-                >
-                  <TableSortLabel
-                    active={orderBy === header}
-                    direction={orderBy === header ? order : "asc"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRequestSort(header);
-                    }}
-                  >
-                    {header}
-                  </TableSortLabel>
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-
-          <TableBody>
-            {data.map((row, index) => (
-              <TableRow hover tabIndex={-1} key={index}>
-                {headers.map((header) => (
-                  <TableCell
-                    key={`${index}-${header}`}
-                    sx={getQueryTableCellStyles(header)}
-                    title={row[header]}
-                    onClick={() => handleColumnClick(header)}
-                  >
-                    {row[header]}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {loading && (
-          <Box sx={{ 
-            textAlign: 'center', 
-            padding: '10px',
-            position: 'sticky',
-            bottom: 0,
-            backgroundColor: '#fff'
-          }}>
-            <CircularProgress size={24} />
-          </Box>
-        )}
-      </Box>
+      {loading && (
+        <Box sx={{ 
+          textAlign: 'center', 
+          padding: '10px',
+          position: 'sticky',
+          bottom: 0,
+          backgroundColor: '#fff'
+        }}>
+          <CircularProgress size={24} />
+        </Box>
+      )}
     </Box>
   );
 }
