@@ -6,7 +6,6 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  //TablePagination,
   TableRow,
   TableSortLabel,
   Button
@@ -17,7 +16,6 @@ import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import { CircularProgress } from "@mui/material";
 
-
 type Order = "asc" | "desc";
 
 export default function DynamicTable() {
@@ -25,33 +23,11 @@ export default function DynamicTable() {
   const [orderBy, setOrderBy] = useState<string>("");
   const [data, setData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const { activeTab, tabs, setTabs } = useAppContext();
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
-//
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true); // Флаг, есть ли ещё данные
-
-//
-  // //const getQueryTableCellStyles = (header: string) => ({
-  // const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
-  //   maxWidth: expandedColumns.has(header) ? 'none' : '150px',
-  //   whiteSpace: 'nowrap',
-  //   overflow: 'hidden',
-  //   textOverflow: 'ellipsis',
-  //   border: "1px solid gray",
-  //   //
-  //   ...(isHeader && {
-  //     position: "sticky",
-  //     top: 0,
-  //     backgroundColor: "#fff", // Используем белый фон
-  //     zIndex: 2,
-  //     borderBottom: "2px solid #666", // Добавляем более заметную границу снизу
-  //     fontWeight: "bold"
-  //   })
-  //   //
-  // });
+  const [hasMore, setHasMore] = useState(true);
+  const [tableHeight, setTableHeight] = useState('700px');
 
   const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
     ...(expandedColumns.has(header) 
@@ -82,6 +58,12 @@ export default function DynamicTable() {
     zIndex: isHeader ? 1 : "inherit",
   });
 
+  const calculateTableHeight = () => {
+    const windowHeight = window.innerHeight;
+    const heightWithMargin = windowHeight * 0.85;
+    setTableHeight(`${heightWithMargin}px`);
+  };
+
   // Fetch table data
   useEffect(() => {
     if (tabs){
@@ -110,6 +92,20 @@ export default function DynamicTable() {
     }
   }, [activeTab, tabs, setTabs])
 
+  useEffect(() => {
+    calculateTableHeight();
+    
+    const handleResize = () => {
+      calculateTableHeight();
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   const handleOpenColumns = () => {
     if(tabs){
       const tab = tabs[activeTab]
@@ -136,15 +132,6 @@ export default function DynamicTable() {
     );
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
   const handleColumnClick = async (header: string) => {
     setExpandedColumns(prev => {
       const newSet = new Set(prev);
@@ -156,47 +143,21 @@ export default function DynamicTable() {
       return newSet;
     });
   };
-//
+
   const handleScroll = async (event: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
   
     if (!loading && hasMore && scrollTop + clientHeight >= scrollHeight - 10) {
       setLoading(true);
-      const result = await queryTab(tabs[activeTab], data.length); // OFFSET равен текущему количеству строк
+      const result = await queryTab(tabs[activeTab], data.length); // OFFSET equals to current number of rows
       if (result.length > 0) {
         setData((prevData) => [...prevData, ...result]);
       } else {
-        setHasMore(false); // Нет больше данных
+        setHasMore(false); // No more data
       }
       setLoading(false);
     }
   };
-//
-  const visibleRows = data
-
-  const renderIndexes = () => {
-    const indexes = []
-    for (let i = 1; i <= data.length; i++){
-      indexes.push(
-        <TableRow key={i}>
-          <TableCell align="center">
-            {i}
-          </TableCell>
-        </TableRow>
-      )
-    }
-    return (
-      <TableContainer>
-          <Table size="small">
-        <TableBody>
-          {indexes}
-        </TableBody>
-      </Table>
-      </TableContainer>
-    )
-  }
-
-  const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
 
   return (
       <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
@@ -207,14 +168,14 @@ export default function DynamicTable() {
             sx={{
               overflowX: 'auto',
               overflowY: 'auto',
-              maxHeight: '400px',
+              maxHeight: tableHeight,
               width: '100%',
               display: 'flex',
               border: "1px solid gray"
             }}
             onScroll={handleScroll}
           >
-            {/* Таблица с индексами */}
+            {/* The table with indexes */}
             <Table size="small" sx={{ width: 'auto', flexShrink: 0 }}>
               <TableHead>
                 <TableRow>
@@ -250,7 +211,7 @@ export default function DynamicTable() {
               </TableBody>
             </Table>
 
-            {/* Основная таблица с данными */}
+            {/* Static Table Header */}
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -276,6 +237,7 @@ export default function DynamicTable() {
                 </TableRow>
               </TableHead>
 
+              {/* Dynamic Table Body */}
               <TableBody>
                 {data.map((row, index) => (
                   <TableRow hover tabIndex={-1} key={index}>
