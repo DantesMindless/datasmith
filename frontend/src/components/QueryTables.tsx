@@ -153,7 +153,7 @@ export default function DynamicTable() {
       }
     }
   };
-
+  
   return (
       <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
       {tabs != null && tabs.length > 0 && activeTab != null && (
@@ -238,16 +238,19 @@ export default function DynamicTable() {
               <TableBody>
                 {data.map((row, index) => (
                   <TableRow hover tabIndex={-1} key={index}>
-                    {headers.map((header) => (
-                      <TableCell
-                        key={`${index}-${header}`}
-                        sx={getQueryTableCellStyles(header)}
-                        title={row[header]}
-                        onClick={() => handleColumnClick(header)}
-                      >
-                        {row[header]}
-                      </TableCell>
-                    ))}
+{headers.map((header) => {
+                      const cellContent = row[header]?.toString() || '';
+                      return (
+                        <TableCell
+                          key={`${index}-${header}`}
+                          sx={getQueryTableCellStyles(header)}
+                          title={cellContent || undefined}
+                          onClick={() => handleColumnClick(header)}
+                        >
+                          {cellContent}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))}
               </TableBody>
