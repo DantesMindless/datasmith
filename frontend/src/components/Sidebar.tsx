@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -20,26 +20,10 @@ import { getDatabasesList, getSchemaTablesList } from "../utils/requests";
 
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import IndeterminateCheckBoxIcon from '@mui/icons-material/IndeterminateCheckBox';
-import SvgIcon, { SvgIconProps } from '@mui/material/SvgIcon';
-import { styled } from '@mui/material/styles';
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
-import { TreeItem, treeItemClasses } from '@mui/x-tree-view/TreeItem';
+import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Connection } from "../providers/constants";
-
-
-function CloseSquare(props: SvgIconProps) {
-  return (
-    <SvgIcon
-      className="close"
-      fontSize="inherit"
-      style={{ width: 14, height: 14 }}
-      {...props}
-    >
-      {/* tslint:disable-next-line: max-line-length */}
-      <path d="M13.5 2c-5.629 0-10.212 4.436-10.475 10h-3.025l4.537 5.917 4.463-5.917h-2.975c.26-3.902 3.508-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.876-2.854l-1.847 2.449c1.919 2.088 4.664 3.405 7.723 3.405 5.798 0 10.5-4.702 10.5-10.5s-4.702-10.5-10.5-10.5z"/>
-    </SvgIcon>
-  );
-}
+import TableRowsIcon from '@mui/icons-material/TableRows';
 
 interface ActiveConnection extends Connection {
   id: string;
@@ -49,12 +33,23 @@ interface ActiveConnection extends Connection {
 
 export default function Sidebar() {
   const { connections, activeConnections, updateActiveConnections, updateConnections, addTableViewTab } = useAppContext();
+  const [expandedItems, setExpandedItems] = useState([])
 
   useEffect(() => {
     if (connections?.length === 0) {
       updateConnections();
     }
   }, [connections, updateConnections]);
+
+  const handleItemClick = (event, item) => {
+    if(!expandedItems.includes(item)){
+      expandedItems.push(item)
+      setExpandedItems([...expandedItems])
+    }else{
+      setExpandedItems(expandedItems.filter((element)=>element != item))
+    }
+    console.log(expandedItems)
+  }
 
   async function addActiveConnection(connection : Connection) {
     const databasesList = await getDatabasesList(connection.id);
@@ -83,13 +78,13 @@ export default function Sidebar() {
     if (activeConnections) {
       return (
         <SimpleTreeView
-        checkboxSelection
-
-          defaultExpandedItems={['grid']}
+        // checkboxSelection
+          expandedItems={expandedItems}
+          onItemClick = {handleItemClick}
           slots={{
             expandIcon: AddBoxIcon,
             collapseIcon: IndeterminateCheckBoxIcon,
-            endIcon: CloseSquare,
+            endIcon: TableRowsIcon,
           }}
         >
           {Object.keys(activeConnections).map((key) =>

@@ -16,7 +16,6 @@ import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 
-
 type Order = "asc" | "desc";
 
 export default function DynamicTable() {
@@ -40,32 +39,20 @@ export default function DynamicTable() {
   });
 
   function setColumnsIds(table, level: number, itemsCollector: string[]) {
-    console.log("table")
-    console.log(table)
-
     const schema_name = Object.keys(table)[0]
-    console.log("schema_name")
-    console.log(schema_name)
     const table_fields = table[schema_name]
-    console.log("table_fields")
-    console.log(table_fields)
-
-    console.log("table")
-    console.log(table)
-
     const rootId = `parent_level_${level}^-^${schema_name}`
     const childIds: string[] = []
     itemsCollector.push(rootId)
-    console.log(table_fields?.fields)
 
     if (table_fields?.fields && table_fields.fields.length > 0) {
       table_fields.fields.forEach((row) => {
         childIds.push(`level_${level}^-^${schema_name}.${row.column_name}`)
       })
       itemsCollector.push(...childIds)
-      // table_fields.relations.forEach((row) => {
-      //   setColumnsIds(row, level + 1, itemsCollector)
-      // })
+      table_fields.relations.forEach((row) => {
+        setColumnsIds(row, level + 1, itemsCollector)
+      })
     }
   }
 
