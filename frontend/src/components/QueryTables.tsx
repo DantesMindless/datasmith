@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState} from "react";
 import {
   Box,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TableSortLabel,
@@ -14,7 +13,6 @@ import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
-import { CircularProgress } from "@mui/material";
 
 type Order = "asc" | "desc";
 
@@ -25,7 +23,6 @@ export default function DynamicTable() {
   const [headers, setHeaders] = useState<string[]>([]);
   const { activeTab, tabs, setTabs } = useAppContext();
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [tableHeight, setTableHeight] = useState('700px');
 
@@ -147,15 +144,13 @@ export default function DynamicTable() {
   const handleScroll = async (event: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
   
-    if (!loading && hasMore && scrollTop + clientHeight >= scrollHeight - 10) {
-      setLoading(true);
+    if (hasMore && scrollTop + clientHeight >= scrollHeight - 10) {
       const result = await queryTab(tabs[activeTab], data.length); // OFFSET equals to current number of rows
       if (result.length > 0) {
         setData((prevData) => [...prevData, ...result]);
       } else {
         setHasMore(false); // No more data
       }
-      setLoading(false);
     }
   };
 
@@ -169,8 +164,10 @@ export default function DynamicTable() {
               overflowX: 'auto',
               overflowY: 'auto',
               maxHeight: tableHeight,
+              position: 'relative',
               width: '100%',
               display: 'flex',
+              lexDirection: 'column',
               border: "1px solid gray"
             }}
             onScroll={handleScroll}
@@ -257,17 +254,6 @@ export default function DynamicTable() {
             </Table>
           </Box>
         </>
-      )}
-      {loading && (
-        <Box sx={{ 
-          textAlign: 'center', 
-          padding: '10px',
-          position: 'sticky',
-          bottom: 0,
-          backgroundColor: '#fff'
-        }}>
-          <CircularProgress size={24} />
-        </Box>
       )}
     </Box>
   );

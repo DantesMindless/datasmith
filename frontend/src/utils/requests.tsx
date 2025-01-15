@@ -51,13 +51,10 @@ export const getConnectionTypes = async () => {
   return getData("datasource/connection-types/")
 };
 
-//export const queryTab = (tab: TableViewTab) => {
 export const queryTab = (tab: TableViewTab, offset = 0) => {
   const getQuery = () => {
-    //return `SELECT * FROM ${tab.schema}.${tab.table} LIMIT ${tab.perPage};`;
     return `SELECT * FROM ${tab.schema}.${tab.table} LIMIT ${tab.perPage} OFFSET ${offset};`;
   }
-  //return putData(`datasource/query/${tab.ID}/`, {query: getQuery()})
   return putData(`datasource/query/${tab.ID}/`, { query: getQuery() });
 }
 
