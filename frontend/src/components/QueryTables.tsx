@@ -165,7 +165,7 @@ export default function DynamicTable() {
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%" }}>
+    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
       {tabs != null && tab ? (
         <>
           <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns} />
@@ -190,7 +190,7 @@ export default function DynamicTable() {
                     <TableCell
                       key={header}
                       sortDirection={orderBy === header ? order : false}
-                      sx={getQueryTableCellStyles(header)}
+                      sx={{...getQueryTableCellStyles(header), fontWeight: "bold"}}
                     >
                       <TableSortLabel
                         active={orderBy === header}

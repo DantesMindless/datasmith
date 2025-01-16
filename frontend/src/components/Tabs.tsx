@@ -6,7 +6,7 @@ import { pageComponents } from "../utils/constants";
 import { Button, ButtonGroup } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 
-const tabButtonStyle = {color: "text.primary", bgcolor: "secondary.main",}
+const tabButtonStyle = {color: "text.primary", bgcolor: "secondary.main", height: "20px", fontSize: "10px"}
 
 export default function TabsSegmentedControls() {
   const { tabs, removeTab, updateActiveTab, setActivePage } = useAppContext();
