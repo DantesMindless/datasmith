@@ -71,12 +71,27 @@ class DataSourceView(BaseAuthApiView):
             DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
-    def put(self, request: HttpRequest, id: UUID) -> Response:
+    def put_tut(self, request: HttpRequest, id: UUID) -> Response:
         data = request.data
         if not (query := data.get("query")):
             return Response("Query not provided", status=status.HTTP_400_BAD_REQUEST)
         if datasource := DataSource.objects.filter(id=id).first():
             success, response_data, message = datasource.query(query)
+            if success and response_data is not None:
+                return Response(response_data)
+            elif success:
+                return Response(message)
+            return Response(message, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
+        )
+
+    def put(self, request: HttpRequest, id: UUID) -> Response:
+        data = request.data
+        if not (query := data.get("query")):
+            return Response("Query not provided", status=status.HTTP_400_BAD_REQUEST)
+        if datasource := DataSource.objects.filter(id=id).first():
+            success, response_data, message = datasource.get_table_rows(query)
             if success and response_data is not None:
                 return Response(response_data)
             elif success:

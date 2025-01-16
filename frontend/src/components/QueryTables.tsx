@@ -56,34 +56,46 @@ export default function DynamicTable() {
     }
   }
 
-  useEffect(() => {
-    if (tabs && tab) {
-      const fetchData = async () => {
-        const result = await queryTab(tab);
-        if (result) {
-          if (result?.length > 0){
-            setHeaders(Object.keys(result[0]));
-            setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result] : [...data, ...result]);
-          } else {
-            setData([])
-          }
-        }
-      };
-      const fetchJoins = async () => {
-        const result = await getJoins(tab);
-        tab.joins = result
-        setColumnsIds({[tab.table]: tab.joins}, 1, tab.columns)
-        tab.activeColumns = tab.columns.filter((item)=>item.includes("level_1"))
-      };
-      fetchData();
-      fetchJoins();
-      setTabs([...tabs])
+  const fetchData = async (tabData) => {
+    const result = await queryTab(tabData);
+    if (result) {
+      if (result?.length > 0) {
+        const tableHeaders = Object.keys(result[0]).filter((item) => !item.includes("total_rows_number"))
+        setHeaders(tableHeaders);
+        setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result] : [...data, ...result]);
+      } else {
+        setData([])
+      }
+      return
+    }
+  };
 
+  const fetchJoins = async (tabData) => {
+    const result = await getJoins(tabData);
+    tabData.joins = result
+    setColumnsIds({ [tabData.table]: tabData.joins }, 1, tabData.columns)
+    tabData.activeColumns = tabData.columns.filter((item) => item.includes("level_1"))
+    return
+  };
+
+  useEffect(() => {
+
+    if (tabs && tab) {
+      (async () => {
+        await fetchJoins(tab);
+        await fetchData(tab);
+        setTabs([...tabs]);
+      })();
     }
   }, [activeTab])
 
+  useEffect(() => {
+    console.log(tab?.activeColumns)
+    fetchData(tab);
+  }, [tab?.activeColumns])
+
   const handleOpenColumns = () => {
-    if (tabs && tab && activeTab !=null ) {
+    if (tabs && tab && activeTab != null) {
       tab.openedColumns = tab.openedColumns ? false : true
       setTabs([...tabs])
     }
@@ -156,7 +168,7 @@ export default function DynamicTable() {
     <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%" }}>
       {tabs != null && tab ? (
         <>
-          <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns}/>
+          <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns} />
           <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
             <Button onClick={handleOpenColumns} sx={{ height: "37px" }}>
               <KeyboardDoubleArrowRightIcon
@@ -168,64 +180,68 @@ export default function DynamicTable() {
         </>
       ) : activeTab}
       {data.length > 0 ?
-      (<Box sx={{ overflowX: 'scroll' }}>
-        <TableContainer>
-          <Table aria-labelledby="tableTitle" size="small">
-            {/* Dynamic Table Header */}
-            <TableHead>
-              <TableRow>
-                {headers.map((header) => (
-                  <TableCell
-                    key={header}
-                    sortDirection={orderBy === header ? order : false}
-                    sx={getQueryTableCellStyles(header)}
-                  >
-                    <TableSortLabel
-                      active={orderBy === header}
-                      direction={orderBy === header ? order : "asc"}
-                      onClick={() => handleRequestSort(header)}
-                    >
-                      {header}
-                    </TableSortLabel>
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-
-            {/* Dynamic Table Body */}
-            <TableBody>
-              {visibleRows.map((row, index) => (
-                <TableRow hover tabIndex={-1} key={index}>
+        (<Box sx={{ overflowX: 'scroll' }}>
+          <TableContainer>
+            <Table aria-labelledby="tableTitle" size="small">
+              {/* Dynamic Table Header */}
+              <TableHead>
+                <TableRow>
                   {headers.map((header) => (
                     <TableCell
                       key={header}
+                      sortDirection={orderBy === header ? order : false}
                       sx={getQueryTableCellStyles(header)}
-                      title={row[header]}
-                      onClick={(e) => {
-                        handleColumnClick(header);
-                      }}
                     >
-                      {row[header]}
+                      <TableSortLabel
+                        active={orderBy === header}
+                        direction={orderBy === header ? order : "asc"}
+                        onClick={() => handleRequestSort(header)}
+                      >
+                        {header}
+                      </TableSortLabel>
                     </TableCell>
                   ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={data.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
-      </Box>):
-      <Box>
-      "No Data Found"
-      </Box>
+              </TableHead>
+
+              {/* Dynamic Table Body */}
+              <TableBody>
+                {visibleRows.map((row, index) => (
+                  <TableRow hover tabIndex={-1} key={index}>
+                    {headers.map((header) => (
+                      <TableCell
+                        key={header}
+                        sx={getQueryTableCellStyles(header)}
+                        title={row[header]}
+                        onClick={(e) => {
+                          handleColumnClick(header);
+                        }}
+                      >
+                        {row[header] != null ? row[header] : "NULL"}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={data.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </Box>) :
+        <Box sx={{display: "flex", width: "100%", border: "1px solid gray"}}>
+          {tab && tab.activeColumns.length == 0 ? (
+            <h3 style={{ textAlign: 'center', width: "100%" }}>Select Columns</h3>
+          ) : (
+            <h3 style={{ textAlign: 'center', width: "100%" }}>No Data Found</h3>
+          )}
+        </Box>
       }
     </Box>
   );

@@ -52,10 +52,11 @@ export const getConnectionTypes = async () => {
 };
 
 export const queryTab = (tab: TableViewTab) => {
-  const getQuery = () => {
-    return `SELECT * FROM ${tab.schema}.${tab.table} LIMIT ${tab.perPage};`;
-  }
-  return putData(`datasource/query/${tab.ID}/`, {query: getQuery()})
+  // const getQuery = () => {
+  //   return `SELECT * FROM ${tab.schema}.${tab.table} LIMIT ${tab.perPage};`;
+  // }
+  const query = tab
+  return putData(`datasource/query/${tab.ID}/`, {query: query})
 }
 
 export const getJoins = (tab: TableViewTab) => {

@@ -184,6 +184,24 @@ class DataSource(BaseModel):
         self.connection.close()
         return data
 
+    def get_table_rows(self, query) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+        """
+        Retrieve rows from a specified table.
+
+        Args:
+            schema (str): The schema containing the table.
+            table (str): The table to query.
+
+        Returns:
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]: List of rows or None if an error occurs.
+        """
+        self.connection.connect()
+        data: Tuple[bool, Optional[List[Dict[str, Any]]], str] = (
+            self.connection.get_table_rows(query)
+        )
+        self.connection.close()
+        return data
+
     def update_metadata(self, schema: Optional[str]) -> Optional[Dict[str, Any]]:
         """
         Update and save the metadata for the datasource.

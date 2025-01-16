@@ -298,3 +298,28 @@ class PostgresConnection(VerifyInputsMixin):
 
         self.close()
         return tables
+
+    def get_table_rows(self, query) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+        columns = query.get("activeColumns")
+        schema = query.get("schema")
+        table = query.get("table")
+        page = query.get("page")
+        per_page = query.get("perPage")
+        offset = (page - 1) * per_page
+
+        if not columns:
+            return "success", [], "No columns provided"
+        else:
+            columns = [column.split(".")[1] for column in columns if "." in column]
+        query = f"SELECT {(", ").join(columns)}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} LIMIT {per_page} OFFSET {offset};"
+        """
+        Retrieve rows from a specified table.
+
+        Args:
+            schema (str): The schema containing the table.
+            table (str): The table to query.
+
+        Returns:
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]: List of rows or None if an error occurs.
+        """
+        return self.query(query)
