@@ -126,6 +126,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     <Context.Provider
       value={{
         activeTab,
+        setActiveTab,
         alert,
         showAlert,
         info,
