@@ -56,7 +56,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     schema: string,
     table: string
   ) => {
-    const rowsPerPage = 100;
+    const rowsPerPage = 50;
     const tabsCount: TableViewTab[] = tabs.filter(
       (row) => schema === row.schema && table === row.table
     );
@@ -71,7 +71,10 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       maxItems: 0,
       name: `${schema} - ${table} #${tabsCount.length}`,
       data: [],
-      openedColumns: false
+      openedColumns: false,
+      scrollPosition: 0,
+      loadedRows: 0,
+      new: true,
     };
     tabs.push(tabObj);
     setDataStorage("activeTabs", [...tabs]);

@@ -60,48 +60,77 @@ export default function DynamicTable() {
     const heightWithMargin = windowHeight * 0.85;
     setTableHeight(`${heightWithMargin}px`);
   };
-
-  // Fetch table data
+  
   useEffect(() => {
-    if (tabs){
+    if (tabs && activeTab !== null) {
+      const tab = tabs[activeTab];
+  
       const fetchData = async () => {
-        const result = await queryTab(tabs[activeTab]);
-        if (result && result.length > 0) {
-          setHeaders(Object.keys(result[0])); // Extract headers dynamically from the first row
-          setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result]: [...data, ...result]);
+        // first load
+        if (tab.new) {
+          const initialData = await queryTab(tab);
+          setHeaders(Object.keys(initialData[0] || {}));
+          setData(initialData);
+          tab.new = false;
+          tab.loadedRows = initialData.length;
+          tab.data = initialData;
+          setTabs([...tabs]);
+        } else {
+          // if data is partially loaded
+          setHeaders(Object.keys(tab.data[0] || {}));
+          setData(tab.data);
+  
+          // load more data if less than before
+          if (tab.data.length < tab.loadedRows) {
+            const additionalData = await queryTab(tab, tab.data.length);
+            tab.data = [...tab.data, ...additionalData];
+            tab.loadedRows = tab.data.length;
+            setData(tab.data);
+            setTabs([...tabs]);
+          }
         }
       };
+  
       fetchData();
     }
-  }, [activeTab, tabs]);
-
-  useEffect(()=>{
-    if(tabs){
-    const tab = tabs[activeTab]
-    const fetchData = async () => {
-      const result = await getJoins(tab);
-      tabs[activeTab].joins = result
-      setTabs([...tabs])
-    };
-    if(tab.joins.length == 0){
-      fetchData();
-    }
-    }
-  }, [activeTab, tabs, setTabs])
+  }, [activeTab, tabs]); // load data after tab change
 
   useEffect(() => {
+    if (tabs && activeTab !== null) {
+      const tab = tabs[activeTab];
+      const fetchJoins = async () => {
+        if (tab.joins.length === 0) {
+          const result = await getJoins(tab);
+          tab.joins = result;
+          setTabs([...tabs]);
+        }
+      };
+      fetchJoins();
+    }
+  }, [activeTab]);//, tabs]); // load joins after tab change
+
+  useEffect(() => {//calculate table height
+
     calculateTableHeight();
-    
     const handleResize = () => {
       calculateTableHeight();
     };
-
     window.addEventListener('resize', handleResize);
-    
     return () => {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  useEffect(() => {
+    if (tabs && activeTab !== null) {
+      const tab = tabs[activeTab];
+      const container = document.querySelector(".table-container");
+  
+      if (container) {
+        container.scrollTop = tab.scrollPosition || 0;
+      }
+    }
+  }, [activeTab, tabs]); // scroll restore after tab change
 
   const handleOpenColumns = () => {
     if(tabs){
@@ -144,22 +173,32 @@ export default function DynamicTable() {
   const handleScroll = async (event: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
   
-    if (hasMore && scrollTop + clientHeight >= scrollHeight - 10) {
-      const result = await queryTab(tabs[activeTab], data.length); // OFFSET equals to current number of rows
-      if (result.length > 0) {
-        setData((prevData) => [...prevData, ...result]);
-      } else {
-        setHasMore(false); // No more data
+    if (tabs && activeTab !== null) {
+      const tab = tabs[activeTab];
+      tab.scrollPosition = scrollTop;
+    
+      // load more data
+      if (hasMore && scrollTop + clientHeight >= scrollHeight - 100) {
+        const newData = await queryTab(tab, tab.data.length);
+        if (newData.length > 0) {
+          tab.data = [...tab.data, ...newData];
+          tab.loadedRows = tab.data.length;
+          setData(tab.data);
+          setTabs([...tabs]);
+        } else {
+          setHasMore(false);
+        }
       }
     }
   };
-  
+    
   return (
       <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
       {tabs != null && tabs.length > 0 && activeTab != null && (
         <>
           <JoinsSidebar />
           <Box
+            className="table-container"
             sx={{
               overflowX: 'auto',
               overflowY: 'auto',

@@ -32,7 +32,10 @@ interface TableViewTab{
     maxItems: number
     name: string
     data: Record<string, string | number | null>[]
-    openedColumns: boolean
+    openedColumns: boolean,
+    scrollPosition: number | null,
+    loadedRows: number,
+    new: boolean
 }
 
 type Connections = Connection[] | null
