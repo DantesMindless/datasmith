@@ -29,16 +29,16 @@ UI_CONTAINER := deep-web-ui-1
 # Targets
 .PHONY: start
 start: ## Start the development containers using Docker Compose.
-	docker compose up -d
+	docker-compose up -d
 .PHONY: start-db
 start-db: ## Start the development containers using Docker Compose.
-	docker compose -f=docker-compose-db.yml up -d
+	docker-compose -f=docker-compose-db.yml up -d
 .PHONY: stop
 stop: ## Start the development containers using Docker Compose.
-	docker compose stop
+	docker-compose stop
 .PHONY: down
 down: ## Start the development containers using Docker Compose.
-	docker compose down
+	docker-compose down
 	docker system prune -a -f
 	docker volume prune -f
 .PHONY: migrate
