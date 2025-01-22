@@ -56,6 +56,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     schema: string,
     table: string
   ) => {
+    const rowsPerPage = 50;
     const tabsCount: TableViewTab[] = tabs.filter(
       (row) => schema === row.schema && table === row.table
     );
@@ -63,10 +64,10 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       ID: connection.id,
       schema: schema,
       table: table,
-      query: `SELECT * FROM ${schema}.${table} LIMIT 100;`,
+      query: `SELECT * FROM ${schema}.${table} LIMIT ${rowsPerPage};`,
       page: 1,
       joins: [],
-      perPage: 100,
+      perPage: rowsPerPage,
       maxItems: 0,
       name: `${schema} - ${table} #${tabsCount.length}`,
       data: [],
@@ -86,6 +87,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     setDataStorage("activeTabs", [...tabsStorage]);
     setTabs([...tabs]);
     setActiveTab(tabs.length -1)
+    setActivePage("queryTab");//debug
   };
 
   const removeTab = async (index: number) => {
@@ -131,6 +133,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     <Context.Provider
       value={{
         activeTab,
+        setActiveTab,//?
         alert,
         showAlert,
         info,

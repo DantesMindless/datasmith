@@ -6,10 +6,20 @@ import { pageComponents } from "../utils/constants";
 import { Button, ButtonGroup } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 
-const tabButtonStyle = {color: "text.primary", bgcolor: "secondary.main", height: "20px", fontSize: "10px"}
+const getDataSourceOptionsButtonStyle = (isActive: boolean) => ({
+  ...(isActive
+    ? { color: "text.primary", bgcolor: "orange", height: "20px", fontSize: "10px" }
+    : { color: "text.secondary", bgcolor: "grey.200", height: "20px", fontSize: "10px" }),
+});
+
+const getTabButtonStyle = (isActive: boolean) => ({
+  ...(isActive
+    ? { color: "text.primary", bgcolor: "primary.main", height: "20px", fontSize: "10px" }
+    : { color: "text.secondary", bgcolor: "secondary.main", height: "20px", fontSize: "10px" }),
+});
 
 export default function TabsSegmentedControls() {
-  const { tabs, removeTab, updateActiveTab, setActivePage } = useAppContext();
+  const { tabs, removeTab, updateActiveTab, setActivePage, activeTab, setActiveTab, activePage } = useAppContext();
 
   return (
     <Box component={"div"} sx={{ bgcolor: "background.default" }}>
@@ -21,8 +31,8 @@ export default function TabsSegmentedControls() {
             >
               <Button
                 size="small"
-                sx={tabButtonStyle}
-                onClick={() => setActivePage(key)}
+                sx={getDataSourceOptionsButtonStyle(key === activePage)}
+                onClick={() => {setActiveTab(null); setActivePage(key)}}
               >
                 {pageComponents[key].name}
               </Button>
@@ -41,7 +51,7 @@ export default function TabsSegmentedControls() {
               <ButtonGroup variant="outlined" aria-label="Basic button group">
               <Button
               size="small"
-              sx={tabButtonStyle}
+              sx={getTabButtonStyle(activeTab === index)}
               onClick={() => {
                 updateActiveTab(index)
                 setActivePage("queryTab")
@@ -49,7 +59,7 @@ export default function TabsSegmentedControls() {
               >
                 {tab.name}
               </Button>
-              <Button sx={{...tabButtonStyle, with: 2, px:1}} aria-label="clise-tab" size="small"
+              <Button sx={{...getTabButtonStyle(activeTab === index), with: 2, px:1}} aria-label="clise-tab" size="small"
                 onClick={() => removeTab(index)}
                 >
                 <CloseIcon fontSize="inherit" />
