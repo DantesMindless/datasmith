@@ -30,12 +30,35 @@ export default function DynamicTable() {
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
   const tab = tabs && activeTab != null ? tabs[activeTab] : null
 
-  const getQueryTableCellStyles = (header: string) => ({
-    maxWidth: expandedColumns.has(header) ? 'none' : '150px',
+  const [tableHeight, setTableHeight] = useState('700px');
+
+  const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
+    ...(expandedColumns.has(header) 
+      ? { width: 'auto', maxWidth: 'none' }
+      : { width: '150px', maxWidth: '150px' }
+    ),
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    border: "1px solid gray"
+    border: "1px solid gray",
+    backgroundColor: isHeader ? "#f5f5f5" : "inherit",
+    position: isHeader ? "sticky" : "inherit",
+    top: isHeader ? 0 : "inherit",
+    zIndex: isHeader ? 1 : "inherit",
+    cursor: 'pointer'
+  });
+
+  const getIndexCellStyles = (isHeader: boolean = false) => ({
+    width: '50px',
+    minWidth: '50px',
+    maxWidth: '50px',
+    padding: '6px',
+    textAlign: 'center',
+    border: "1px solid gray",
+    backgroundColor: isHeader ? "#f5f5f5" : "#f5f5f5",
+    position: isHeader ? "sticky" : "inherit",
+    top: isHeader ? 0 : "inherit",
+    zIndex: isHeader ? 1 : "inherit",
   });
 
   function setColumnsIds(table, level: number, itemsCollector: string[]) {
@@ -93,6 +116,23 @@ export default function DynamicTable() {
     console.log(tab?.activeColumns)
     fetchData(tab);
   }, [tab?.activeColumns])
+
+  const calculateTableHeight = () => {
+    const windowHeight = window.innerHeight;
+    const heightWithMargin = windowHeight * 0.85;
+    setTableHeight(`${heightWithMargin}px`);
+  };
+
+  useEffect(() => {//calculate table height
+    calculateTableHeight();
+    const handleResize = () => {
+      calculateTableHeight();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const handleOpenColumns = () => {
     if (tabs && tab && activeTab != null) {
@@ -168,73 +208,137 @@ export default function DynamicTable() {
     <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
       {tabs != null && tab ? (
         <>
-          <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns} />
-          <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-            <Button onClick={handleOpenColumns} sx={{ height: "37px" }}>
-              <KeyboardDoubleArrowRightIcon
-                sx={{ rotate: tab?.openedColumns ? "180deg" : "0deg", transition: "rotate 0.1s ease-in-out" }}
-              />
-            </Button>
-            {renderIndexesMemo}
-          </Box>
-        </>
-      ) : activeTab}
-      {data.length > 0 ?
-        (<Box sx={{ overflowX: 'scroll' }}>
-          <TableContainer>
-            <Table aria-labelledby="tableTitle" size="small">
-              {/* Dynamic Table Header */}
-              <TableHead>
-                <TableRow>
-                  {headers.map((header) => (
-                    <TableCell
-                      key={header}
-                      sortDirection={orderBy === header ? order : false}
-                      sx={{...getQueryTableCellStyles(header), fontWeight: "bold"}}
-                    >
-                      <TableSortLabel
-                        active={orderBy === header}
-                        direction={orderBy === header ? order : "asc"}
-                        onClick={() => handleRequestSort(header)}
-                      >
-                        {header}
-                      </TableSortLabel>
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
+           <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns} />
 
-              {/* Dynamic Table Body */}
-              <TableBody>
-                {visibleRows.map((row, index) => (
-                  <TableRow hover tabIndex={-1} key={index}>
+         </>
+      ) : activeTab}
+
+      {/*{data.length > 0 ?
+        (
+        <Box sx={{ overflowX: 'scroll' }}>*/}
+
+
+
+
+          <Box
+            className="table-container"
+            sx={{
+              overflowX: 'auto',
+              overflowY: 'auto',
+              maxHeight: tableHeight,
+              position: 'relative',
+              width: '100%',
+              display: 'flex',
+              lexDirection: 'column',
+              border: "1px solid gray"
+            }}
+            // onScroll={handleScroll}
+          >
+          {/* <TableContainer> */}
+            {/*<Table aria-labelledby="tableTitle" size="small">*/}
+              {/* The table with indexes */}
+              <Table size="small" sx={{ width: 'auto', flexShrink: 0 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={getIndexCellStyles(true)}>
+                      <Button 
+                        onClick={handleOpenColumns}
+                        sx={{
+                          minWidth: 'unset',
+                          padding: 0,
+                          width: '100%',
+                          height: '100%',
+                        
+                        }}
+                      >
+                        <KeyboardDoubleArrowRightIcon
+                          sx={{
+                            rotate: tabs[activeTab].openedColumns ? "0deg" : "180deg",
+                            transition: "rotate 0.1s ease-in-out"
+                          }}
+                        />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {headers.map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell sx={getIndexCellStyles()}>
+                        {index + 1}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <Table size="small">
+                {/* Static Table Header */}
+                <TableHead>
+                  <TableRow>
                     {headers.map((header) => (
                       <TableCell
                         key={header}
-                        sx={getQueryTableCellStyles(header)}
-                        title={row[header]}
-                        onClick={(e) => {
-                          handleColumnClick(header);
-                        }}
+                        sortDirection={orderBy === header ? order : false}
+                        sx={getQueryTableCellStyles(header, true)}
+                        onClick={() => handleColumnClick(header)}
                       >
-                        {row[header] != null ? row[header] : "NULL"}
+                        <TableSortLabel
+                          active={orderBy === header}
+                          direction={orderBy === header ? order : "asc"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRequestSort(header);
+                          }}
+                        >
+                          {header}
+                        </TableSortLabel>
                       </TableCell>
                     ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={data.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
-        </Box>) :
+                </TableHead>
+
+                {/* Dynamic Table Body */}
+                <TableBody>
+                  {visibleRows.map((row, index) => (
+                    <TableRow hover tabIndex={-1} key={index}>
+                      {/*{headers.map((header) => (
+                        <TableCell
+                          key={header}
+                          sx={getQueryTableCellStyles(header)}
+                          title={row[header]}
+                          onClick={(e) => {
+                            handleColumnClick(header);
+                          }}
+                        >
+                          {row[header] != null ? row[header] : "NULL"}
+                        </TableCell>
+                      ))}*/}
+                      {headers.map((header) => {
+                      const cellContent = row[header]?.toString() || '';
+                      return (
+                        <TableCell
+                          key={`${index}-${header}`}
+                          sx={getQueryTableCellStyles(header)}
+                          title={cellContent || undefined}
+                          onClick={() => handleColumnClick(header)}
+                        >
+                          {cellContent}
+                        </TableCell>
+                      );
+                    })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            {/*</Table>*/}
+          {/* </TableContainer> */}
+          </Box>
+
+
+
+
+        {/*</Box>) :
         <Box sx={{display: "flex", width: "100%", border: "1px solid gray"}}>
           {tab && tab.activeColumns.length == 0 ? (
             <h3 style={{ textAlign: 'center', width: "100%" }}>Select Columns</h3>
@@ -242,7 +346,7 @@ export default function DynamicTable() {
             <h3 style={{ textAlign: 'center', width: "100%" }}>No Data Found</h3>
           )}
         </Box>
-      }
+      }*/}
     </Box>
   );
 }
