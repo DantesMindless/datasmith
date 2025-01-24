@@ -37,6 +37,7 @@ export default function DynamicTable() {
       ? { width: 'auto', maxWidth: 'none' }
       : { width: '150px', maxWidth: '150px' }
     ),
+    height: '53px',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -48,11 +49,25 @@ export default function DynamicTable() {
     cursor: 'pointer'
   });
 
+  // const getIndexCellStyles = (isHeader: boolean = false) => ({
+  //   width: '50px',
+  //   minWidth: '50px',
+  //   maxWidth: '50px',
+  //   padding: '6px',
+  //   textAlign: 'center',
+  //   border: "1px solid gray",
+  //   backgroundColor: isHeader ? "#f5f5f5" : "#f5f5f5",
+  //   position: isHeader ? "sticky" : "inherit",
+  //   top: isHeader ? 0 : "inherit",
+  //   zIndex: isHeader ? 1 : "inherit",
+  // });
+
   const getIndexCellStyles = (isHeader: boolean = false) => ({
     width: '50px',
-    minWidth: '50px',
+    minWidth: '50px', 
     maxWidth: '50px',
     padding: '6px',
+    height: '53px', // Добавьте фиксированную высоту, совпадающую с основной таблицей
     textAlign: 'center',
     border: "1px solid gray",
     backgroundColor: isHeader ? "#f5f5f5" : "#f5f5f5",
@@ -181,17 +196,37 @@ export default function DynamicTable() {
 
   const visibleRows = data
 
+  // const renderIndexes = () => {
+  //   const indexes = []
+  //   for (let i = 1; i <= data.length; i++) {
+  //     indexes.push(
+  //       <TableRow>
+  //         <TableCell align="center">
+  //           {i}
+  //         </TableCell>
+  //       </TableRow>
+  //     )
+  //   }
+  //   return (
+  //     <TableContainer>
+  //       <Table size="small">
+  //         <TableBody>
+  //           {indexes}
+  //         </TableBody>
+  //       </Table>
+  //     </TableContainer>
+  //   )
+  // }
+
   const renderIndexes = () => {
-    const indexes = []
-    for (let i = 1; i <= data.length; i++) {
-      indexes.push(
-        <TableRow>
-          <TableCell align="center">
-            {i}
-          </TableCell>
-        </TableRow>
-      )
-    }
+    const indexes = headers.map((_, index) => (
+      <TableRow key={index}>
+        <TableCell align="center">
+          {index + 1}
+        </TableCell>
+      </TableRow>
+    ));
+  
     return (
       <TableContainer>
         <Table size="small">
@@ -200,8 +235,8 @@ export default function DynamicTable() {
           </TableBody>
         </Table>
       </TableContainer>
-    )
-  }
+    );
+  };
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
   return (
@@ -213,13 +248,7 @@ export default function DynamicTable() {
          </>
       ) : activeTab}
 
-      {/*{data.length > 0 ?
-        (
-        <Box sx={{ overflowX: 'scroll' }}>*/}
-
-
-
-
+      {data.length > 0 ? (
           <Box
             className="table-container"
             sx={{
@@ -227,15 +256,21 @@ export default function DynamicTable() {
               overflowY: 'auto',
               maxHeight: tableHeight,
               position: 'relative',
-              width: '100%',
+              width: '99%',
               display: 'flex',
-              lexDirection: 'column',
               border: "1px solid gray"
             }}
-            // onScroll={handleScroll}
+            //onScroll={handleScroll}
           >
           {/* <TableContainer> */}
             {/*<Table aria-labelledby="tableTitle" size="small">*/}
+
+
+
+            {/*<TableRow sx={{ height: '53px' }}>*/}
+
+
+
               {/* The table with indexes */}
               <Table size="small" sx={{ width: 'auto', flexShrink: 0 }}>
                 <TableHead>
@@ -272,7 +307,17 @@ export default function DynamicTable() {
                 </TableBody>
               </Table>
 
-              <Table size="small">
+
+
+
+
+
+
+
+
+
+
+              <Table aria-labelledby="tableTitle" size="small">
                 {/* Static Table Header */}
                 <TableHead>
                   <TableRow>
@@ -280,7 +325,7 @@ export default function DynamicTable() {
                       <TableCell
                         key={header}
                         sortDirection={orderBy === header ? order : false}
-                        sx={getQueryTableCellStyles(header, true)}
+                        sx={{...getQueryTableCellStyles(header, true), fontWeight: "bold"}}
                         onClick={() => handleColumnClick(header)}
                       >
                         <TableSortLabel
@@ -318,9 +363,11 @@ export default function DynamicTable() {
                       const cellContent = row[header]?.toString() || '';
                       return (
                         <TableCell
-                          key={`${index}-${header}`}
+                          //key={`${index}-${header}`}
+                          key={header}
                           sx={getQueryTableCellStyles(header)}
                           title={cellContent || undefined}
+                          //title={row[header]}
                           onClick={() => handleColumnClick(header)}
                         >
                           {cellContent}
@@ -331,14 +378,28 @@ export default function DynamicTable() {
                   ))}
                 </TableBody>
               </Table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+              
             {/*</Table>*/}
           {/* </TableContainer> */}
           </Box>
-
-
-
-
-        {/*</Box>) :
+        ) :
         <Box sx={{display: "flex", width: "100%", border: "1px solid gray"}}>
           {tab && tab.activeColumns.length == 0 ? (
             <h3 style={{ textAlign: 'center', width: "100%" }}>Select Columns</h3>
@@ -346,7 +407,7 @@ export default function DynamicTable() {
             <h3 style={{ textAlign: 'center', width: "100%" }}>No Data Found</h3>
           )}
         </Box>
-      }*/}
+      }
     </Box>
   );
 }
