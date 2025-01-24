@@ -196,37 +196,17 @@ export default function DynamicTable() {
 
   const visibleRows = data
 
-  // const renderIndexes = () => {
-  //   const indexes = []
-  //   for (let i = 1; i <= data.length; i++) {
-  //     indexes.push(
-  //       <TableRow>
-  //         <TableCell align="center">
-  //           {i}
-  //         </TableCell>
-  //       </TableRow>
-  //     )
-  //   }
-  //   return (
-  //     <TableContainer>
-  //       <Table size="small">
-  //         <TableBody>
-  //           {indexes}
-  //         </TableBody>
-  //       </Table>
-  //     </TableContainer>
-  //   )
-  // }
-
   const renderIndexes = () => {
-    const indexes = headers.map((_, index) => (
-      <TableRow key={index}>
-        <TableCell align="center">
-          {index + 1}
-        </TableCell>
-      </TableRow>
-    ));
-  
+    const indexes = []
+    for (let i = 1; i <= data.length; i++) {
+      indexes.push(
+        <TableRow>
+          <TableCell align="center">
+            {i}
+          </TableCell>
+        </TableRow>
+      )
+    }
     return (
       <TableContainer>
         <Table size="small">
@@ -235,8 +215,28 @@ export default function DynamicTable() {
           </TableBody>
         </Table>
       </TableContainer>
-    );
-  };
+    )
+  }
+
+  // const renderIndexes = () => {
+  //   const indexes = headers.map((_, index) => (
+  //     <TableRow key={index}>
+  //       <TableCell align="center">
+  //         {index + 1}
+  //       </TableCell>
+  //     </TableRow>
+  //   ));
+  
+  //   return (
+  //     <TableContainer>
+  //       <Table size="small">
+  //         <TableBody>
+  //           {indexes}
+  //         </TableBody>
+  //       </Table>
+  //     </TableContainer>
+  //   );
+  // };
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
   return (
@@ -297,7 +297,7 @@ export default function DynamicTable() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {headers.map((_, index) => (
+                  {data.map((_, index) => (
                     <TableRow key={index}>
                       <TableCell sx={getIndexCellStyles()}>
                         {index + 1}
@@ -305,6 +305,24 @@ export default function DynamicTable() {
                     </TableRow>
                   ))}
                 </TableBody>
+   {/*             <TableHead>
+   <TableRow>
+    <TableCell sx={getIndexCellStyles(true)}>
+      <Button onClick={handleOpenColumns}>
+        <KeyboardDoubleArrowRightIcon />
+      </Button>
+    </TableCell>
+  </TableRow>
+</TableHead>
+<TableBody>
+  {data.map((_, index) => (
+    <TableRow key={index}>
+      <TableCell sx={getIndexCellStyles()}>
+        {index + 1}
+      </TableCell>
+    </TableRow>
+  ))}
+</TableBody> */}
               </Table>
 
 
@@ -317,7 +335,7 @@ export default function DynamicTable() {
 
 
 
-              <Table aria-labelledby="tableTitle" size="small">
+              <Table size="small">
                 {/* Static Table Header */}
                 <TableHead>
                   <TableRow>
