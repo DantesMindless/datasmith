@@ -38,6 +38,13 @@ interface TableViewTab{
     filters: string[]
     initialLoad: boolean
     headers : string[]
+    scrollState: ScrollState
+}
+
+interface ScrollState {
+    newTab: boolean
+    allDataLoaded: boolean
+    scrollTop: number
 }
 
 type Connections = Connection[] | null
