@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from "axios";
 
 const httpfetch: AxiosInstance = axios.create({
   baseURL: "https://localhost/api",
-  timeout: 2000,
+  timeout: 1000,
   headers: {
     "Content-Type": "application/json", // Default content type
     Accept: "application/json", // Default accept header

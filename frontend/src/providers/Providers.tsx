@@ -56,7 +56,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     schema: string,
     table: string
   ) => {
-    const rowsPerPage = 75;
+    const rowsPerPage = 100;
     const tabsCount: TableViewTab[] = tabs.filter(
       (row) => schema === row.schema && table === row.table
     );
@@ -92,7 +92,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     setDataStorage("activeTabs", [...tabsStorage]);
     setTabs([...tabs]);
     setActiveTab(tabs.length -1)
-    setActivePage("queryTab");//debug
+    setActivePage("queryTab");//OSvyryd - debug
   };
 
   const removeTab = async (index: number) => {
@@ -138,7 +138,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     <Context.Provider
       value={{
         activeTab,
-        setActiveTab,//?
+        setActiveTab,
         alert,
         showAlert,
         info,

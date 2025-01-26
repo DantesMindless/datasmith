@@ -1,10 +1,12 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo} from "react";
 import {
   Box,
   Table,
   TableBody,
   TableCell,
+  //TableContainer,//unused
   TableHead,
+  //TablePagination,//unused
   TableRow,
   TableSortLabel,
   Button
@@ -13,6 +15,7 @@ import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
+import { TableViewTab } from "../providers/constants";
 type Order = "asc" | "desc";
 
 export default function DynamicTable() {
@@ -22,9 +25,9 @@ export default function DynamicTable() {
   const [orderBy, setOrderBy] = useState<string>("");
   const [data, setData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [isNewTab, setIsNewTab] = useState(false);
-  const [page, setPage] = useState(0);//deprecated
-  const [rowsPerPage, setRowsPerPage] = useState(10);//deprecated
+  const [dataToTabCopyRequest, setDataToTabCopyRequest] = useState(false);
+  // const [page, setPage] = useState(0);//unused
+  // const [rowsPerPage, setRowsPerPage] = useState(10);//unused
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
 
   const [isScrollLoading, setIsScrollLoading] = useState(false);
@@ -79,7 +82,7 @@ export default function DynamicTable() {
     }
   }
 
-  const fetchData = async (tabData, updateHeaderOnly: boolean = false) => {
+  const fetchData = async (tabData : TableViewTab, updateHeaderOnly: boolean = false) => {
     const result = await queryTab(tabData);
     if (result) {
       if (result?.length > 0) {
@@ -89,7 +92,7 @@ export default function DynamicTable() {
           //setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result] : [...data, ...result]);
           setData([...result]);
           if (tabs[activeTab].scrollState.newTab) {
-            setIsNewTab(true);
+            setDataToTabCopyRequest(true);
           }
         }
       } else {
@@ -108,23 +111,23 @@ export default function DynamicTable() {
   };
 
   useEffect(() => {
-    if (isNewTab && tabs[activeTab].scrollState.newTab) {
+    if (dataToTabCopyRequest && tabs[activeTab].scrollState.newTab) {
       tabs[activeTab].data = [...data];
       tabs[activeTab].scrollState.newTab = false;
       setScrollPosition(0);
     }
-    setIsNewTab(false);
-  }, [isNewTab===true])
+    setDataToTabCopyRequest(false);
+  }, [dataToTabCopyRequest===true])
+
+  let bypassHandleScroll = false;
 
   const setScrollPosition = (position: number) => {
-    bypassScrollUpdate = true;
+    bypassHandleScroll = true;
     const tableContainer = document.querySelector('.table-container');
     if (tableContainer) {
       tableContainer.scrollTop = position;
     }
   }
-
-  let bypassScrollUpdate = false;
 
   useEffect(() => {
     const tab = tabs[activeTab];
@@ -156,7 +159,7 @@ export default function DynamicTable() {
   useEffect(() => {
     const tab = tabs[activeTab];
     fetchData(tab, true);
-}, [tabs[activeTab]?.activeColumns])
+  }, [tabs[activeTab]?.activeColumns])
 
   const calculateTableHeight = () => {
     const windowHeight = window.innerHeight;
@@ -200,14 +203,14 @@ export default function DynamicTable() {
     );
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {//deprecated
-    setPage(newPage);
-  };
+  // const handleChangePage = (event: unknown, newPage: number) => {//unused
+  //   setPage(newPage);
+  // };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {//deprecated
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  // const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {//unused
+  //   setRowsPerPage(parseInt(event.target.value, 10));
+  //   setPage(0);
+  // };
 
   const handleColumnClick = async (header: string) => {
     setExpandedColumns(prev => {
@@ -242,11 +245,11 @@ export default function DynamicTable() {
   }
 
   const handleScroll = async (event: React.UIEvent<HTMLDivElement>) => {
-    if (isScrollLoading) {
+    if (isScrollLoading) {//to prevent double loading
      return;
     }
-    if (bypassScrollUpdate) {
-      bypassScrollUpdate = false;
+    if (bypassHandleScroll) {//in case of manual set scrollPosition
+      bypassHandleScroll = false;
       return;
     }
     setIsScrollLoading(true);
