@@ -2,7 +2,7 @@ import logging
 from typing import Optional, Tuple, List, Dict, Any, Set
 from psycopg2.extras import RealDictCursor
 import psycopg2
-
+import re
 from .mixins import VerifyInputsMixin, SerializerVerifyInputsMixin
 from cachetools import LFUCache
 from rest_framework import serializers
@@ -199,6 +199,44 @@ class PostgresConnection(VerifyInputsMixin):
         else:
             return False, None, message
 
+    def get_tables_relations(self) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+        """
+        Retrieve related tables for all tables
+
+        Returns:
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+                - Success status,
+                - List of related tables or None,
+                - Message.
+        """
+        query = """
+    SELECT
+    tc.table_name,
+    kcu.column_name,
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name
+    FROM
+        information_schema.table_constraints AS tc
+    JOIN
+        information_schema.key_column_usage AS kcu
+    ON
+        tc.constraint_name = kcu.constraint_name
+    JOIN
+        information_schema.constraint_column_usage AS ccu
+    ON
+        ccu.constraint_name = tc.constraint_name
+    WHERE
+        constraint_type = 'FOREIGN KEY';
+        """
+
+        success, data, message = self.query(query)
+        if success and data:
+            return True, data, "Related tables retrieved successfully."
+        elif success:
+            return False, None, "No related tables found"
+        else:
+            return False, None, message
+
     def get_table_columns(self, table_name: str) -> Optional[List[Dict[str, Any]]]:
         """
         Retrieve column information for a table.
@@ -268,14 +306,6 @@ class PostgresConnection(VerifyInputsMixin):
                             ]
                         }
                     )
-                    # TODO: figure out what is it doing here :)
-                    # if sub_relations := get_relationships(
-                    #     related_table["related_table"], scanned_tables
-                    # ):
-                    #     table_relations[related_table["related_table"]][
-                    #         "relations"
-                    #     ].append(sub_relations)
-                    # scanned_tables.add(related_table["related_table"])
             cache[table_name] = table_relations
             return table_relations
 
@@ -307,19 +337,98 @@ class PostgresConnection(VerifyInputsMixin):
         per_page = query.get("perPage")
         offset = (page - 1) * per_page
 
+        selects_string, joins_conditions_string = self.joins_engine(table, columns)
         if not columns:
             return "success", [], "No columns provided"
         else:
             columns = [column.split(".")[1] for column in columns if "." in column]
-        query = f"SELECT {(", ").join(columns)}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} LIMIT {per_page} OFFSET {offset};"
-        """
-        Retrieve rows from a specified table.
-
-        Args:
-            schema (str): The schema containing the table.
-            table (str): The table to query.
-
-        Returns:
-            Tuple[bool, Optional[List[Dict[str, Any]]], str]: List of rows or None if an error occurs.
-        """
+        query = f"SELECT {selects_string}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} {joins_conditions_string}LIMIT {per_page} OFFSET {offset};"
         return self.query(query)
+
+    def joins_engine(self, table_name, columns) -> Tuple[str, str]:
+        tables = set()
+        scanned_columns = set()
+        selects = []
+        for column in columns:
+            clean_column = re.sub(r"^.([A-z0-9])*\^-\^", "", column)
+            if "." in column:
+                column = clean_column.split(".")
+                related_table_name = column[0]
+                related_column_name = column[1]
+                scanned_columns.add(related_column_name)
+                tables.add(related_table_name)
+                clean_column_value = (
+                    clean_column
+                    if related_column_name not in scanned_columns
+                    else f"{clean_column} AS {related_table_name}_{related_column_name}"
+                )
+                selects.append(clean_column_value)
+            else:
+                tables.add(clean_column)
+
+        if len(tables) > 0:
+            relations = self.get_tables_relations()[1]
+            joins_dict = PostgresConnection.generate_joins(table_name, relations)
+        joins_list = PostgresConnection.concat_joins(
+            joins_dict, tables, set([table_name])
+        )
+        joins_conditions_string = " ".join(joins_list) + " "
+        selects_string = ", ".join(selects) + " "
+        print(selects_string)
+        print(joins_conditions_string)
+
+        return selects_string, joins_conditions_string
+
+    def filters_engine(self, filters) -> Tuple[str, str]:
+        return "PostgreSQL"
+
+    @staticmethod
+    def concat_joins(joins_dict, tables: list, joined_tables):
+        joins = []
+        for table in tables:
+            if table not in joined_tables:
+                if joins_string := joins_dict.get(table, {}):
+                    joined_tables.add(table)
+                    joins.append(joins_string.get("joiner", ""))
+                    if related_joins := joins_string.get("related"):
+                        joins += PostgresConnection.concat_joins(
+                            related_joins, tables, joined_tables
+                        )
+                    break
+        return joins
+
+    @staticmethod
+    def generate_joins(root_table, relations_metadata, joined=None):
+        joins = {}
+        joined = set([root_table]) if not joined else joined
+        for rel in relations_metadata:
+            joined_copy = set(joined) if joined else set()
+            if rel["table_name"] == root_table:
+                joined_copy.add(root_table)
+                if rel["foreign_table_name"] not in joined:
+                    joins.update(
+                        {
+                            rel["foreign_table_name"]: {
+                                "joiner": f"LEFT JOIN {rel["table_name"]} ON {rel["table_name"]}.{rel["column_name"]} = {rel["foreign_table_name"]}.{rel["foreign_column_name"]}",
+                                "related": PostgresConnection.generate_joins(
+                                    rel["foreign_table_name"],
+                                    relations_metadata,
+                                    joined_copy,
+                                ),
+                            }
+                        }
+                    )
+            elif rel["foreign_table_name"] == root_table:
+                joined_copy.add(root_table)
+                if rel["table_name"] not in joined:
+                    joins.update(
+                        {
+                            rel["table_name"]: {
+                                "joiner": f"LEFT JOIN {rel["table_name"]} ON {rel["foreign_table_name"]}.{rel["foreign_column_name"]} = {rel["table_name"]}.{rel["column_name"]}",
+                                "related": PostgresConnection.generate_joins(
+                                    rel["table_name"], relations_metadata, joined_copy
+                                ),
+                            }
+                        }
+                    )
+        return joins
