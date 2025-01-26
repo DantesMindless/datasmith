@@ -13,8 +13,6 @@ import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
-import { debounce } from '../utils/debounce';
-import CircularProgress from '@mui/material/CircularProgress';
 type Order = "asc" | "desc";
 
 export default function DynamicTable() {
@@ -25,14 +23,12 @@ export default function DynamicTable() {
   const [data, setData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [isNewTab, setIsNewTab] = useState(false);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [page, setPage] = useState(0);//deprecated
+  const [rowsPerPage, setRowsPerPage] = useState(10);//deprecated
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
-  //const tab = tabs && activeTab != null ? tabs[activeTab] : null
-  //const [hasMore, setHasMore] = useState(true);
 
   const [isScrollLoading, setIsScrollLoading] = useState(false);
-  const [cnt, setCnt] = useState(0);
+  const [postponedScrollUpdate, setPostponedScrollUpdate] = useState(false);
 
   const [tableHeight, setTableHeight] = useState('700px');
 
@@ -84,25 +80,18 @@ export default function DynamicTable() {
   }
 
   const fetchData = async (tabData, updateHeaderOnly: boolean = false) => {
-    if (tabs[activeTab].scrollState.newTab) {
-      setData([]);
-    }
     const result = await queryTab(tabData);
     if (result) {
       if (result?.length > 0) {
         const tableHeaders = Object.keys(result[0]).filter((item) => !item.includes("total_rows_number"))
         setHeaders(tableHeaders);
-        console.log("* (1.1) * HeaderUpdated");
         if (!updateHeaderOnly) {
-          setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result] : [...data, ...result]);
-          console.log("* (1.1) * Data Updated data_size=", data.length);
+          //setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result] : [...data, ...result]);
+          setData([...result]);
           if (tabs[activeTab].scrollState.newTab) {
             setIsNewTab(true);
           }
-        } else {
-          console.log("* (1.1) * Data Bypassed");
         }
-
       } else {
         setData([])
       }
@@ -120,40 +109,26 @@ export default function DynamicTable() {
 
   useEffect(() => {
     if (isNewTab && tabs[activeTab].scrollState.newTab) {
-      console.log("* (2) * copy data to new tab");
       tabs[activeTab].data = [...data];
-      console.log("* (2) * data_size=", tabs[activeTab].data.length);
-      console.log("* (2) * tab.data_size=", tabs[activeTab].data.length);
-      
-      console.log("* (2) * tscrollState.newTab=true");
       tabs[activeTab].scrollState.newTab = false;
-      console.log("* (2) * tscrollState.newTab=false");
       setScrollPosition(0);
     }
     setIsNewTab(false);
   }, [isNewTab===true])
 
   const setScrollPosition = (position: number) => {
+    bypassScrollUpdate = true;
     const tableContainer = document.querySelector('.table-container');
     if (tableContainer) {
       tableContainer.scrollTop = position;
     }
   }
 
+  let bypassScrollUpdate = false;
+
   useEffect(() => {
-    console.log("* (1) * ACTIVE TAB = ", activeTab);
     const tab = tabs[activeTab];
-    if (! tab.scrollState.newTab) {
-      console.log("* (1) * oldTab");
-      const tableHeaders = Object.keys(tab.data[0]).filter((item) => !item.includes("total_rows_number"))
-      setScrollPosition(tab.scrollState.scrollTop);
-      setHeaders(tableHeaders);
-      setData(tab.data);
-      
-      
-    } else {
-      console.log("* (1) * newTab");
-      setData([]);
+    if (tab.scrollState.newTab) {
       if (tabs && tab) {
         (async () => {
           await fetchJoins(tab);
@@ -161,17 +136,26 @@ export default function DynamicTable() {
           setTabs([...tabs]);
         })();
       }
-      setData([]);
-      console.log("* (1) * fill new tab with data, size=", data.length);
+    } else {
+      setScrollPosition(0);
+      const tableHeaders = Object.keys(tab.data[0]).filter((item) => !item.includes("total_rows_number"))
+      setHeaders(tableHeaders);
+      setData(tab.data);
+      setPostponedScrollUpdate(true);
     }
-    setCnt(0);
   }, [activeTab])
 
   useEffect(() => {
     const tab = tabs[activeTab];
-    console.log("tab?.activeColumns=", tab?.activeColumns)
+    if (postponedScrollUpdate===true) {
+      setScrollPosition(tab.scrollState.scrollTop);
+    }
+    setPostponedScrollUpdate(false);
+  }, [postponedScrollUpdate===true])
+
+  useEffect(() => {
+    const tab = tabs[activeTab];
     fetchData(tab, true);
-  //}, [tab?.activeColumns])
 }, [tabs[activeTab]?.activeColumns])
 
   const calculateTableHeight = () => {
@@ -216,11 +200,11 @@ export default function DynamicTable() {
     );
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (event: unknown, newPage: number) => {//deprecated
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {//deprecated
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
@@ -257,30 +241,22 @@ export default function DynamicTable() {
     )
   }
 
-  //const [isFetching, setIsFetching] = useState(false);
   const handleScroll = async (event: React.UIEvent<HTMLDivElement>) => {
     if (isScrollLoading) {
      return;
     }
-    //setIsFetching(true);
+    if (bypassScrollUpdate) {
+      bypassScrollUpdate = false;
+      return;
+    }
     setIsScrollLoading(true);
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
     const tab = tabs[activeTab];
     tab.scrollState.scrollTop = scrollTop;
     if (tabs && activeTab !== null) {
-      
-
-      console.log("SCROLL: tab.data.length=", tab.data.length, "tab.allDataLoaded=", tab.scrollState.allDataLoaded);
-      console.log("SCROLL: data.length=", data.length);
-      // load more data
-      setCnt(cnt + 1);
-      if (!tab.scrollState.allDataLoaded && scrollTop + clientHeight >= scrollHeight * 0.8) {
-
-        //console.log("expanding page=yes");
+      if (!tab.scrollState.allDataLoaded && scrollTop + clientHeight >= scrollHeight * 0.8) {// load more data
         tab.page = Math.floor(tab.data.length / tab.perPage) + 1;
-        //console.log("expanding page=", tab.page)
         const newData = await queryTab(tab);
-        //console.log("sliced data=", newData)
         if (newData.length > 0) {
           tab.data = [...tab.data, ...newData];
           setData(tab.data);
@@ -291,13 +267,9 @@ export default function DynamicTable() {
         } else {
           tab.scrollState.allDataLoaded = true;
         }
-      } else {
-        //console.log("expanding page=no");
-      }
-
+      } 
     }
     setIsScrollLoading(false);
-    //setIsFetching(false);
   };
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
