@@ -9,7 +9,8 @@ import {
   //TablePagination,//unused
   TableRow,
   TableSortLabel,
-  Button
+  Button,
+  TextField
 } from "@mui/material";
 import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
@@ -34,6 +35,7 @@ export default function DynamicTable() {
   const [postponedScrollUpdate, setPostponedScrollUpdate] = useState(false);
 
   const [tableHeight, setTableHeight] = useState('700px');
+  const [searchTerms, setSearchTerms] = useState<{ [key: string]: string }>({});
 
   const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
     ...(expandedColumns.has(header) 
@@ -275,6 +277,10 @@ export default function DynamicTable() {
     setIsScrollLoading(false);
   };
 
+  const handleSearchChange = (header: string, value: string) => {
+    setSearchTerms((prev) => ({ ...prev, [header]: value }));
+  };
+  
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
 
   return (
@@ -352,6 +358,33 @@ export default function DynamicTable() {
                     </TableCell>
                   ))}
                 </TableRow>
+
+                <TableRow>
+                  {headers.map((header) => (
+                    <TableCell key={`search-${header}`}
+                      sx={{'& .MuiInputBase-root': {
+                          height: '30px', 
+                          fontSize: '12px',
+                        },
+                        '& .MuiInputBase-input': {padding: '5px',},
+                        border: "1px solid gray",
+                        backgroundColor: "#f5f5f5",
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 1,
+                      }}>
+                      <TextField
+                        size="small"
+                        variant="outlined"
+                        fullWidth
+                        placeholder="Search..."
+                      value={searchTerms[header] || ""}
+                        onChange={(e) => handleSearchChange(header, e.target.value)}
+                      />
+                    </TableCell>
+                  ))}
+                </TableRow>
+
               </TableHead>
 
               {/* Dynamic Table Body */}
