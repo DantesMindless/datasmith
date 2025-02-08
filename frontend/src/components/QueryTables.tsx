@@ -10,7 +10,9 @@ import {
   TableRow,
   TableSortLabel,
   Button,
-  TextField
+  TextField,
+  Select,
+  MenuItem
 } from "@mui/material";
 import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
@@ -205,15 +207,6 @@ export default function DynamicTable() {
     );
   };
 
-  // const handleChangePage = (event: unknown, newPage: number) => {//unused
-  //   setPage(newPage);
-  // };
-
-  // const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {//unused
-  //   setRowsPerPage(parseInt(event.target.value, 10));
-  //   setPage(0);
-  // };
-
   const handleColumnClick = async (header: string) => {
     setExpandedColumns(prev => {
       const newSet = new Set(prev);
@@ -280,7 +273,74 @@ export default function DynamicTable() {
   const handleSearchChange = (header: string, value: string) => {
     setSearchTerms((prev) => ({ ...prev, [header]: value }));
   };
+
+  const getColumnType = (value) => {
+    if (value === null || value === undefined) return "string";
+    if (typeof value === "number") return "number";
+    if (typeof value === "boolean") return "boolean";
+    const dateRegex = /^\d{4}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])$/;
+    if (typeof value === "string" && dateRegex.test(value)) {
+      return "date";
+    }
+    return "string";
+  };
   
+  const renderSearchField = (header: string) => {
+    const type = getColumnType(data[0][header]);
+    console.log("header =", header, " in renderSearchField type =", type);
+    switch (type) {
+      case "number":
+        return (
+          <TextField
+            type="number"
+            size="small"
+            variant="outlined"
+            fullWidth
+            placeholder="Search..."
+            value={searchTerms[header] || ""}
+            onChange={(e) => handleSearchChange(header, e.target.value)}
+          />
+        );
+      case "boolean":
+        return (
+          <Select
+            size="small"
+            variant="outlined"
+            fullWidth
+            value={searchTerms[header] || ""}
+            onChange={(e) => handleSearchChange(header, e.target.value)}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="true">True</MenuItem>
+            <MenuItem value="false">False</MenuItem>
+          </Select>
+        );
+      case "date":
+        return (
+          <TextField
+            type="date"
+            size="small"
+            variant="outlined"
+            fullWidth
+            value={searchTerms[header] || ""}
+            onChange={(e) => handleSearchChange(header, e.target.value)}
+          />
+        );
+      default:
+        return (
+          <TextField
+            size="small"
+            variant="outlined"
+            fullWidth
+            placeholder="Search..."
+            value={searchTerms[header] || ""}
+            onChange={(e) => handleSearchChange(header, e.target.value)}
+          />
+        );
+    }
+  };
+  
+
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
 
   return (
@@ -373,14 +433,15 @@ export default function DynamicTable() {
                         top: 0,
                         zIndex: 1,
                       }}>
-                      <TextField
+                        {renderSearchField(header)}
+                      {/*<TextField
                         size="small"
                         variant="outlined"
                         fullWidth
                         placeholder="Search..."
                       value={searchTerms[header] || ""}
                         onChange={(e) => handleSearchChange(header, e.target.value)}
-                      />
+                      />*/}
                     </TableCell>
                   ))}
                 </TableRow>
