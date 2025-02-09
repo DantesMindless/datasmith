@@ -299,6 +299,32 @@ class PostgresConnection(VerifyInputsMixin):
         self.close()
         return tables
 
+
+    # def get_table_rows(self, query) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+    #     columns = query.get("activeColumns")
+    #     schema = query.get("schema")
+    #     table = query.get("table")
+    #     page = query.get("page")
+    #     per_page = query.get("perPage")
+    #     offset = (page - 1) * per_page
+    #
+    #     if not columns:
+    #         return "success", [], "No columns provided"
+    #     else:
+    #         columns = [column.split(".")[1] for column in columns if "." in column]
+    #     query = f"SELECT {(", ").join(columns)}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} LIMIT {per_page} OFFSET {offset};"
+    #     """
+    #     Retrieve rows from a specified table.
+    #
+    #     Args:
+    #         schema (str): The schema containing the table.
+    #         table (str): The table to query.
+    #
+    #     Returns:
+    #         Tuple[bool, Optional[List[Dict[str, Any]]], str]: List of rows or None if an error occurs.
+    #     """
+    #     return self.query(query)
+
     def get_table_rows(self, query) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         columns = query.get("activeColumns")
         schema = query.get("schema")
@@ -307,19 +333,22 @@ class PostgresConnection(VerifyInputsMixin):
         per_page = query.get("perPage")
         offset = (page - 1) * per_page
 
+        where_clause = query.get("filter", {})
+
         if not columns:
             return "success", [], "No columns provided"
         else:
             columns = [column.split(".")[1] for column in columns if "." in column]
-        query = f"SELECT {(", ").join(columns)}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} LIMIT {per_page} OFFSET {offset};"
-        """
-        Retrieve rows from a specified table.
 
-        Args:
-            schema (str): The schema containing the table.
-            table (str): The table to query.
+        base_query = f"SELECT {(', ').join(columns)}, (SELECT COUNT(*) FROM {schema}.{table}"
 
-        Returns:
-            Tuple[bool, Optional[List[Dict[str, Any]]], str]: List of rows or None if an error occurs.
-        """
+        count_where = f" WHERE {where_clause}" if where_clause else ""
+
+        query = f"{base_query}{count_where}) AS total_rows_number FROM {schema}.{table}"
+
+        if where_clause:
+            query += f" WHERE {where_clause}"
+
+        query += f" LIMIT {per_page} OFFSET {offset};"
+
         return self.query(query)

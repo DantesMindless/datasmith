@@ -18,7 +18,8 @@ import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
-import { TableViewTab } from "../providers/constants";
+import { TableViewTab, FilterOperator, Filter } from "../providers/constants";
+import { combineFilters } from "./Filters";
 type Order = "asc" | "desc";
 
 export default function DynamicTable() {
@@ -37,7 +38,7 @@ export default function DynamicTable() {
   const [postponedScrollUpdate, setPostponedScrollUpdate] = useState(false);
 
   const [tableHeight, setTableHeight] = useState('700px');
-  const [searchTerms, setSearchTerms] = useState<{ [key: string]: string }>({});
+  const [searchTerms, setSearchTerms] = useState<{ [key: string]: Filter }>({});
 
   const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
     ...(expandedColumns.has(header) 
@@ -271,10 +272,46 @@ export default function DynamicTable() {
   };
 
   const handleSearchChange = (header: string, value: string) => {
-    setSearchTerms((prev) => ({ ...prev, [header]: value }));
+    const columnType = getColumnType(data[0][header]);
+    let typeDefaultOperator: FilterOperator = FilterOperator.EQUALS;
+    switch (columnType) {
+      case "number":
+        typeDefaultOperator = FilterOperator.EQUALS;
+        break;
+      case "boolean":
+        typeDefaultOperator = FilterOperator.EQUALS;
+        break;
+      default:
+        typeDefaultOperator = FilterOperator.CONTAINS;
+    }
+    const filter: Filter = {
+      value: value,
+      operator: typeDefaultOperator,
+      field: header,
+      type: columnType
+    };
+
+    const newFilters = {
+      ...searchTerms,
+      [header]: filter
+    };
+  
+    const whereClause = combineFilters(Object.values(newFilters));
+    
+    if (tabs && activeTab !== null) {
+      const newTabs = [...tabs];
+      newTabs[activeTab] = {
+        ...newTabs[activeTab],
+        filter: whereClause
+      };
+      setTabs(newTabs);
+    }
+  
+    setSearchTerms(newFilters);
+
   };
 
-  const getColumnType = (value) => {
+  const getColumnType = (value: string | number | boolean | Date) => {
     if (value === null || value === undefined) return "string";
     if (typeof value === "number") return "number";
     if (typeof value === "boolean") return "boolean";
@@ -287,6 +324,7 @@ export default function DynamicTable() {
   
   const renderSearchField = (header: string) => {
     const type = getColumnType(data[0][header]);
+    const currentValue = searchTerms[header]?.value || "";
     console.log("header =", header, " in renderSearchField type =", type);
     switch (type) {
       case "number":
@@ -297,7 +335,7 @@ export default function DynamicTable() {
             variant="outlined"
             fullWidth
             placeholder="Search..."
-            value={searchTerms[header] || ""}
+            value={currentValue}
             onChange={(e) => handleSearchChange(header, e.target.value)}
           />
         );
@@ -307,7 +345,7 @@ export default function DynamicTable() {
             size="small"
             variant="outlined"
             fullWidth
-            value={searchTerms[header] || ""}
+            value={currentValue}
             onChange={(e) => handleSearchChange(header, e.target.value)}
           >
             <MenuItem value="">All</MenuItem>
@@ -322,7 +360,7 @@ export default function DynamicTable() {
             size="small"
             variant="outlined"
             fullWidth
-            value={searchTerms[header] || ""}
+            value={currentValue}
             onChange={(e) => handleSearchChange(header, e.target.value)}
           />
         );
@@ -333,7 +371,7 @@ export default function DynamicTable() {
             variant="outlined"
             fullWidth
             placeholder="Search..."
-            value={searchTerms[header] || ""}
+            value={currentValue}
             onChange={(e) => handleSearchChange(header, e.target.value)}
           />
         );
@@ -434,14 +472,6 @@ export default function DynamicTable() {
                         zIndex: 1,
                       }}>
                         {renderSearchField(header)}
-                      {/*<TextField
-                        size="small"
-                        variant="outlined"
-                        fullWidth
-                        placeholder="Search..."
-                      value={searchTerms[header] || ""}
-                        onChange={(e) => handleSearchChange(header, e.target.value)}
-                      />*/}
                     </TableCell>
                   ))}
                 </TableRow>

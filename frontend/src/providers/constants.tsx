@@ -35,7 +35,7 @@ interface TableViewTab{
     openedColumns: boolean
     columns: string[]
     activeColumns: string[]
-    filters: string[]
+    filter: string
     initialLoad: boolean
     headers : string[]
     scrollState: ScrollState
@@ -64,4 +64,26 @@ interface ContextType {
     removeTab: (index: number) => void
 }
 
-export type {ContextType, ProviderProps, Alert, Info, Connections, Connection, TableViewTab }
+export enum FilterOperator {
+    EQUALS = 'equals',
+    NOT_EQUALS = 'notEquals',
+    CONTAINS = 'contains',
+    GREATER_THAN = 'greaterThan',
+    LESS_THAN = 'lessThan',
+    BETWEEN = 'between',
+    IN = 'in',
+    IS_NULL = 'isNull',
+    IS_NOT_NULL = 'isNotNull'
+  }
+
+interface Filter{
+    value?: any;
+    from?: any;
+    to?: any;
+    operator: FilterOperator;
+    field: string;
+    type: 'number' | 'boolean' | 'string' | 'date';
+}
+
+export type {ContextType, ProviderProps, Alert, Info, 
+    Connections, Connection, TableViewTab, Filter}

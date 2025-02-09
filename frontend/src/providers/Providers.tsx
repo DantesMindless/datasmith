@@ -74,7 +74,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       openedColumns: false,
       columns : [],
       activeColumns:[],
-      filters: [],
+      filter: "",
       initialLoad: true,
       headers: [],
       scrollState: {
