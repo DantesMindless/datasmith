@@ -298,14 +298,18 @@ export default function DynamicTable() {
   
     const whereClause = combineFilters(Object.values(newFilters));
     
-    if (tabs && activeTab !== null) {
-      const newTabs = [...tabs];
-      newTabs[activeTab] = {
-        ...newTabs[activeTab],
-        filter: whereClause
-      };
-      setTabs(newTabs);
-    }
+    tabs[activeTab].filter = whereClause;
+
+    fetchData(tabs[activeTab]);
+
+    // if (tabs && activeTab !== null) {
+    //   const newTabs = [...tabs];
+    //   newTabs[activeTab] = {
+    //     ...newTabs[activeTab],
+    //     filter: whereClause
+    //   };
+    //   setTabs(newTabs);
+    // }
   
     setSearchTerms(newFilters);
 
@@ -325,7 +329,6 @@ export default function DynamicTable() {
   const renderSearchField = (header: string) => {
     const type = getColumnType(data[0][header]);
     const currentValue = searchTerms[header]?.value || "";
-    console.log("header =", header, " in renderSearchField type =", type);
     switch (type) {
       case "number":
         return (
