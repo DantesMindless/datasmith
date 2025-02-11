@@ -22,6 +22,8 @@ import { TableViewTab, FilterOperator, Filter } from "../providers/constants";
 import { combineFilters } from "./Filters";
 type Order = "asc" | "desc";
 
+let detectedColumnTypes: { [key: string]: string } = {};
+
 export default function DynamicTable() {
 
   const { activeTab, tabs, setTabs } = useAppContext();
@@ -122,6 +124,15 @@ export default function DynamicTable() {
       setScrollPosition(0);
     }
     setDataToTabCopyRequest(false);
+    if (data.length > 0) {
+      //detectedColumnTypes = {};
+      const keys = Object.keys(data[0]);
+      keys.forEach(key => {
+        detectedColumnTypes[key] = getColumnType(data[0][key]);
+        //console.log("1key =", key, " 1type =", detectedColumnTypes[key]);
+      });
+    }
+    console.log("1detectedColumnTypes =", detectedColumnTypes);
   }, [dataToTabCopyRequest===true])
 
   let bypassHandleScroll = false;
@@ -135,6 +146,7 @@ export default function DynamicTable() {
   }
 
   useEffect(() => {
+    
     const tab = tabs[activeTab];
     if (tab.scrollState.newTab) {
       if (tabs && tab) {
@@ -271,8 +283,12 @@ export default function DynamicTable() {
     setIsScrollLoading(false);
   };
 
+  
+
   const handleSearchChange = (header: string, value: string) => {
-    const columnType = getColumnType(data[0][header]);
+    const columnType = detectedColumnTypes[header];
+    console.log("2detectedColumnTypes =", detectedColumnTypes);
+    console.log("2header =", header, " 2type =", columnType);
     let typeDefaultOperator: FilterOperator = FilterOperator.EQUALS;
     switch (columnType) {
       case "number":
@@ -281,9 +297,13 @@ export default function DynamicTable() {
       case "boolean":
         typeDefaultOperator = FilterOperator.EQUALS;
         break;
+      case "date":
+        typeDefaultOperator = FilterOperator.GREATER_THAN;
+        break;
       default:
         typeDefaultOperator = FilterOperator.CONTAINS;
     }
+
     const filter: Filter = {
       value: value,
       operator: typeDefaultOperator,
@@ -291,28 +311,21 @@ export default function DynamicTable() {
       type: columnType
     };
 
-    const newFilters = {
-      ...searchTerms,
-      [header]: filter
-    };
+    const newFilters = {...searchTerms};
+    if (value.length > 0) {
+      newFilters[header] = filter;
+    } else {
+      delete newFilters[header];
+    }
   
     const whereClause = combineFilters(Object.values(newFilters));
     
     tabs[activeTab].filter = whereClause;
 
     fetchData(tabs[activeTab]);
+    console.log("data.length =", data.length);
 
-    // if (tabs && activeTab !== null) {
-    //   const newTabs = [...tabs];
-    //   newTabs[activeTab] = {
-    //     ...newTabs[activeTab],
-    //     filter: whereClause
-    //   };
-    //   setTabs(newTabs);
-    // }
-  
     setSearchTerms(newFilters);
-
   };
 
   const getColumnType = (value: string | number | boolean | Date) => {
@@ -327,7 +340,7 @@ export default function DynamicTable() {
   };
   
   const renderSearchField = (header: string) => {
-    const type = getColumnType(data[0][header]);
+    const type = detectedColumnTypes[header];
     const currentValue = searchTerms[header]?.value || "";
     switch (type) {
       case "number":
@@ -380,7 +393,6 @@ export default function DynamicTable() {
         );
     }
   };
-  
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
 
@@ -392,7 +404,7 @@ export default function DynamicTable() {
         </>
       ) : activeTab}
 
-      {data.length > 0 ? (
+      {headers.length > 0 ? (
           <Box
             className="table-container"
             sx={{
@@ -481,7 +493,17 @@ export default function DynamicTable() {
 
               </TableHead>
 
+
+
+
+
+
+
+
+
+
               {/* Dynamic Table Body */}
+              { data.length > 0 ? (
               <TableBody>
                 {visibleRows.map((row, index) => (
                   <TableRow hover tabIndex={-1} key={index}>
@@ -500,6 +522,22 @@ export default function DynamicTable() {
                   </TableRow>
                 ))}
               </TableBody>
+              )
+              : (
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={headers.length} sx={{textAlign: "center"}}>No Data Found</TableCell>
+                  </TableRow>
+                </TableBody>
+              )}
+
+
+
+
+
+
+
+
             </Table>
           </Box>
         ) :
