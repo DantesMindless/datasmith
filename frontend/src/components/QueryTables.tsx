@@ -20,6 +20,7 @@ import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import { TableViewTab, FilterOperator, Filter } from "../providers/constants";
 import { combineFilters } from "./Filters";
+import SQLFilterForm from "./FilterForm";
 type Order = "asc" | "desc";
 
 let detectedColumnTypes: { [key: string]: string } = {};
@@ -41,6 +42,9 @@ export default function DynamicTable() {
 
   const [tableHeight, setTableHeight] = useState('700px');
   const [searchTerms, setSearchTerms] = useState<{ [key: string]: Filter }>({});
+
+
+  const [whereClause, setWhereClause] = useState('');
 
   const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
     ...(expandedColumns.has(header) 
@@ -131,8 +135,9 @@ export default function DynamicTable() {
         detectedColumnTypes[key] = getColumnType(data[0][key]);
         //console.log("1key =", key, " 1type =", detectedColumnTypes[key]);
       });
+      console.log("1detectedColumnTypes =", detectedColumnTypes);
     }
-    console.log("1detectedColumnTypes =", detectedColumnTypes);
+    
   }, [dataToTabCopyRequest===true])
 
   let bypassHandleScroll = false;
@@ -146,7 +151,7 @@ export default function DynamicTable() {
   }
 
   useEffect(() => {
-    
+    detectedColumnTypes = {};
     const tab = tabs[activeTab];
     if (tab.scrollState.newTab) {
       if (tabs && tab) {
@@ -394,6 +399,24 @@ export default function DynamicTable() {
     }
   };
 
+  const handleFilterChange = (header: string, clause: string) => {
+    const newFilters = { ...searchTerms };
+    if (clause) {
+      newFilters[header] = {
+        value: clause,
+        operator: 'CUSTOM',
+        field: header,
+        type: detectedColumnTypes[header]
+      };
+    } else {
+      delete newFilters[header];
+    }
+    console.log("newFilters =", newFilters);
+    tabs[activeTab].filter = combineFilters(Object.values(newFilters));
+    fetchData(tabs[activeTab]);
+    setSearchTerms(newFilters);
+  };
+
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
 
   return (
@@ -419,6 +442,7 @@ export default function DynamicTable() {
             }}
             onScroll={handleScroll}
           >
+            
             {/* The table with indexes */}
             <Table size="small" sx={{ width: 'auto', flexShrink: 0 }}>
               <TableHead> {/*Arrow button*/}
@@ -471,7 +495,6 @@ export default function DynamicTable() {
                     </TableCell>
                   ))}
                 </TableRow>
-
                 <TableRow>
                   {headers.map((header) => (
                     <TableCell key={`search-${header}`}
@@ -486,22 +509,15 @@ export default function DynamicTable() {
                         top: 0,
                         zIndex: 1,
                       }}>
-                        {renderSearchField(header)}
+                        <SQLFilterForm
+                          fieldName={typeof header !== 'object' ? header : ''}
+                          fieldType={detectedColumnTypes[header] || 'string'}
+                          onFilterChange={(clause) => handleFilterChange(header, clause)}
+                        />
                     </TableCell>
                   ))}
                 </TableRow>
-
               </TableHead>
-
-
-
-
-
-
-
-
-
-
               {/* Dynamic Table Body */}
               { data.length > 0 ? (
               <TableBody>
