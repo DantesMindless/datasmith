@@ -4,22 +4,17 @@ import {
   Table,
   TableBody,
   TableCell,
-  //TableContainer,//unused
   TableHead,
-  //TablePagination,//unused
   TableRow,
   TableSortLabel,
   Button,
-  TextField,
-  Select,
-  MenuItem
 } from "@mui/material";
 import { queryTab, getJoins } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import { TableViewTab, FilterOperator, Filter } from "../providers/constants";
-import { combineFilters } from "./Filters";
+import { combineFilters, getColumnType } from "./FilterForm";
 import SQLFilterForm from "./FilterForm";
 type Order = "asc" | "desc";
 
@@ -33,8 +28,6 @@ export default function DynamicTable() {
   const [data, setData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [dataToTabCopyRequest, setDataToTabCopyRequest] = useState(false);
-  // const [page, setPage] = useState(0);//unused
-  // const [rowsPerPage, setRowsPerPage] = useState(10);//unused
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
 
   const [isScrollLoading, setIsScrollLoading] = useState(false);
@@ -42,9 +35,6 @@ export default function DynamicTable() {
 
   const [tableHeight, setTableHeight] = useState('700px');
   const [searchTerms, setSearchTerms] = useState<{ [key: string]: Filter }>({});
-
-
-  const [whereClause, setWhereClause] = useState('');
 
   const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
     ...(expandedColumns.has(header) 
@@ -100,7 +90,6 @@ export default function DynamicTable() {
         const tableHeaders = Object.keys(result[0]).filter((item) => !item.includes("total_rows_number"))
         setHeaders(tableHeaders);
         if (!updateHeaderOnly) {
-          //setData(data.length === 0 || (data[data.length - 1].toString() === result[result.length - 1].toString()) ? [...result] : [...data, ...result]);
           setData([...result]);
           if (tabs[activeTab].scrollState.newTab) {
             setDataToTabCopyRequest(true);
@@ -129,15 +118,11 @@ export default function DynamicTable() {
     }
     setDataToTabCopyRequest(false);
     if (data.length > 0) {
-      //detectedColumnTypes = {};
       const keys = Object.keys(data[0]);
       keys.forEach(key => {
         detectedColumnTypes[key] = getColumnType(data[0][key]);
-        //console.log("1key =", key, " 1type =", detectedColumnTypes[key]);
       });
-      console.log("1detectedColumnTypes =", detectedColumnTypes);
     }
-    
   }, [dataToTabCopyRequest===true])
 
   let bypassHandleScroll = false;
@@ -151,9 +136,11 @@ export default function DynamicTable() {
   }
 
   useEffect(() => {
-    detectedColumnTypes = {};
+
     const tab = tabs[activeTab];
     if (tab.scrollState.newTab) {
+      detectedColumnTypes = {};//reset column types
+      setSearchTerms({});//reset search terms
       if (tabs && tab) {
         (async () => {
           await fetchJoins(tab);
@@ -290,129 +277,22 @@ export default function DynamicTable() {
 
   
 
-  const handleSearchChange = (header: string, value: string) => {
-    const columnType = detectedColumnTypes[header];
-    console.log("2detectedColumnTypes =", detectedColumnTypes);
-    console.log("2header =", header, " 2type =", columnType);
-    let typeDefaultOperator: FilterOperator = FilterOperator.EQUALS;
-    switch (columnType) {
-      case "number":
-        typeDefaultOperator = FilterOperator.EQUALS;
-        break;
-      case "boolean":
-        typeDefaultOperator = FilterOperator.EQUALS;
-        break;
-      case "date":
-        typeDefaultOperator = FilterOperator.GREATER_THAN;
-        break;
-      default:
-        typeDefaultOperator = FilterOperator.CONTAINS;
-    }
 
-    const filter: Filter = {
-      value: value,
-      operator: typeDefaultOperator,
-      field: header,
-      type: columnType
-    };
-
-    const newFilters = {...searchTerms};
-    if (value.length > 0) {
-      newFilters[header] = filter;
-    } else {
-      delete newFilters[header];
-    }
-  
-    const whereClause = combineFilters(Object.values(newFilters));
-    
-    tabs[activeTab].filter = whereClause;
-
-    fetchData(tabs[activeTab]);
-    console.log("data.length =", data.length);
-
-    setSearchTerms(newFilters);
-  };
-
-  const getColumnType = (value: string | number | boolean | Date) => {
-    if (value === null || value === undefined) return "string";
-    if (typeof value === "number") return "number";
-    if (typeof value === "boolean") return "boolean";
-    const dateRegex = /^\d{4}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])$/;
-    if (typeof value === "string" && dateRegex.test(value)) {
-      return "date";
-    }
-    return "string";
-  };
-  
-  const renderSearchField = (header: string) => {
-    const type = detectedColumnTypes[header];
-    const currentValue = searchTerms[header]?.value || "";
-    switch (type) {
-      case "number":
-        return (
-          <TextField
-            type="number"
-            size="small"
-            variant="outlined"
-            fullWidth
-            placeholder="Search..."
-            value={currentValue}
-            onChange={(e) => handleSearchChange(header, e.target.value)}
-          />
-        );
-      case "boolean":
-        return (
-          <Select
-            size="small"
-            variant="outlined"
-            fullWidth
-            value={currentValue}
-            onChange={(e) => handleSearchChange(header, e.target.value)}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="true">True</MenuItem>
-            <MenuItem value="false">False</MenuItem>
-          </Select>
-        );
-      case "date":
-        return (
-          <TextField
-            type="date"
-            size="small"
-            variant="outlined"
-            fullWidth
-            value={currentValue}
-            onChange={(e) => handleSearchChange(header, e.target.value)}
-          />
-        );
-      default:
-        return (
-          <TextField
-            size="small"
-            variant="outlined"
-            fullWidth
-            placeholder="Search..."
-            value={currentValue}
-            onChange={(e) => handleSearchChange(header, e.target.value)}
-          />
-        );
-    }
-  };
 
   const handleFilterChange = (header: string, clause: string) => {
     const newFilters = { ...searchTerms };
     if (clause) {
       newFilters[header] = {
-        value: clause,
-        operator: 'CUSTOM',
-        field: header,
-        type: detectedColumnTypes[header]
+        clause: clause,
+        column: header,
       };
+      console.log("header =", header, "clause =", clause);
     } else {
       delete newFilters[header];
     }
     console.log("newFilters =", newFilters);
     tabs[activeTab].filter = combineFilters(Object.values(newFilters));
+    console.log("fetching data");
     fetchData(tabs[activeTab]);
     setSearchTerms(newFilters);
   };
@@ -447,7 +327,7 @@ export default function DynamicTable() {
             <Table size="small" sx={{ width: 'auto', flexShrink: 0 }}>
               <TableHead> {/*Arrow button*/}
                 <TableRow>
-                  <TableCell sx={getIndexCellStyles(true)}>
+                  <TableCell sx={{...getIndexCellStyles(true), height: '118px'}}>
                     <Button 
                       onClick={handleOpenColumns}
                       sx={{

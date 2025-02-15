@@ -26,6 +26,7 @@ interface TableViewTab{
     schema: string // database
     table: string // table name
     query: string
+    columnTypes: Record<string, string>
     joins: Record<string, string>[]
     page:   number
     perPage: number
@@ -64,25 +65,9 @@ interface ContextType {
     removeTab: (index: number) => void
 }
 
-export enum FilterOperator {
-    EQUALS = 'equals',
-    NOT_EQUALS = 'notEquals',
-    CONTAINS = 'contains',
-    GREATER_THAN = 'greaterThan',
-    LESS_THAN = 'lessThan',
-    BETWEEN = 'between',
-    IN = 'in',
-    IS_NULL = 'isNull',
-    IS_NOT_NULL = 'isNotNull'
-  }
-
 interface Filter{
-    value?: any;
-    from?: any;
-    to?: any;
-    operator: FilterOperator;
-    field: string;
-    type: 'number' | 'boolean' | 'string' | 'date';
+    clause: string;
+    column: string;
 }
 
 export type {ContextType, ProviderProps, Alert, Info, 

@@ -65,6 +65,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       schema: schema,
       table: table,
       query: `SELECT * FROM ${schema}.${table} LIMIT ${rowsPerPage};`,
+      columnTypes: {},
       page: 1,
       joins: [],
       perPage: rowsPerPage,

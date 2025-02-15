@@ -1,11 +1,33 @@
 // SQLFilterForm.tsx
 import React, { useState, useEffect } from 'react';
-import { Select, MenuItem, TextField, Box } from '@mui/material';
-import { prepareFilterValue } from './Filters';
+import { Select, MenuItem, TextField, Box, Button } from '@mui/material';
+//import { prepareFilterValue } from './Filters';
+
 interface SQLFilterFormProps {
   fieldName: string;
   fieldType: string;
   onFilterChange: (whereClause: string) => void;
+}
+
+
+export function getColumnType(value: string | number | boolean | Date) :string {
+  if (value === null || value === undefined) return "string";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  const dateRegex = /^\d{4}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])$/;
+  if (typeof value === "string" && dateRegex.test(value)) {
+    return "date";
+  }
+  return "string";
+};
+
+export function combineFilters(filters: Filter[], conjunction: 'AND' | 'OR' = 'AND'): string {
+  console.log("filters =", filters);
+  if (!filters.length) return '';
+  
+  const conditions = filters.map(filter => filter.clause);
+  console.log("conditions =", conditions.join(` ${conjunction} `));
+  return conditions.join(` ${conjunction} `);
 }
 
 const SQLFilterForm: React.FC<SQLFilterFormProps> = ({ 
@@ -28,6 +50,16 @@ const SQLFilterForm: React.FC<SQLFilterFormProps> = ({
     timestamp: ['=', '!=', '>', '<', '>=', '<=', 'BETWEEN', 'IS NULL', 'IS NOT NULL'],
     string: ['=', '!=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL'] // fallback for string type
   };
+
+  const prepareFilterValue = (value:any): any => {
+    const type = getColumnType(value);
+      switch (type) {
+        case 'date':
+          return `'${new Date(value).toISOString()}'`;
+        default:
+          return value;
+    };
+  }
 
   const generateWhereClause = () => {
     if (!filters.value) return '';
@@ -151,39 +183,60 @@ const SQLFilterForm: React.FC<SQLFilterFormProps> = ({
         {renderInput(
           filters.value,
           (e) => setFilters({ ...filters, value: e.target.value })
-        )}
+          )}
         {isRangeOperator(filters.operator) && (
           renderInput(
             filters.valueEnd,
             (e) => setFilters({ ...filters, valueEnd: e.target.value })
           )
         )}
-      </Box>
+    </Box>
     );
   };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-      <Select
-        size="small"
-        value={filters.operator}
-        onChange={(e) => setFilters({ 
-          ...filters, 
-          operator: e.target.value as string,
-          valueEnd: '' 
-        })}
-        sx={{ 
-          height: '30px',
-          fontSize: '12px',
-          '& .MuiSelect-select': { padding: '5px' }
-        }}
-      >
-        {(operatorsByType[fieldType] || operatorsByType.string).map(op => (
-          <MenuItem key={op} value={op}>
-            {op}
-          </MenuItem>
-        ))}
-      </Select>
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+        <Select
+          size="small"
+          value={filters.operator}
+          onChange={(e) => setFilters({ 
+            ...filters, 
+            operator: e.target.value as string,
+            valueEnd: '' 
+          })}
+          sx={{ 
+            height: '30px',
+            fontSize: '12px',
+            flex: 1,
+            '& .MuiSelect-select': { padding: '5px' }
+          }}
+        >
+          {(operatorsByType[fieldType] || operatorsByType.string).map(op => (
+            <MenuItem key={op} value={op}>
+              {op}
+            </MenuItem>
+          ))}
+        </Select>
+        {(filters.value || filters.valueEnd) && (
+        <Button 
+          size="small"
+          variant="contained"
+          sx={{ 
+            height: '30px',
+            minWidth: '30px',
+            fontSize: '12px',
+            padding: '5px',
+            marginLeft: 'auto'
+          }}
+          onClick={() => setFilters({ 
+            operator: '=',
+            value: '',
+            valueEnd: '' 
+          })}
+        >X</Button>
+      )}
+      </Box>
       {renderValueInput()}
     </Box>
   );
