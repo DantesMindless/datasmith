@@ -172,6 +172,27 @@ class DataSourceSchemasMetadataView(BaseAuthApiView):
         )
 
 
+class DataSourceColumnTypesView(BaseAuthApiView):
+    def get(self, request: HttpRequest, id: UUID, table_name: str) -> Response:
+        """
+        Retrieve column data types for a specific table in the datasource
+
+        Args:
+            request (HttpRequest): The HTTP request
+            id (UUID): DataSource ID
+            table_name (str): Name of the table to get column types for
+
+        Returns:
+            Response: Column types data or error message
+        """
+        if datasource := DataSource.objects.filter(id=id).first():
+            success, data, message = datasource.get_table_column_types(table_name)
+            if success:
+                return Response(data)
+            return Response(message, status=status.HTTP_400_BAD_REQUEST)
+        return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
+
+
 class DataSourceTestConnectionView(BaseAuthApiView):
     def get(self, request: HttpRequest, id: UUID) -> Response:
         """

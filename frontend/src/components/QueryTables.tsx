@@ -9,7 +9,7 @@ import {
   TableSortLabel,
   Button,
 } from "@mui/material";
-import { queryTab, getJoins } from "../utils/requests";
+import { queryTab, getJoins, getColumnTypes } from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
@@ -35,6 +35,8 @@ export default function DynamicTable() {
 
   const [tableHeight, setTableHeight] = useState('700px');
   const [searchTerms, setSearchTerms] = useState<{ [key: string]: Filter }>({});
+
+  const [columnTypes, setColumnTypes] = useState<{ [key: string]: string }>({});
 
   const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
     ...(expandedColumns.has(header) 
@@ -92,6 +94,9 @@ export default function DynamicTable() {
         if (!updateHeaderOnly) {
           setData([...result]);
           if (tabs[activeTab].scrollState.newTab) {
+            const columnTypes = await fetchColumnTypes(tabData);
+            setColumnTypes(columnTypes);
+            
             setDataToTabCopyRequest(true);
           }
         }
@@ -107,6 +112,12 @@ export default function DynamicTable() {
     tabData.joins = result
     setColumnsIds({ [tabData.table]: tabData.joins }, 1, tabData.columns)
     tabData.activeColumns = tabData.columns.filter((item) => item.includes("level_1"))
+    return
+  };
+
+  const fetchColumnTypes = async (tabData) => {
+    const result = await getColumnTypes(tabData);
+    tabData.columnTypes = result
     return
   };
 
@@ -141,6 +152,8 @@ export default function DynamicTable() {
     if (tab.scrollState.newTab) {
       detectedColumnTypes = {};//reset column types
       setSearchTerms({});//reset search terms
+      console.log("columnTypes =", columnTypes);
+      console.log("types =", tab.columnTypes);
       if (tabs && tab) {
         (async () => {
           await fetchJoins(tab);

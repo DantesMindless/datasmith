@@ -170,6 +170,14 @@ class DataSource(BaseModel):
         self.connection.close()
         return data
 
+    def get_table_column_types(self, tablename:str):
+        self.connection.connect()
+        data: Tuple[bool, Optional[List[Dict[str, Any]]], str] = (
+            self.connection.get_table_column_types(tablename)
+        )
+        self.connection.close()
+        return data
+
     def get_schemas(self) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """
         Retrieve available schemas in the datasource.

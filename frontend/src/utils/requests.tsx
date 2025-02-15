@@ -62,3 +62,7 @@ export const queryTab = (tab: TableViewTab) => {
 export const getJoins = (tab: TableViewTab) => {
   return getData(`datasource-metadata/tables/${tab.ID}/${tab.schema}/${tab.table}/`,)
 }
+
+export const getColumnTypes = (tab: TableViewTab) => {
+  return getData(`datasource-metadata/table-columns-types/${tab.ID}/${tab.table}/`,)
+}

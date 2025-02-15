@@ -7,6 +7,7 @@ from .views import (
     DataSourceDetailMetadataView,
     DataSourceConnectionTypesView,
     DataSourceConnectionTypesFormFieldsView,
+    DataSourceColumnTypesView,
 )
 
 urlpatterns = [
@@ -50,6 +51,10 @@ urlpatterns = [
         "datasource-metadata/schemas/<uuid:id>/",
         DataSourceSchemasMetadataView.as_view(),
         name="datasource-metadata-update",
+    ),
+    path('datasource-metadata/table-columns-types/<uuid:id>/<str:table_name>/',
+         DataSourceColumnTypesView.as_view(),
+         name='datasource-column-types'
     ),
     path(
         "datasource/connection-types/",

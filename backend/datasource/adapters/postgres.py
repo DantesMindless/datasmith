@@ -234,6 +234,57 @@ class PostgresConnection(VerifyInputsMixin):
                 """
         return self.query(query)[1]
 
+    def get_table_column_types(self, table_name: str) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+        """
+        Retrieve column data types for a given table.
+
+        Args:
+            table_name (str): Table name.
+
+        Returns:
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+                - Success status,
+                - List of column data types or None,
+                - Message.
+        """
+        query = f"""
+        SELECT
+            column_name,
+            data_type
+        FROM
+            information_schema.columns
+        WHERE
+            table_name = '{table_name}';
+        """
+        success, data, message = self.query(query)
+
+        if success and data:
+            type_mapping = {
+                "integer": "int",
+                "bigint": "int",
+                "smallint": "int",
+                "double precision": "float",
+                "real": "float",
+                "numeric": "decimal",
+                "character varying": "string",
+                "text": "string",
+                "boolean": "bool",
+                "date": "date",
+                "timestamp without time zone": "datetime",
+                "timestamp with time zone": "datetime",
+                "uuid": "uuid",
+                "json": "json",
+                "jsonb": "json",
+                "bytea": "binary",
+            }
+
+            for column in data:
+                column["frontend_type"] = type_mapping.get(column["data_type"], "unknown")
+
+            return True, data, "Column types retrieved successfully."
+
+        return False, None, message
+
     def get_metadata(self, schema: str) -> Dict[str, Any]:
         """
         Retrieve metadata for all tables.
@@ -299,31 +350,6 @@ class PostgresConnection(VerifyInputsMixin):
         self.close()
         return tables
 
-
-    # def get_table_rows(self, query) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
-    #     columns = query.get("activeColumns")
-    #     schema = query.get("schema")
-    #     table = query.get("table")
-    #     page = query.get("page")
-    #     per_page = query.get("perPage")
-    #     offset = (page - 1) * per_page
-    #
-    #     if not columns:
-    #         return "success", [], "No columns provided"
-    #     else:
-    #         columns = [column.split(".")[1] for column in columns if "." in column]
-    #     query = f"SELECT {(", ").join(columns)}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} LIMIT {per_page} OFFSET {offset};"
-    #     """
-    #     Retrieve rows from a specified table.
-    #
-    #     Args:
-    #         schema (str): The schema containing the table.
-    #         table (str): The table to query.
-    #
-    #     Returns:
-    #         Tuple[bool, Optional[List[Dict[str, Any]]], str]: List of rows or None if an error occurs.
-    #     """
-    #     return self.query(query)
 
     def get_table_rows(self, query) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         columns = query.get("activeColumns")
