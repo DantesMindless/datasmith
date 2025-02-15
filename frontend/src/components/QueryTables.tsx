@@ -9,16 +9,16 @@ import {
   TableSortLabel,
   Button,
 } from "@mui/material";
-import { queryTab, getJoins, getColumnTypes } from "../utils/requests";
+import { queryTab, getJoins, getColumnTypes} from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import { TableViewTab, FilterOperator, Filter } from "../providers/constants";
-import { combineFilters, getColumnType } from "./FilterForm";
+import { combineFilters} from "./FilterForm";
 import SQLFilterForm from "./FilterForm";
 type Order = "asc" | "desc";
 
-let detectedColumnTypes: { [key: string]: string } = {};
+//let detectedColumnTypes: { [key: string]: string } = {};
 
 export default function DynamicTable() {
 
@@ -94,9 +94,9 @@ export default function DynamicTable() {
         if (!updateHeaderOnly) {
           setData([...result]);
           if (tabs[activeTab].scrollState.newTab) {
-            const columnTypes = await fetchColumnTypes(tabData);
-            setColumnTypes(columnTypes);
-            
+            const types = await fetchColumnTypes(tabData);
+            setColumnTypes(types);
+
             setDataToTabCopyRequest(true);
           }
         }
@@ -117,8 +117,7 @@ export default function DynamicTable() {
 
   const fetchColumnTypes = async (tabData) => {
     const result = await getColumnTypes(tabData);
-    tabData.columnTypes = result
-    return
+    return result
   };
 
   useEffect(() => {
@@ -127,12 +126,10 @@ export default function DynamicTable() {
       tabs[activeTab].scrollState.newTab = false;
       setScrollPosition(0);
     }
+    
     setDataToTabCopyRequest(false);
     if (data.length > 0) {
-      const keys = Object.keys(data[0]);
-      keys.forEach(key => {
-        detectedColumnTypes[key] = getColumnType(data[0][key]);
-      });
+      tabs[activeTab].columnTypes = columnTypes;
     }
   }, [dataToTabCopyRequest===true])
 
@@ -150,10 +147,7 @@ export default function DynamicTable() {
 
     const tab = tabs[activeTab];
     if (tab.scrollState.newTab) {
-      detectedColumnTypes = {};//reset column types
       setSearchTerms({});//reset search terms
-      console.log("columnTypes =", columnTypes);
-      console.log("types =", tab.columnTypes);
       if (tabs && tab) {
         (async () => {
           await fetchJoins(tab);
@@ -163,6 +157,7 @@ export default function DynamicTable() {
       }
     } else {
       setScrollPosition(0);
+      setColumnTypes(tab.columnTypes);
       const tableHeaders = Object.keys(tab.data[0]).filter((item) => !item.includes("total_rows_number"))
       setHeaders(tableHeaders);
       setData(tab.data);
@@ -299,13 +294,10 @@ export default function DynamicTable() {
         clause: clause,
         column: header,
       };
-      console.log("header =", header, "clause =", clause);
     } else {
       delete newFilters[header];
     }
-    console.log("newFilters =", newFilters);
-    tabs[activeTab].filter = combineFilters(Object.values(newFilters));
-    console.log("fetching data");
+    tabs[activeTab].where_clause = combineFilters(Object.values(newFilters));
     fetchData(tabs[activeTab]);
     setSearchTerms(newFilters);
   };
@@ -404,7 +396,7 @@ export default function DynamicTable() {
                       }}>
                         <SQLFilterForm
                           fieldName={typeof header !== 'object' ? header : ''}
-                          fieldType={detectedColumnTypes[header] || 'string'}
+                          fieldType={columnTypes[header]?.frontend_type || 'string'}
                           onFilterChange={(clause) => handleFilterChange(header, clause)}
                         />
                     </TableCell>

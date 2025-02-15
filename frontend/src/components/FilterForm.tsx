@@ -1,45 +1,45 @@
 // SQLFilterForm.tsx
 import React, { useState, useEffect } from 'react';
 import { Select, MenuItem, TextField, Box, Button } from '@mui/material';
-//import { prepareFilterValue } from './Filters';
+import { FilterFields, Filter } from '../providers/constants';
 
 interface SQLFilterFormProps {
   fieldName: string;
   fieldType: string;
-  onFilterChange: (whereClause: string) => void;
+  onFilterChange: (whereClause: string, filter: FilterFields) => void;
+  initialValues: FilterFields;
 }
 
-
-export function getColumnType(value: string | number | boolean | Date) :string {
-  if (value === null || value === undefined) return "string";
-  if (typeof value === "number") return "number";
-  if (typeof value === "boolean") return "boolean";
-  const dateRegex = /^\d{4}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])$/;
-  if (typeof value === "string" && dateRegex.test(value)) {
-    return "date";
-  }
-  return "string";
-};
+// export function getColumnType(value: string | number | boolean | Date) :string {
+//   if (value === null || value === undefined) return "string";
+//   if (typeof value === "number") return "number";
+//   if (typeof value === "boolean") return "boolean";
+//   const dateRegex = /^\d{4}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])$/;
+//   if (typeof value === "string" && dateRegex.test(value)) {
+//     return "date";
+//   }
+//   return "string";
+// };
 
 export function combineFilters(filters: Filter[], conjunction: 'AND' | 'OR' = 'AND'): string {
-  console.log("filters =", filters);
   if (!filters.length) return '';
   
   const conditions = filters.map(filter => filter.clause);
-  console.log("conditions =", conditions.join(` ${conjunction} `));
   return conditions.join(` ${conjunction} `);
 }
 
 const SQLFilterForm: React.FC<SQLFilterFormProps> = ({ 
   fieldName, 
   fieldType = 'text',
-  onFilterChange 
-}) => {
-  const [filters, setFilters] = useState({
-    operator: '=',
+  onFilterChange,
+  initialValues = {
     value: '',
     valueEnd: '',
-  });
+    operator: '=',
+  }
+}) => {
+  const [filters, setFilters] = useState(initialValues);
+
 
   const operatorsByType = {
     text: ['=', '!=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL'],
@@ -51,22 +51,22 @@ const SQLFilterForm: React.FC<SQLFilterFormProps> = ({
     string: ['=', '!=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL'] // fallback for string type
   };
 
-  const prepareFilterValue = (value:any): any => {
-    const type = getColumnType(value);
-      switch (type) {
-        case 'date':
-          return `'${new Date(value).toISOString()}'`;
-        default:
-          return value;
+  const convertFilterFieldValue = (value:any, fieldType:string): any => {
+    switch (fieldType) {
+      case 'date':
+        return `'${new Date(value).toISOString()}'`;
+      default:
+        return value;
     };
   }
 
   const generateWhereClause = () => {
-    if (!filters.value) return '';
+    if (!filters.value && filters.operator !== 'IS NULL' && filters.operator !== 'IS NOT NULL' ) return '';
+    if (isRangeOperator(filters.operator) && !filters.valueEnd) return '';
     
     let { operator, value, valueEnd } = filters;
-    value = prepareFilterValue(value);
-    valueEnd = prepareFilterValue(valueEnd);
+    value = convertFilterFieldValue(value, fieldType);
+    valueEnd = isRangeOperator(operator) ? convertFilterFieldValue(valueEnd, fieldType) : '';
     let whereClause = '';
 
     if (operator === 'IS NULL' || operator === 'IS NOT NULL') {
@@ -95,7 +95,7 @@ const SQLFilterForm: React.FC<SQLFilterFormProps> = ({
   useEffect(() => {
       if (filters.operator || filters.value || filters.valueEnd) {
       const whereClause = generateWhereClause();
-      onFilterChange(whereClause);
+      onFilterChange(whereClause, filters);
     }
   }, [filters]);
 

@@ -65,7 +65,6 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       schema: schema,
       table: table,
       query: `SELECT * FROM ${schema}.${table} LIMIT ${rowsPerPage};`,
-      columnTypes: {},
       page: 1,
       joins: [],
       perPage: rowsPerPage,
@@ -75,7 +74,11 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       openedColumns: false,
       columns : [],
       activeColumns:[],
-      filter: "",
+
+      columnTypes: {},
+      column_filters: {},
+      where_clause: "",
+
       initialLoad: true,
       headers: [],
       scrollState: {
@@ -84,6 +87,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         scrollTop: 0,
       }
     };
+
     tabs.push(tabObj);
     const tabsStorage = [...tabs]
     tabsStorage.forEach((row)=>{

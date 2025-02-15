@@ -26,7 +26,7 @@ interface TableViewTab{
     schema: string // database
     table: string // table name
     query: string
-    columnTypes: Record<string, string>
+    
     joins: Record<string, string>[]
     page:   number
     perPage: number
@@ -36,7 +36,11 @@ interface TableViewTab{
     openedColumns: boolean
     columns: string[]
     activeColumns: string[]
-    filter: string
+
+    columnTypes: Record<string, string>
+    column_filters: Record<string, string>
+    where_clause: string
+
     initialLoad: boolean
     headers : string[]
     scrollState: ScrollState
@@ -46,6 +50,12 @@ interface ScrollState {
     newTab: boolean
     allDataLoaded: boolean
     scrollTop: number
+}
+
+interface FilterFields {
+    value: string
+    valueEnd: string
+    operator: string
 }
 
 type Connections = Connection[] | null
@@ -71,4 +81,4 @@ interface Filter{
 }
 
 export type {ContextType, ProviderProps, Alert, Info, 
-    Connections, Connection, TableViewTab, Filter}
+    Connections, Connection, TableViewTab, Filter,FilterFields}//, Filter

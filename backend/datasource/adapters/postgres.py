@@ -260,28 +260,29 @@ class PostgresConnection(VerifyInputsMixin):
 
         if success and data:
             type_mapping = {
-                "integer": "int",
-                "bigint": "int",
-                "smallint": "int",
-                "double precision": "float",
-                "real": "float",
-                "numeric": "decimal",
+                "integer": "number",
+                "bigint": "number",
+                "smallint": "number",
+                "double precision": "number",
+                "real": "number",
+                "numeric": "number",
                 "character varying": "string",
                 "text": "string",
-                "boolean": "bool",
+                "boolean": "boolean",
                 "date": "date",
-                "timestamp without time zone": "datetime",
-                "timestamp with time zone": "datetime",
+                "timestamp without time zone": "time",
+                "timestamp with time zone": "time",
                 "uuid": "uuid",
                 "json": "json",
                 "jsonb": "json",
                 "bytea": "binary",
             }
-
+            type_dict = {}
             for column in data:
-                column["frontend_type"] = type_mapping.get(column["data_type"], "unknown")
-
-            return True, data, "Column types retrieved successfully."
+                types = {"source_type": column["data_type"],
+                         "frontend_type" :  type_mapping.get(column["data_type"], "unknown")}
+                type_dict.update({column["column_name"] : types})
+            return True, type_dict, "Column types retrieved successfully."
 
         return False, None, message
 
@@ -359,7 +360,7 @@ class PostgresConnection(VerifyInputsMixin):
         per_page = query.get("perPage")
         offset = (page - 1) * per_page
 
-        where_clause = query.get("filter", {})
+        where_clause = query.get("where_clause", {})
 
         if not columns:
             return "success", [], "No columns provided"
