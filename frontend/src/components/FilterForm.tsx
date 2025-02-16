@@ -1,5 +1,4 @@
-// SQLFilterForm.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import { Select, MenuItem, TextField, Box, Button } from '@mui/material';
 import { FilterFields, Filter } from '../providers/constants';
 
@@ -10,16 +9,10 @@ interface SQLFilterFormProps {
   initialValues: FilterFields;
 }
 
-// export function getColumnType(value: string | number | boolean | Date) :string {
-//   if (value === null || value === undefined) return "string";
-//   if (typeof value === "number") return "number";
-//   if (typeof value === "boolean") return "boolean";
-//   const dateRegex = /^\d{4}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])$/;
-//   if (typeof value === "string" && dateRegex.test(value)) {
-//     return "date";
-//   }
-//   return "string";
-// };
+export interface SQLFilterFormRef {
+  resetForm: () => void;
+  updateForm: (values: FilterFields) => void;
+}
 
 export function combineFilters(filters: Filter[], conjunction: 'AND' | 'OR' = 'AND'): string {
   if (!filters.length) return '';
@@ -28,18 +21,29 @@ export function combineFilters(filters: Filter[], conjunction: 'AND' | 'OR' = 'A
   return conditions.join(` ${conjunction} `);
 }
 
-const SQLFilterForm: React.FC<SQLFilterFormProps> = ({ 
+const SQLFilterForm = forwardRef<SQLFilterFormRef, SQLFilterFormProps>(({ 
   fieldName, 
   fieldType = 'text',
   onFilterChange,
-  initialValues = {
-    value: '',
-    valueEnd: '',
-    operator: '=',
-  }
-}) => {
-  const [filters, setFilters] = useState(initialValues);
+  initialValues
+}, ref) => {
+  const [filters, setFilters] = useState<FilterFields>({
+    operator: initialValues?.operator || '=',
+    value: initialValues?.value || '',
+    valueEnd: initialValues?.valueEnd || ''
+  });
 
+  useImperativeHandle(ref, () => ({
+    resetForm: () => {
+      const defaultFilters = {
+        operator: '=',
+        value: '',
+        valueEnd: ''
+      };
+      setFilters(defaultFilters);
+      onFilterChange('', defaultFilters);
+    }
+  }));
 
   const operatorsByType = {
     text: ['=', '!=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL'],
@@ -92,12 +96,52 @@ const SQLFilterForm: React.FC<SQLFilterFormProps> = ({
     return whereClause;
   };
 
+  const lastWhereClause = useRef<string>('');
+
   useEffect(() => {
-      if (filters.operator || filters.value || filters.valueEnd) {
+    if (filters.operator || filters.value || filters.valueEnd) {
       const whereClause = generateWhereClause();
-      onFilterChange(whereClause, filters);
+      if (whereClause !== lastWhereClause.current) {
+        lastWhereClause.current = whereClause;
+        onFilterChange(whereClause, filters);
+      }
     }
   }, [filters]);
+
+  useEffect(() => {
+    if (initialValues && (
+      initialValues.operator !== filters.operator ||
+      initialValues.value !== filters.value ||
+      initialValues.valueEnd !== filters.valueEnd
+    )) {
+      setFilters({
+        operator: initialValues.operator || '=',
+        value: initialValues.value || '',
+        valueEnd: initialValues.valueEnd || ''
+      });
+    }
+  }, [initialValues]);
+
+  useImperativeHandle(ref, () => ({
+    resetForm: () => {
+      const defaultFilters = {
+        operator: '=',
+        value: '',
+        valueEnd: ''
+      };
+      setFilters(defaultFilters);
+      lastWhereClause.current = '';
+      onFilterChange('', defaultFilters);
+    },
+    updateForm: (newValues: FilterFields) => {
+      setFilters(newValues);
+      const whereClause = generateWhereClause();
+      if (whereClause !== lastWhereClause.current) {
+        lastWhereClause.current = whereClause;
+        onFilterChange(whereClause, newValues);
+      }
+    }
+  }));
 
   const isRangeOperator = (op: string) => ['BETWEEN', 'RANGE'].includes(op);
 
@@ -240,6 +284,6 @@ const SQLFilterForm: React.FC<SQLFilterFormProps> = ({
       {renderValueInput()}
     </Box>
   );
-};
+});
 
 export default SQLFilterForm;

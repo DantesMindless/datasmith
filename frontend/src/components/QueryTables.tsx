@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo} from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Box,
   Table,
@@ -13,12 +13,10 @@ import { queryTab, getJoins, getColumnTypes} from "../utils/requests";
 import { useAppContext } from "../providers/useAppContext";
 import JoinsSidebar from "./JoinsSidebar";
 import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
-import { TableViewTab, FilterOperator, Filter } from "../providers/constants";
+import { TableViewTab, Filter, FilterFields } from "../providers/constants";
 import { combineFilters} from "./FilterForm";
-import SQLFilterForm from "./FilterForm";
+import SQLFilterForm, { SQLFilterFormRef } from "./FilterForm";
 type Order = "asc" | "desc";
-
-//let detectedColumnTypes: { [key: string]: string } = {};
 
 export default function DynamicTable() {
 
@@ -34,9 +32,12 @@ export default function DynamicTable() {
   const [postponedScrollUpdate, setPostponedScrollUpdate] = useState(false);
 
   const [tableHeight, setTableHeight] = useState('700px');
-  const [searchTerms, setSearchTerms] = useState<{ [key: string]: Filter }>({});
 
+  const [searchTerms, setSearchTerms] = useState<{ [key: string]: Filter & FilterFields }>({});
   const [columnTypes, setColumnTypes] = useState<{ [key: string]: string }>({});
+  const [cleanFiltersFlag, setCleanFiltersFlag] = useState(false);
+
+  const filterRefs = useRef<{ [key: string]: React.RefObject<SQLFilterFormRef> }>({});
 
   const getQueryTableCellStyles = (header: string, isHeader: boolean = false) => ({
     ...(expandedColumns.has(header) 
@@ -93,6 +94,7 @@ export default function DynamicTable() {
         setHeaders(tableHeaders);
         if (!updateHeaderOnly) {
           setData([...result]);
+          tabData.data = [...result];//?
           if (tabs[activeTab].scrollState.newTab) {
             const types = await fetchColumnTypes(tabData);
             setColumnTypes(types);
@@ -101,7 +103,7 @@ export default function DynamicTable() {
           }
         }
       } else {
-        setData([])
+        setData([]);
       }
       return
     }
@@ -118,6 +120,15 @@ export default function DynamicTable() {
   const fetchColumnTypes = async (tabData) => {
     const result = await getColumnTypes(tabData);
     return result
+  };
+
+  const resetAllFilters = () => {
+    Object.values(filterRefs.current).forEach(ref => {
+      ref.current?.resetForm();
+    });
+    setSearchTerms({});
+    tabs[activeTab].where_clause = '';
+    fetchData(tabs[activeTab]);
   };
 
   useEffect(() => {
@@ -144,10 +155,10 @@ export default function DynamicTable() {
   }
 
   useEffect(() => {
-
     const tab = tabs[activeTab];
     if (tab.scrollState.newTab) {
-      setSearchTerms({});//reset search terms
+      resetAllFilters();
+      setCleanFiltersFlag(true);
       if (tabs && tab) {
         (async () => {
           await fetchJoins(tab);
@@ -158,12 +169,36 @@ export default function DynamicTable() {
     } else {
       setScrollPosition(0);
       setColumnTypes(tab.columnTypes);
+      
+      // Only update search terms if they've changed
+      if (JSON.stringify(tab.column_filters) !== JSON.stringify(searchTerms)) {
+        setSearchTerms(tab.column_filters);
+        
+        Object.entries(tab.column_filters).forEach(([header, filter]) => {// Update filter forms
+          if (filterRefs.current[header]?.current) {
+            filterRefs.current[header].current?.updateForm({
+              operator: filter.operator,
+              value: filter.value,
+              valueEnd: filter.valueEnd
+            });
+          }
+        });
+        if (Object.keys(tab.column_filters).length > 0) {
+          tab.where_clause = combineFilters(Object.values(tab.column_filters));
+          fetchData(tab);
+        }
+      }
       const tableHeaders = Object.keys(tab.data[0]).filter((item) => !item.includes("total_rows_number"))
       setHeaders(tableHeaders);
       setData(tab.data);
       setPostponedScrollUpdate(true);
     }
-  }, [activeTab])
+  }, [activeTab]);
+
+  useEffect(() => {
+    console.log("cleanFiltersFlag =", cleanFiltersFlag);
+    setCleanFiltersFlag(false);
+  }, [cleanFiltersFlag===true])
 
   useEffect(() => {
     const tab = tabs[activeTab];
@@ -283,23 +318,34 @@ export default function DynamicTable() {
     setIsScrollLoading(false);
   };
 
-  
-
-
-
-  const handleFilterChange = (header: string, clause: string) => {
+  const handleFilterChange = (header: string, clause: string, filter: FilterFields) => {
     const newFilters = { ...searchTerms };
     if (clause) {
       newFilters[header] = {
         clause: clause,
-        column: header,
+        operator: filter.operator,
+        value: filter.value,
+        valueEnd: filter.valueEnd
       };
+      console.log("clause =", clause);
     } else {
       delete newFilters[header];
     }
-    tabs[activeTab].where_clause = combineFilters(Object.values(newFilters));
-    fetchData(tabs[activeTab]);
-    setSearchTerms(newFilters);
+
+    if (JSON.stringify(newFilters) !== JSON.stringify(searchTerms)) {
+      tabs[activeTab].where_clause = combineFilters(Object.values(newFilters));
+      tabs[activeTab].column_filters = newFilters;
+      setSearchTerms(newFilters);
+      fetchData(tabs[activeTab]);
+    }
+  };
+
+  const formatCellValue = (value: any, fieldType: string) => {//to show boolean values as true/false
+    if (value === null || value === undefined) return "NULL";
+    if (fieldType === 'boolean' || typeof value === 'boolean') {
+      return value.toString(); // Will show "true" or "false"
+    }
+    return value;
   };
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
@@ -327,7 +373,6 @@ export default function DynamicTable() {
             }}
             onScroll={handleScroll}
           >
-            
             {/* The table with indexes */}
             <Table size="small" sx={{ width: 'auto', flexShrink: 0 }}>
               <TableHead> {/*Arrow button*/}
@@ -354,7 +399,6 @@ export default function DynamicTable() {
               </TableHead>
               {renderIndexesMemo}
             </Table>
-
             {/* Query Table */}
             <Table aria-labelledby="tableTitle" size="small">
               {/* Static Table Header */}
@@ -380,27 +424,40 @@ export default function DynamicTable() {
                     </TableCell>
                   ))}
                 </TableRow>
+                {/* Filter Forms */}
                 <TableRow>
-                  {headers.map((header) => (
-                    <TableCell key={`search-${header}`}
-                      sx={{'& .MuiInputBase-root': {
-                          height: '30px', 
-                          fontSize: '12px',
-                        },
-                        '& .MuiInputBase-input': {padding: '5px',},
-                        border: "1px solid gray",
-                        backgroundColor: "#f5f5f5",
-                        position: "sticky",
-                        top: 0,
-                        zIndex: 1,
-                      }}>
+                  {headers.map((header) => {
+                    // Initialize ref for this filter
+                    if (!filterRefs.current[header]) {
+                      filterRefs.current[header] = React.createRef<SQLFilterFormRef>();
+                    }
+                    return (
+                      <TableCell key={`search-${header}`}
+                        sx={{'& .MuiInputBase-root': {
+                            height: '30px', 
+                            fontSize: '12px',
+                          },
+                          '& .MuiInputBase-input': {padding: '5px',},
+                          border: "1px solid gray",
+                          backgroundColor: "#f5f5f5",
+                          position: "sticky",
+                          top: 0,
+                          zIndex: 1,
+                        }}>
                         <SQLFilterForm
+                          ref={filterRefs.current[header]}
                           fieldName={typeof header !== 'object' ? header : ''}
                           fieldType={columnTypes[header]?.frontend_type || 'string'}
-                          onFilterChange={(clause) => handleFilterChange(header, clause)}
+                          onFilterChange={(clause, filter) => handleFilterChange(header, clause, filter)}
+                          initialValues={{
+                            operator: searchTerms[header]?.operator || "=",
+                            value: searchTerms[header]?.value || '',
+                            valueEnd: searchTerms[header]?.valueEnd || ''
+                          }}
                         />
-                    </TableCell>
-                  ))}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               </TableHead>
               {/* Dynamic Table Body */}
@@ -417,7 +474,8 @@ export default function DynamicTable() {
                           handleColumnClick(header);
                         }}
                       >
-                        {row[header] != null ? row[header] : "NULL"}
+                        {formatCellValue(row[header], columnTypes[header]?.frontend_type)}{/*//reveals boolean values as true/false*/}
+                        {/*row[header] != null ? row[header] : "NULL"*/}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -431,14 +489,6 @@ export default function DynamicTable() {
                   </TableRow>
                 </TableBody>
               )}
-
-
-
-
-
-
-
-
             </Table>
           </Box>
         ) :

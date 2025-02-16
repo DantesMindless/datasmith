@@ -38,7 +38,7 @@ interface TableViewTab{
     activeColumns: string[]
 
     columnTypes: Record<string, string>
-    column_filters: Record<string, string>
+    column_filters: Record<string, FilterFields>
     where_clause: string
 
     initialLoad: boolean
