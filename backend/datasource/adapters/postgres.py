@@ -369,15 +369,14 @@ class PostgresConnection(VerifyInputsMixin):
         if len(tables) > 0:
             relations = self.get_tables_relations()[1]
             joins_dict = PostgresConnection.generate_joins(table_name, relations)
-        joins_list = PostgresConnection.concat_joins(
-            joins_dict, tables, set([table_name])
-        )
-        joins_conditions_string = " ".join(joins_list) + " "
-        selects_string = ", ".join(selects) + " "
-        print(selects_string)
-        print(joins_conditions_string)
+            joins_list = PostgresConnection.concat_joins(
+                joins_dict, tables, set([table_name])
+            )
+            joins_conditions_string = " ".join(joins_list) + " "
+            selects_string = ", ".join(selects) + " "
 
-        return selects_string, joins_conditions_string
+            return selects_string, joins_conditions_string
+        return "", ""
 
     def filters_engine(self, filters) -> Tuple[str, str]:
         return "PostgreSQL"
@@ -401,34 +400,35 @@ class PostgresConnection(VerifyInputsMixin):
     def generate_joins(root_table, relations_metadata, joined=None):
         joins = {}
         joined = set([root_table]) if not joined else joined
-        for rel in relations_metadata:
-            joined_copy = set(joined) if joined else set()
-            if rel["table_name"] == root_table:
-                joined_copy.add(root_table)
-                if rel["foreign_table_name"] not in joined:
-                    joins.update(
-                        {
-                            rel["foreign_table_name"]: {
-                                "joiner": f"LEFT JOIN {rel["table_name"]} ON {rel["table_name"]}.{rel["column_name"]} = {rel["foreign_table_name"]}.{rel["foreign_column_name"]}",
-                                "related": PostgresConnection.generate_joins(
-                                    rel["foreign_table_name"],
-                                    relations_metadata,
-                                    joined_copy,
-                                ),
+        if relations_metadata:
+            for rel in relations_metadata:
+                joined_copy = set(joined) if joined else set()
+                if rel["table_name"] == root_table:
+                    joined_copy.add(root_table)
+                    if rel["foreign_table_name"] not in joined:
+                        joins.update(
+                            {
+                                rel["foreign_table_name"]: {
+                                    "joiner": f"LEFT JOIN {rel["table_name"]} ON {rel["table_name"]}.{rel["column_name"]} = {rel["foreign_table_name"]}.{rel["foreign_column_name"]}",
+                                    "related": PostgresConnection.generate_joins(
+                                        rel["foreign_table_name"],
+                                        relations_metadata,
+                                        joined_copy,
+                                    ),
+                                }
                             }
-                        }
-                    )
-            elif rel["foreign_table_name"] == root_table:
-                joined_copy.add(root_table)
-                if rel["table_name"] not in joined:
-                    joins.update(
-                        {
-                            rel["table_name"]: {
-                                "joiner": f"LEFT JOIN {rel["table_name"]} ON {rel["foreign_table_name"]}.{rel["foreign_column_name"]} = {rel["table_name"]}.{rel["column_name"]}",
-                                "related": PostgresConnection.generate_joins(
-                                    rel["table_name"], relations_metadata, joined_copy
-                                ),
+                        )
+                elif rel["foreign_table_name"] == root_table:
+                    joined_copy.add(root_table)
+                    if rel["table_name"] not in joined:
+                        joins.update(
+                            {
+                                rel["table_name"]: {
+                                    "joiner": f"LEFT JOIN {rel["table_name"]} ON {rel["foreign_table_name"]}.{rel["foreign_column_name"]} = {rel["table_name"]}.{rel["column_name"]}",
+                                    "related": PostgresConnection.generate_joins(
+                                        rel["table_name"], relations_metadata, joined_copy
+                                    ),
+                                }
                             }
-                        }
-                    )
+                        )
         return joins
