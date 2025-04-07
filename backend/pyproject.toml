@@ -29,6 +29,8 @@ cachetools = "^5.5.0"
 django-cors-headers = "^4.6.0"
 pymongo = "^4.6.1"
 redis = "^5.0.0"
+debugpy = "^1.8.13"
+torch = "^2.6.0"
 
 
 [build-system]

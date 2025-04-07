@@ -78,7 +78,7 @@ class NeuralNetworkModel(BaseModel):
         return self
 
     def train_model_by_name(
-        self, name: str, training_data: Tuple[np.ndarray, np.ndarray]
+        self, name: str, training_data: Tuple[np.ndarray, ...]
     ) -> Any:
         """
         Train the model specified by name.
