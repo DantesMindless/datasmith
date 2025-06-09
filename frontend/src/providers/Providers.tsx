@@ -26,8 +26,8 @@ function setDataStorage(objName: string, obj: any): any[] {
 export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
   const [alert, setAlert] = useState<Alert | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
-  const [connections, setConnections] = useState<Connections[]>(
-    getDataStorage("connections")
+  const [connections, setConnections] = useState<Connections[] | null>(
+    null
   );
   const [activeConnections, setActiveConnections] = useState<string[]>(
     getDataStorage("activeConnections", {})
@@ -108,7 +108,6 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
   const updateConnections = async () => {
     try {
       const data = await getConnections();
-      console.log("connections", connections);
       setDataStorage("connections", [...data]);
       setConnections(data);
     } catch (error) {

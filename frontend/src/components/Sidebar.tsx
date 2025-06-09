@@ -36,7 +36,7 @@ export default function Sidebar() {
   const [expandedItems, setExpandedItems] = useState([])
 
   useEffect(() => {
-    if (connections?.length === 0) {
+    if (connections === null) {
       updateConnections();
     }
   }, [connections, updateConnections]);

@@ -4,6 +4,7 @@ FROM python:3.12-slim-bookworm
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV DOCKER True
 
 # Install dependencies
 RUN pip install --upgrade pip

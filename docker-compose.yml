@@ -5,17 +5,12 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env.development
-    environment:
-      - ENV=development
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_BUCKET_NAME=my-bucket
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
     ports:
       - "8000:8000"
+      - "3000:3000"
     depends_on:
       - db
 
@@ -50,7 +45,7 @@ services:
   nginx:
       image: nginx:latest
       environment:
-        - ENV=development
+        ENV: development
       volumes:
         - ./nginx:/etc/nginx/conf.d
         - static_volume:/app/staticfiles
