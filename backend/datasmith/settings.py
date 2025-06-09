@@ -43,6 +43,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://datasmith.local",
     "https://datasmith.local",
+    "https://localhost",
+    "http://localhost", 
 ]
 
 LOGGING = LOGGING
