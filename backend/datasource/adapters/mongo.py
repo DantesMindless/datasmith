@@ -36,13 +36,11 @@
 #         self.client.close()
 
 import logging
-from typing import Optional, Any, Dict, List, Union, Tuple
+from typing import Optional, Any
 from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, OperationFailure
-import json
+from pymongo.errors import ConnectionFailure
 
 from .mixins import VerifyInputsMixin, SerializerVerifyInputsMixin
-from cachetools import LFUCache
 
 from rest_framework import serializers
 
@@ -66,12 +64,12 @@ class MongoDBConnection(VerifyInputsMixin):
     serializer_class = MongoDBConnectionSerializer
 
     def __init__(
-            self,
-            host: str,
-            database: str,
-            user: Optional[str] = None,
-            password: Optional[str] = None,
-            port: int = 27017,
+        self,
+        host: str,
+        database: str,
+        user: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 27017,
     ) -> None:
         """
         Initialize the MongoDB connection.
@@ -99,7 +97,7 @@ class MongoDBConnection(VerifyInputsMixin):
             bool: True if the connection is successful, False otherwise.
         """
         try:
-            connection_string = f"mongodb://"
+            connection_string = "mongodb://"
             if self.user and self.password:
                 connection_string += f"{self.user}:{self.password}@"
             connection_string += f"{self.host}:{self.port}"
@@ -107,7 +105,7 @@ class MongoDBConnection(VerifyInputsMixin):
             self.client = MongoClient(connection_string)
             self.db = self.client[self.database]
             # Verify connection by executing a simple command
-            self.client.admin.command('ping')
+            self.client.admin.command("ping")
             return True
         except ConnectionFailure:
             logger.error("Failed to connect to the database.", exc_info=True)

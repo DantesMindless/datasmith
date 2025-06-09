@@ -5,28 +5,51 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0003_mlmodel_target_column'),
+        ("app", "0003_mlmodel_target_column"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='mlmodel',
-            name='status',
-            field=models.CharField(choices=[('pending', 'Pending'), ('training', 'Training'), ('complete', 'Complete'), ('failed', 'Failed')], default='pending', max_length=50),
+            model_name="mlmodel",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("pending", "Pending"),
+                    ("training", "Training"),
+                    ("complete", "Complete"),
+                    ("failed", "Failed"),
+                ],
+                default="pending",
+                max_length=50,
+            ),
         ),
         migrations.CreateModel(
-            name='TrainingRun',
+            name="TrainingRun",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('started_at', models.DateTimeField(auto_now_add=True)),
-                ('completed_at', models.DateTimeField(blank=True, null=True)),
-                ('accuracy', models.FloatField(blank=True, null=True)),
-                ('algorithm', models.CharField(max_length=255)),
-                ('status', models.CharField(default='pending', max_length=50)),
-                ('error_message', models.TextField(blank=True, null=True)),
-                ('model', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='training_runs', to='app.mlmodel')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("started_at", models.DateTimeField(auto_now_add=True)),
+                ("completed_at", models.DateTimeField(blank=True, null=True)),
+                ("accuracy", models.FloatField(blank=True, null=True)),
+                ("algorithm", models.CharField(max_length=255)),
+                ("status", models.CharField(default="pending", max_length=50)),
+                ("error_message", models.TextField(blank=True, null=True)),
+                (
+                    "model",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="training_runs",
+                        to="app.mlmodel",
+                    ),
+                ),
             ],
         ),
     ]

@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0002_remove_mlalgorithm_content_type_and_more'),
+        ("app", "0002_remove_mlalgorithm_content_type_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='mlmodel',
-            name='target_column',
-            field=models.CharField(default='target', max_length=255),
+            model_name="mlmodel",
+            name="target_column",
+            field=models.CharField(default="target", max_length=255),
         ),
     ]

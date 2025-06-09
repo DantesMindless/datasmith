@@ -4,20 +4,31 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0005_mlmodel_max_iter_mlmodel_model_type_and_more'),
+        ("app", "0005_mlmodel_max_iter_mlmodel_model_type_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='mlmodel',
-            name='training_config',
+            model_name="mlmodel",
+            name="training_config",
             field=models.JSONField(blank=True, default=dict),
         ),
         migrations.AlterField(
-            model_name='mlmodel',
-            name='model_type',
-            field=models.CharField(choices=[('logistic_regression', 'Logistic Regression'), ('random_forest', 'Random Forest'), ('svm', 'Support Vector Machine'), ('naive_bayes', 'Naive Bayes'), ('knn', 'k-Nearest Neighbours'), ('GRADIENT_BOOSTING', 'Gradient Boosting'), ('neural_network', 'Neural Network (PyTorch)')], default='logistic_regression', max_length=50),
+            model_name="mlmodel",
+            name="model_type",
+            field=models.CharField(
+                choices=[
+                    ("logistic_regression", "Logistic Regression"),
+                    ("random_forest", "Random Forest"),
+                    ("svm", "Support Vector Machine"),
+                    ("naive_bayes", "Naive Bayes"),
+                    ("knn", "k-Nearest Neighbours"),
+                    ("GRADIENT_BOOSTING", "Gradient Boosting"),
+                    ("neural_network", "Neural Network (PyTorch)"),
+                ],
+                default="logistic_regression",
+                max_length=50,
+            ),
         ),
     ]

@@ -4,15 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('datasource', '0002_datasource_metadata'),
+        ("datasource", "0002_datasource_metadata"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='datasource',
-            name='type',
-            field=models.CharField(choices=[('POSTGRES', 'Postgres'), ('MYSQL', 'MySQL'), ('MONGO', 'MongoDB'), ('REDIS', 'Redis')], default='POSTGRES', max_length=10),
+            model_name="datasource",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("POSTGRES", "Postgres"),
+                    ("MYSQL", "MySQL"),
+                    ("MONGO", "MongoDB"),
+                    ("REDIS", "Redis"),
+                ],
+                default="POSTGRES",
+                max_length=10,
+            ),
         ),
     ]

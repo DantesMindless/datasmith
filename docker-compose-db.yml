@@ -37,7 +37,7 @@ services:
     image: redis:latest
     environment:
       REDIS_USER: redis  # Redis 6+ supports ACLs with usernames
-      REDIS_PASSWORD: redis    
+      REDIS_PASSWORD: redis
     ports:
       - "6379:6379"
     volumes:
@@ -60,7 +60,7 @@ services:
     ports:
       - "9000:9000"
     command: server /data --console-address ":9001"
-    
+
 
 volumes:
   mysql_data:

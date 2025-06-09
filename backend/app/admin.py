@@ -1,11 +1,11 @@
 from io import StringIO
 from django.http import HttpResponse
-from django.utils import timezone
 import os
 import pandas as pd
 import joblib
 from django.contrib import admin
-from django.utils.html import escape
+from django.utils.html import format_html, format_html_join, escape
+from django.utils.safestring import mark_safe
 from django.conf import settings
 from django.middleware import csrf
 from sklearn.linear_model import LogisticRegression
@@ -15,9 +15,13 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+import logging
+import json
 
-from .models import Dataset, MLModel, TrainingRun, ModelType  
+from app.models.main import ModelStatus
+from .models import Dataset, MLModel, TrainingRun, ModelType
 
+logger = logging.getLogger(__name__)
 
 
 @admin.register(Dataset)
@@ -27,110 +31,111 @@ class DatasetAdmin(admin.ModelAdmin):
 
 @admin.register(MLModel)
 class MLModelAdmin(admin.ModelAdmin):
-    list_display = ("name", "model_type", "status", "dataset", "created_by", "created_at")
+    list_display = (
+        "name",
+        "model_type",
+        "status",
+        "dataset",
+        "created_by",
+        "created_at",
+    )
     actions = ["train_model", "make_prediction"]
+
     @admin.action(description="Train selected ML models")
     def train_model(self, request, queryset):
-            
-            for obj in queryset:
-                dataset_path = obj.dataset.file.path
-                target_col = obj.target_column
-                algorithm = obj.model_type
+        for obj in queryset:
+            dataset_path = obj.dataset.file.path
+            target_col = obj.target_column
 
-                run = TrainingRun.objects.create(
-                    model=obj,
-                    algorithm=algorithm,
-                    status="training"
+            run, _ = TrainingRun.objects.get_or_create(model=obj)
+            run.add_entry(status=ModelStatus.TRAINING)
+            obj.status = ModelStatus.TRAINING
+            obj.save()
+
+            try:
+                df = pd.read_csv(dataset_path)
+
+                # CSV validation
+                if df.isnull().values.any():
+                    raise ValueError("Dataset contains missing values.")
+
+                if target_col not in df.columns:
+                    raise ValueError(
+                        f"Target column '{target_col}' not found in dataset."
+                    )
+                config = obj.training_config or {}
+                features = config.get("features")
+                normalize = config.get("normalize", False)
+                if features:
+                    X = df[features]
+                else:
+                    X = df.drop(columns=[target_col])
+                y = df[target_col]
+
+                if not all(X.dtypes.apply(lambda dt: dt.kind in "biufc")):
+                    raise ValueError("Non-numeric values found in input features.")
+
+                # Split data using config values
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=obj.test_size, random_state=obj.random_state
                 )
-                obj.status = "training"
+
+                # Dynamic model selection
+                def get_model_instance(algorithm: str, obj: MLModel):
+                    if algorithm == ModelType.LOGISTIC_REGRESSION:
+                        return LogisticRegression(max_iter=obj.max_iter)
+                    elif algorithm == ModelType.RANDOM_FOREST:
+                        return RandomForestClassifier(random_state=obj.random_state)
+                    elif algorithm == ModelType.SVM:
+                        return SVC(max_iter=obj.max_iter)
+                    elif algorithm == ModelType.NAIVE_BAYES:
+                        return GaussianNB()
+                    elif algorithm == ModelType.KNN:
+                        return KNeighborsClassifier()
+                    elif algorithm == ModelType.GRADIENT_BOOSTING:
+                        return GradientBoostingClassifier()
+                    elif algorithm == ModelType.NEURAL_NETWORK:
+                        raise NotImplementedError(
+                            "Neural networks must be trained separately (PyTorch)."
+                        )
+                    else:
+                        raise ValueError(f"Unsupported model type: {algorithm}")
+
+                clf = get_model_instance(obj.model_type, obj)
+                # Train and evaluate
+
+                clf.fit(X_train, y_train)
+                y_pred = clf.predict(X_test)
+                acc = accuracy_score(y_test, y_pred)
+
+                # Save trained model
+                model_dir = os.path.join(settings.MEDIA_ROOT, "trained_models")
+                os.makedirs(model_dir, exist_ok=True)
+                model_path = os.path.join(model_dir, f"{obj.id}.joblib")
+                joblib.dump(clf, model_path)
+
+                # Update MLModel
+                obj.model_file.name = f"trained_models/{obj.id}.joblib"
+                obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
+                obj.status = ModelStatus.COMPLETE
                 obj.save()
 
-                try:
-                    df = pd.read_csv(dataset_path)
+                # Update TrainingRun
+                run.add_entry(status=ModelStatus.COMPLETE, accuracy=acc)
 
-                    # CSV validation
-                    if df.isnull().values.any():
-                        raise ValueError("Dataset contains missing values.")
+                self.message_user(request, f"Model '{obj.name}' trained successfully.")
 
-                    if target_col not in df.columns:
-                        raise ValueError(f"Target column '{target_col}' not found in dataset.")
-                    config = obj.training_config or {}
-                    features = config.get("features")  
-                    normalize = config.get("normalize", False)
-                    if features:
-                        X = df[features]
-                    else:
-                        X = df.drop(columns=[target_col])
-                    y = df[target_col]
+            except Exception as e:
+                error_message = f"Training failed for '{obj.name}': {str(e)}"
 
-                    if not all(X.dtypes.apply(lambda dt: dt.kind in 'biufc')):
-                        raise ValueError("Non-numeric values found in input features.")
+                obj.training_log = error_message
+                obj.status = ModelStatus.FAILED
+                obj.save()
 
-                    # Split data using config values
-                    X_train, X_test, y_train, y_test = train_test_split(
-                        X, y,
-                        test_size=obj.test_size,
-                        random_state=obj.random_state
-                    )
+                run.add_entry(status=ModelStatus.FAILED, error=str(e))
 
-                    # Dynamic model selection
-                    def get_model_instance(algorithm: str, obj: MLModel):
-                        if algorithm == ModelType.LOGISTIC_REGRESSION:
-                            return LogisticRegression(max_iter=obj.max_iter)
-                        elif algorithm == ModelType.RANDOM_FOREST:
-                            return RandomForestClassifier(random_state=obj.random_state)
-                        elif algorithm == ModelType.SVM:
-                            return SVC(max_iter=obj.max_iter)
-                        elif algorithm == ModelType.NAIVE_BAYES:
-                            return GaussianNB()
-                        elif algorithm == ModelType.KNN:
-                            return KNeighborsClassifier()
-                        elif algorithm == ModelType.GRADIENT_BOOSTING:
-                            return GradientBoostingClassifier()
-                        elif algorithm == ModelType.NEURAL_NETWORK:
-                            raise NotImplementedError("Neural networks must be trained separately (PyTorch).")
-                        else:
-                            raise ValueError(f"Unsupported model type: {algorithm}")
-                    clf = get_model_instance(obj.model_type, obj)
-                    # Train and evaluate
-                    
-                    clf.fit(X_train, y_train)
-                    y_pred = clf.predict(X_test)
-                    acc = accuracy_score(y_test, y_pred)
-
-                    # Save trained model
-                    model_dir = os.path.join(settings.MEDIA_ROOT, "trained_models")
-                    os.makedirs(model_dir, exist_ok=True)
-                    model_path = os.path.join(model_dir, f"{obj.id}.joblib")
-                    joblib.dump(clf, model_path)
-
-                    # Update MLModel
-                    obj.model_file.name = f"trained_models/{obj.id}.joblib"
-                    obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
-                    obj.status = "complete"
-                    obj.save()
-
-                    # Update TrainingRun
-                    run.completed_at = timezone.now()
-                    run.accuracy = acc
-                    run.status = "complete"
-                    run.save()
-
-                    self.message_user(request, f"Model '{obj.name}' trained successfully.")
-
-                except Exception as e:
-                    # On failure
-                    obj.training_log = f"Training failed: {str(e)}"
-                    obj.status = "failed"
-                    obj.save()
-
-                    run.status = "failed"
-                    run.error_message = str(e)
-                    run.completed_at = timezone.now()
-                    run.save()
-
-                    self.message_user(request, f"Training failed for '{obj.name}': {str(e)}", level="error")
-
+                logger.error(error_message, exc_info=True)  # 🔥 logs full traceback
+                self.message_user(request, error_message, level="error")
 
     @admin.action(description="Upload CSV and Predict")
     def make_prediction(self, request, queryset):
@@ -152,7 +157,9 @@ class MLModelAdmin(admin.ModelAdmin):
                 preds = clf.predict(X)
                 df["prediction"] = preds
 
-                table_html = df.to_html(classes="table table-striped", index=False, escape=False)
+                table_html = df.to_html(
+                    classes="table table-striped", index=False, escape=False
+                )
                 token = csrf.get_token(request)
                 return HttpResponse(f"""
                     <style>
@@ -173,7 +180,9 @@ class MLModelAdmin(admin.ModelAdmin):
                 """)
 
             except Exception as e:
-                self.message_user(request, f"Prediction failed: {str(e)}", level="error")
+                self.message_user(
+                    request, f"Prediction failed: {str(e)}", level="error"
+                )
                 return None
 
         else:
@@ -201,5 +210,20 @@ class MLModelAdmin(admin.ModelAdmin):
 
 @admin.register(TrainingRun)
 class TrainingRunAdmin(admin.ModelAdmin):
-    list_display = ("model", "status", "started_at", "completed_at", "accuracy", "algorithm")
+    list_display = (
+        "model",
+        "pretty_history",
+        
+    )
+    def pretty_history(self, obj):
+        if not obj.history:
+            return "(no history)"
 
+        # Format each entry as an indented JSON block
+        formatted = [
+            f"<pre>{json.dumps(entry, indent=2)}</pre>"
+            for entry in obj.history
+        ]
+        return mark_safe("".join(formatted))
+
+    pretty_history.short_description = "Training History"

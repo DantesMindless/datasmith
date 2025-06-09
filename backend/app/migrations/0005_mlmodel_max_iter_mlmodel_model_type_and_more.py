@@ -4,30 +4,37 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0004_mlmodel_status_trainingrun'),
+        ("app", "0004_mlmodel_status_trainingrun"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='mlmodel',
-            name='max_iter',
+            model_name="mlmodel",
+            name="max_iter",
             field=models.IntegerField(default=1000),
         ),
         migrations.AddField(
-            model_name='mlmodel',
-            name='model_type',
-            field=models.CharField(choices=[('logistic_regression', 'Logistic Regression'), ('random_forest', 'Random Forest'), ('svm', 'Support Vector Machine')], default='logistic_regression', max_length=50),
+            model_name="mlmodel",
+            name="model_type",
+            field=models.CharField(
+                choices=[
+                    ("logistic_regression", "Logistic Regression"),
+                    ("random_forest", "Random Forest"),
+                    ("svm", "Support Vector Machine"),
+                ],
+                default="logistic_regression",
+                max_length=50,
+            ),
         ),
         migrations.AddField(
-            model_name='mlmodel',
-            name='random_state',
+            model_name="mlmodel",
+            name="random_state",
             field=models.IntegerField(default=42),
         ),
         migrations.AddField(
-            model_name='mlmodel',
-            name='test_size',
+            model_name="mlmodel",
+            name="test_size",
             field=models.FloatField(default=0.2),
         ),
     ]

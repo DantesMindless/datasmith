@@ -7,150 +7,328 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('contenttypes', '0002_remove_content_type_name'),
+        ("contenttypes", "0002_remove_content_type_name"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='QuadraticTrainingData',
+            name="QuadraticTrainingData",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('input_data', models.JSONField(help_text='Precomputed input features for training')),
-                ('output_data', models.JSONField(help_text='Expected output values for training')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "input_data",
+                    models.JSONField(
+                        help_text="Precomputed input features for training"
+                    ),
+                ),
+                (
+                    "output_data",
+                    models.JSONField(help_text="Expected output values for training"),
+                ),
             ],
             options={
-                'db_table': 'test_quadratictrainingdata',
+                "db_table": "test_quadratictrainingdata",
             },
         ),
         migrations.CreateModel(
-            name='LinearRegressionAlgorithm',
+            name="LinearRegressionAlgorithm",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('object_id', models.UUIDField()),
-                ('fit_intercept', models.BooleanField(default=True)),
-                ('normalize', models.BooleanField(default=False)),
-                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)s_created_by', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("description", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("object_id", models.UUIDField()),
+                ("fit_intercept", models.BooleanField(default=True)),
+                ("normalize", models.BooleanField(default=False)),
+                (
+                    "content_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='MLAlgorithm',
+            name="MLAlgorithm",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('object_id', models.UUIDField()),
-                ('algorithm_type', models.CharField(choices=[('linear_regression', 'Linear Regression'), ('random_forest', 'Random Forest'), ('xgboost', 'XGBoost'), ('neural_network', 'Neural Network')], max_length=50)),
-                ('feature_scaling', models.BooleanField(default=True)),
-                ('feature_selection', models.BooleanField(default=False)),
-                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)s_created_by', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("description", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("object_id", models.UUIDField()),
+                (
+                    "algorithm_type",
+                    models.CharField(
+                        choices=[
+                            ("linear_regression", "Linear Regression"),
+                            ("random_forest", "Random Forest"),
+                            ("xgboost", "XGBoost"),
+                            ("neural_network", "Neural Network"),
+                        ],
+                        max_length=50,
+                    ),
+                ),
+                ("feature_scaling", models.BooleanField(default=True)),
+                ("feature_selection", models.BooleanField(default=False)),
+                (
+                    "content_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='MLModel',
+            name="MLModel",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('deleted', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now_add=True)),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True)),
-                ('task_type', models.CharField(choices=[('classification', 'Classification'), ('regression', 'Regression')], max_length=20)),
-                ('status', models.CharField(choices=[('training', 'Training'), ('trained', 'Trained'), ('failed', 'Failed')], default='training', max_length=20)),
-                ('target_column', models.CharField(max_length=100)),
-                ('test_size', models.FloatField(default=0.2)),
-                ('random_state', models.IntegerField(default=42)),
-                ('model_file', models.FileField(blank=True, null=True, upload_to='ml_models/')),
-                ('training_data', models.FileField(blank=True, null=True, upload_to='training_data/')),
-                ('metrics', models.JSONField(blank=True, default=dict)),
-                ('feature_columns', models.JSONField(blank=True, default=list)),
-                ('algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='app.mlalgorithm')),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)s_created_by', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("deleted", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now_add=True)),
+                ("name", models.CharField(max_length=100)),
+                ("description", models.TextField(blank=True)),
+                (
+                    "task_type",
+                    models.CharField(
+                        choices=[
+                            ("classification", "Classification"),
+                            ("regression", "Regression"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("training", "Training"),
+                            ("trained", "Trained"),
+                            ("failed", "Failed"),
+                        ],
+                        default="training",
+                        max_length=20,
+                    ),
+                ),
+                ("target_column", models.CharField(max_length=100)),
+                ("test_size", models.FloatField(default=0.2)),
+                ("random_state", models.IntegerField(default=42)),
+                (
+                    "model_file",
+                    models.FileField(blank=True, null=True, upload_to="ml_models/"),
+                ),
+                (
+                    "training_data",
+                    models.FileField(blank=True, null=True, upload_to="training_data/"),
+                ),
+                ("metrics", models.JSONField(blank=True, default=dict)),
+                ("feature_columns", models.JSONField(blank=True, default=list)),
+                (
+                    "algorithm",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="app.mlalgorithm",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='NeuralNetworkAlgorithm',
+            name="NeuralNetworkAlgorithm",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('object_id', models.UUIDField()),
-                ('hidden_layers', models.JSONField(default=list)),
-                ('activation', models.CharField(default='relu', max_length=20)),
-                ('dropout_rate', models.FloatField(default=0.2)),
-                ('batch_normalization', models.BooleanField(default=False)),
-                ('optimizer', models.CharField(default='adam', max_length=20)),
-                ('loss_function', models.CharField(default='mse', max_length=20)),
-                ('learning_rate', models.FloatField(default=0.001)),
-                ('batch_size', models.PositiveIntegerField(default=32)),
-                ('epochs', models.PositiveIntegerField(default=100)),
-                ('early_stopping', models.BooleanField(default=False)),
-                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)s_created_by', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("description", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("object_id", models.UUIDField()),
+                ("hidden_layers", models.JSONField(default=list)),
+                ("activation", models.CharField(default="relu", max_length=20)),
+                ("dropout_rate", models.FloatField(default=0.2)),
+                ("batch_normalization", models.BooleanField(default=False)),
+                ("optimizer", models.CharField(default="adam", max_length=20)),
+                ("loss_function", models.CharField(default="mse", max_length=20)),
+                ("learning_rate", models.FloatField(default=0.001)),
+                ("batch_size", models.PositiveIntegerField(default=32)),
+                ("epochs", models.PositiveIntegerField(default=100)),
+                ("early_stopping", models.BooleanField(default=False)),
+                (
+                    "content_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='RandomForestAlgorithm',
+            name="RandomForestAlgorithm",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('object_id', models.UUIDField()),
-                ('n_estimators', models.PositiveIntegerField(default=100)),
-                ('max_depth', models.PositiveIntegerField(blank=True, null=True)),
-                ('min_samples_split', models.PositiveIntegerField(default=2)),
-                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)s_created_by', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("description", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("object_id", models.UUIDField()),
+                ("n_estimators", models.PositiveIntegerField(default=100)),
+                ("max_depth", models.PositiveIntegerField(blank=True, null=True)),
+                ("min_samples_split", models.PositiveIntegerField(default=2)),
+                (
+                    "content_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='XGBoostAlgorithm',
+            name="XGBoostAlgorithm",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('object_id', models.UUIDField()),
-                ('n_estimators', models.PositiveIntegerField(default=100)),
-                ('max_depth', models.PositiveIntegerField(default=3)),
-                ('learning_rate', models.FloatField(default=0.1)),
-                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='%(class)s_created_by', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("description", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("object_id", models.UUIDField()),
+                ("n_estimators", models.PositiveIntegerField(default=100)),
+                ("max_depth", models.PositiveIntegerField(default=3)),
+                ("learning_rate", models.FloatField(default=0.1)),
+                (
+                    "content_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
     ]
