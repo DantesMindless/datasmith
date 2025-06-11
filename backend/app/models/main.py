@@ -3,7 +3,7 @@ from django.db import models
 from core.models import (
     BaseModel,
 )
-
+from app.models.choices import ModelStatus, ModelType
 
 class Dataset(BaseModel):
     name = models.CharField(max_length=255, default="Untitled Dataset")
@@ -15,27 +15,6 @@ class Dataset(BaseModel):
 
     def __str__(self):
         return self.name
-
-
-from django.db import models
-
-
-class ModelStatus(models.TextChoices):
-    PENDING = "pending", "Pending"
-    TRAINING = "training", "Training"
-    COMPLETE = "complete", "Complete"
-    FAILED = "failed", "Failed"
-
-
-class ModelType(models.TextChoices):
-    LOGISTIC_REGRESSION = "logistic_regression", "Logistic Regression"
-    RANDOM_FOREST = "random_forest", "Random Forest"
-    SVM = "svm", "Support Vector Machine"
-    NAIVE_BAYES = "naive_bayes", "Naive Bayes"
-    KNN = "knn", "k-Nearest Neighbours"
-    GRADIENT_BOOSTING = "GRADIENT_BOOSTING", "Gradient Boosting"
-    NEURAL_NETWORK = "neural_network", "Neural Network (PyTorch)"
-
 
 class MLModel(BaseModel):
     name = models.CharField(max_length=255, default="Unnamed Model")

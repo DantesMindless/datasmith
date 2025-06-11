@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import logging
 import json
-
+from app.functions.nn import train_neural_network 
 from app.models.main import ModelStatus
 from .models import Dataset, MLModel, TrainingRun, ModelType
 
@@ -94,28 +94,34 @@ class MLModelAdmin(admin.ModelAdmin):
                         return KNeighborsClassifier()
                     elif algorithm == ModelType.GRADIENT_BOOSTING:
                         return GradientBoostingClassifier()
-                    elif algorithm == ModelType.NEURAL_NETWORK:
-                        raise NotImplementedError(
-                            "Neural networks must be trained separately (PyTorch)."
-                        )
                     else:
                         raise ValueError(f"Unsupported model type: {algorithm}")
 
-                clf = get_model_instance(obj.model_type, obj)
-                # Train and evaluate
+                if obj.model_type == ModelType.NEURAL_NETWORK:
+                    model_path, acc = train_neural_network(obj, X_train, y_train, X_test, y_test)
+                    obj.model_file.name = model_path.replace(settings.MEDIA_ROOT + "/", "")
+                else:
+                    clf = get_model_instance(obj.model_type, obj)
+                    clf.fit(X_train, y_train)
+                    y_pred = clf.predict(X_test)
+                    acc = accuracy_score(y_test, y_pred)
 
-                clf.fit(X_train, y_train)
-                y_pred = clf.predict(X_test)
-                acc = accuracy_score(y_test, y_pred)
+                    # Save scikit-learn model
+                    model_dir = os.path.join(settings.MEDIA_ROOT, "trained_models")
+                    os.makedirs(model_dir, exist_ok=True)
+                    model_path = os.path.join(model_dir, f"{obj.id}.joblib")
+                    joblib.dump(clf, model_path)
+                    obj.model_file.name = f"trained_models/{obj.id}.joblib"
 
-                # Save trained model
-                model_dir = os.path.join(settings.MEDIA_ROOT, "trained_models")
-                os.makedirs(model_dir, exist_ok=True)
-                model_path = os.path.join(model_dir, f"{obj.id}.joblib")
-                joblib.dump(clf, model_path)
+                    # Save trained model
+                    model_dir = os.path.join(settings.MEDIA_ROOT, "trained_models")
+                    os.makedirs(model_dir, exist_ok=True)
+                    model_path = os.path.join(model_dir, f"{obj.id}.joblib")
+                    joblib.dump(clf, model_path)
 
-                # Update MLModel
-                obj.model_file.name = f"trained_models/{obj.id}.joblib"
+                    # Update MLModel
+                    obj.model_file.name = f"trained_models/{obj.id}.joblib"
+                    
                 obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
                 obj.status = ModelStatus.COMPLETE
                 obj.save()
