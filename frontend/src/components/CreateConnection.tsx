@@ -4,20 +4,16 @@ import {
   Button,
   ButtonGroup,
   FormControl,
-  InputLabel,
-  Input,
   MenuItem,
   Select,
   TextField,
-  Typography,
-  FormHelperText,
 } from "@mui/material";
 import CheckCircleOutlineTwoToneIcon from "@mui/icons-material/CheckCircleOutlineTwoTone";
 import ErrorTwoToneIcon from "@mui/icons-material/ErrorTwoTone";
 import { useAppContext } from "../providers/useAppContext";
 import httpfetch from "../utils/axios";
 import { AxiosError, AxiosResponse } from "axios";
-import { getConnections, getConnectionTypes } from "../utils/requests";
+import { getConnectionTypes } from "../utils/requests";
 
 type ConnectionSuccessType = null | boolean;
 
