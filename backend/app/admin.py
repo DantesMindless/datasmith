@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from .models import Dataset, MLModel, TrainingRun
-from app.functions.admin_functions import train_model, make_prediction
+from app.functions.admin_actions import make_prediction, train_model
 import json
 
 
@@ -31,7 +31,7 @@ class MLModelAdmin(admin.ModelAdmin):
         Override to allow custom non-redirect behavior from make_prediction.
         """
         if request.POST.get("action") == "make_prediction":
-            return self.make_prediction(request, queryset)
+            return make_prediction(self, request, queryset)
         return super().response_action(request, queryset)
 
 
