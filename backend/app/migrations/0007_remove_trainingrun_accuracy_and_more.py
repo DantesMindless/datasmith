@@ -5,44 +5,47 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0006_mlmodel_training_config_alter_mlmodel_model_type'),
+        ("app", "0006_mlmodel_training_config_alter_mlmodel_model_type"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='trainingrun',
-            name='accuracy',
+            model_name="trainingrun",
+            name="accuracy",
         ),
         migrations.RemoveField(
-            model_name='trainingrun',
-            name='algorithm',
+            model_name="trainingrun",
+            name="algorithm",
         ),
         migrations.RemoveField(
-            model_name='trainingrun',
-            name='completed_at',
+            model_name="trainingrun",
+            name="completed_at",
         ),
         migrations.RemoveField(
-            model_name='trainingrun',
-            name='error_message',
+            model_name="trainingrun",
+            name="error_message",
         ),
         migrations.RemoveField(
-            model_name='trainingrun',
-            name='started_at',
+            model_name="trainingrun",
+            name="started_at",
         ),
         migrations.RemoveField(
-            model_name='trainingrun',
-            name='status',
+            model_name="trainingrun",
+            name="status",
         ),
         migrations.AddField(
-            model_name='trainingrun',
-            name='history',
+            model_name="trainingrun",
+            name="history",
             field=models.JSONField(blank=True, default=list),
         ),
         migrations.AlterField(
-            model_name='trainingrun',
-            name='model',
-            field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='training_run', to='app.mlmodel'),
+            model_name="trainingrun",
+            name="model",
+            field=models.OneToOneField(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="training_run",
+                to="app.mlmodel",
+            ),
         ),
     ]

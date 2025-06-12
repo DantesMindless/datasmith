@@ -81,6 +81,7 @@ def train_neural_network(obj, X_train, y_train, X_test, y_test, media_root=None)
     # Save model
     if media_root is None:
         from django.conf import settings
+
         media_root = settings.MEDIA_ROOT
 
     model_dir = os.path.join(media_root, "trained_models")

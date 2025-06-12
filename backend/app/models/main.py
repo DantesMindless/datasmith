@@ -5,6 +5,7 @@ from core.models import (
 )
 from app.models.choices import ModelStatus, ModelType
 
+
 class Dataset(BaseModel):
     name = models.CharField(max_length=255, default="Untitled Dataset")
     file = models.FileField(
@@ -15,6 +16,7 @@ class Dataset(BaseModel):
 
     def __str__(self):
         return self.name
+
 
 class MLModel(BaseModel):
     name = models.CharField(max_length=255, default="Unnamed Model")
@@ -63,4 +65,3 @@ class TrainingRun(models.Model):
         }
         self.history.append(entry)
         self.save()
-
