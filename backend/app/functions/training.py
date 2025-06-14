@@ -21,6 +21,8 @@ ACTIVATION_MAP = {
     ActivationFunction.SIGMOID: nn.Sigmoid,
     ActivationFunction.LEAKY_RELU: nn.LeakyReLU,
 }
+
+
 class ConfigurableMLP(nn.Module):
     def __init__(self, input_dim, output_dim, layer_config):
         super().__init__()
@@ -41,6 +43,7 @@ class ConfigurableMLP(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+
 def get_model_instance(model_type, obj):
     if model_type == ModelType.LOGISTIC_REGRESSION:
         return LogisticRegression(max_iter=obj.max_iter)
@@ -56,7 +59,8 @@ def get_model_instance(model_type, obj):
         return GradientBoostingClassifier()
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
-    
+
+
 def train_sklearn_model(obj, X_train, y_train, X_test, y_test):
     clf = get_model_instance(obj.model_type, obj)
     clf.fit(X_train, y_train)
@@ -69,9 +73,12 @@ def train_sklearn_model(obj, X_train, y_train, X_test, y_test):
     joblib.dump(clf, model_path)
     return model_path, acc
 
+
 def train_nn(obj, X_train, y_train, X_test, y_test):
     config = obj.training_config or {}
-    layer_config = config.get("layer_config", [{"units": 32, "activation": ActivationFunction.RELU}])
+    layer_config = config.get(
+        "layer_config", [{"units": 32, "activation": ActivationFunction.RELU}]
+    )
     epochs = config.get("epochs", 20)
     batch_size = config.get("batch_size", 16)
     lr = config.get("learning_rate", 0.001)
@@ -114,4 +121,3 @@ def train_nn(obj, X_train, y_train, X_test, y_test):
     encoder_path = os.path.join(model_dir, f"{obj.id}_encoder.joblib")
     joblib.dump(le, encoder_path)
     return model_path, acc
-

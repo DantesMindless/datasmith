@@ -23,7 +23,9 @@ def train_model(self, request, queryset):
             df = pd.read_csv(obj.dataset.file.path)
             target = obj.target_column
             config = obj.training_config or {}
-            features = config.get("features") or df.drop(columns=[target]).columns.tolist()
+            features = (
+                config.get("features") or df.drop(columns=[target]).columns.tolist()
+            )
 
             if df.isnull().values.any():
                 raise ValueError("Dataset contains missing values.")
@@ -47,7 +49,9 @@ def train_model(self, request, queryset):
             if obj.model_type == ModelType.NEURAL_NETWORK:
                 model_path, acc = train_nn(obj, X_train, y_train, X_test, y_test)
             else:
-                model_path, acc = train_sklearn_model(obj, X_train, y_train, X_test, y_test)
+                model_path, acc = train_sklearn_model(
+                    obj, X_train, y_train, X_test, y_test
+                )
 
             obj.model_file.name = model_path.replace(settings.MEDIA_ROOT + "/", "")
             obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
@@ -84,13 +88,19 @@ def make_prediction(self, request, queryset):
             else:
                 df = predict_sklearn_model(selected_model, df)
             if df is None:
-                raise ValueError("Prediction returned no result — check model compatibility and input features.")
-            table_html = df.to_html(classes="table table-striped", index=False, escape=False)
+                raise ValueError(
+                    "Prediction returned no result — check model compatibility and input features."
+                )
+            table_html = df.to_html(
+                classes="table table-striped", index=False, escape=False
+            )
 
-            options_html = "\n".join([
-                f'<option value="{m.pk}" {"selected" if m.pk == selected_model.pk else ""}>{escape(m.name)}</option>'
-                for m in MLModel.objects.filter(status="complete")
-            ])
+            options_html = "\n".join(
+                [
+                    f'<option value="{m.pk}" {"selected" if m.pk == selected_model.pk else ""}>{escape(m.name)}</option>'
+                    for m in MLModel.objects.filter(status="complete")
+                ]
+            )
 
             return HttpResponse(f"""
                 <style>
@@ -118,10 +128,12 @@ def make_prediction(self, request, queryset):
             self.message_user(request, f" Prediction failed: {str(e)}", level="error")
             return None
 
-    options_html = "\n".join([
-        f'<option value="{m.pk}" {"selected" if m.pk == model.pk else ""}>{escape(m.name)}</option>'
-        for m in MLModel.objects.filter(status="complete")
-    ])
+    options_html = "\n".join(
+        [
+            f'<option value="{m.pk}" {"selected" if m.pk == model.pk else ""}>{escape(m.name)}</option>'
+            for m in MLModel.objects.filter(status="complete")
+        ]
+    )
 
     return HttpResponse(f"""
         <form method="post">

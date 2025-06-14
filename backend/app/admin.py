@@ -1,10 +1,8 @@
-
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from .models import Dataset, MLModel, TrainingRun
 from app.functions.admin_actions import make_prediction, train_model
 import json
-
 
 
 @admin.register(Dataset)
@@ -23,8 +21,6 @@ class MLModelAdmin(admin.ModelAdmin):
         "created_at",
     )
     actions = [train_model, make_prediction]
-
-    
 
     def response_action(self, request, queryset):
         """

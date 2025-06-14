@@ -1,9 +1,9 @@
-
 import joblib
 import torch
 import os
 from app.functions.training import ConfigurableMLP
 from app.models.choices import ActivationFunction
+
 
 def predict_sklearn_model(model_obj, df):
     model_path = model_obj.model_file.path
@@ -19,7 +19,9 @@ def predict_sklearn_model(model_obj, df):
 def predict_nn(model_obj, df):
     config = model_obj.training_config or {}
     features = config.get("features") or df.columns.tolist()
-    layer_config = config.get("layer_config", [{"units": 32, "activation": ActivationFunction.RELU}])
+    layer_config = config.get(
+        "layer_config", [{"units": 32, "activation": ActivationFunction.RELU}]
+    )
 
     input_dim = len(features)
     output_dim = config.get("output_dim") or 3
@@ -28,7 +30,7 @@ def predict_nn(model_obj, df):
     model_path = model_obj.model_file.path
     encoder_path = model_path.replace(".pt", "_encoder.joblib")
     le = joblib.load(encoder_path)
-    
+
     model.load_state_dict(torch.load(model_path))
     model.eval()
 
