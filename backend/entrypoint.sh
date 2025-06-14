@@ -1,27 +1,26 @@
 #!/bin/sh
-
-# Exit script on any error
 set -e
 
-echo "Updating poetry.lock..."
+echo "Updating poetry.lock and installing dependencies..."
 poetry lock
-
-# Check the environment variable
 poetry install --no-root
 
 if [ "$ENV" = "development" ]; then
     echo "Running in development mode"
-    # Run migrations in development
     poetry run python manage.py migrate
     poetry run python manage.py create_superuser
-    # poetry run python manage.py migrate  --database=default
-    # poetry run python manage.py migrate  --database=test
-    # Start the Django development server
-    exec poetry run python manage.py runserver 0.0.0.0:8000
+fi
+
+# No command passed → default to Django runserver or Gunicorn
+if [ $# -eq 0 ]; then
+    if [ "$ENV" = "development" ]; then
+        echo "Starting Django development server"
+        exec poetry run python manage.py runserver 0.0.0.0:8000
+    else
+        echo "Starting Gunicorn production server"
+        exec poetry run gunicorn --bind 0.0.0.0:8000 datasmith.wsgi:application --workers 3
+    fi
 else
-    echo "Running in production mode"
-    # Run migrations in production
-    poetry run python manage.py migrate --noinput
-    # Start Gunicorn in production
-    exec poetry run gunicorn --bind 0.0.0.0:8000 datasmith.wsgi:application --workers 3
+    echo "Running custom command: $@"
+    exec "$@"
 fi

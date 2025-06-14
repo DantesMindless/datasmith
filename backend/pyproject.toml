@@ -36,6 +36,7 @@ redis = "^5.0.0"
 torch = "^2.7.1"
 xgboost = "^3.0.2"
 debugpy = "^1.8.14"
+celery = "^5.5.3"
 
 
 
