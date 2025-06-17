@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
 import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
@@ -42,6 +44,48 @@ class ConfigurableMLP(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
+
+class ConfigurableCNN(nn.Module):
+    def __init__(self, input_channels, conv_layers, fc_layers, num_classes, input_size):
+        super().__init__()
+        layers = []
+        in_channels = input_channels
+        for layer in conv_layers:
+            out_channels = layer.get("out_channels", 16)
+            kernel_size = layer.get("kernel_size", 3)
+            act = layer.get("activation", ActivationFunction.RELU)
+            act_class = ACTIVATION_MAP.get(act, nn.ReLU)
+            layers.append(
+                nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=1)
+            )
+            layers.append(nn.MaxPool2d(2))
+            layers.append(act_class())
+            in_channels = out_channels
+
+        self.conv = nn.Sequential(*layers)
+
+        # Assuming square image and pooling halves it each time
+        conv_output_size = input_size // (2 ** len(conv_layers))
+        self.flatten = nn.Flatten()
+        fc_input_dim = in_channels * conv_output_size * conv_output_size
+
+        fc = []
+        dims = [fc_input_dim]
+        for config in fc_layers:
+            units = config.get("units", 64)
+            act = config.get("activation", ActivationFunction.RELU)
+            act_class = ACTIVATION_MAP.get(act, nn.ReLU)
+            fc.append(nn.Linear(dims[-1], units))
+            fc.append(act_class())
+            dims.append(units)
+        fc.append(nn.Linear(dims[-1], num_classes))
+        self.fc = nn.Sequential(*fc)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.flatten(x)
+        return self.fc(x)
 
 
 def get_model_instance(model_type, obj):
@@ -121,3 +165,43 @@ def train_nn(obj, X_train, y_train, X_test, y_test):
     encoder_path = os.path.join(model_dir, f"{obj.id}_encoder.joblib")
     joblib.dump(le, encoder_path)
     return model_path, acc
+
+
+def train_cnn(obj):
+    image_path = obj.dataset.extracted_path
+    if not image_path or not os.path.isdir(image_path):
+        raise ValueError("Extracted image path is invalid or missing.")
+    config = obj.training_config or {}
+    conv_layers = config.get("conv_layers", [{"out_channels": 32}])
+    fc_layers = config.get("fc_layers", [{"units": 128}])
+    input_size = config.get("input_size", 64)
+    batch_size = config.get("batch_size", 16)
+    lr = config.get("learning_rate", 0.001)
+    epochs = config.get("epochs", 10)
+
+    transform = transforms.Compose(
+        [
+            transforms.Resize((input_size, input_size)),
+            transforms.ToTensor(),
+        ]
+    )
+    dataset = datasets.ImageFolder(image_path, transform=transform)
+    loader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    model = ConfigurableCNN(3, conv_layers, fc_layers, len(dataset.classes), input_size)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+
+    model.train()
+    for _ in range(epochs):
+        for batch_x, batch_y in loader:
+            optimizer.zero_grad()
+            loss = criterion(model(batch_x), batch_y)
+            loss.backward()
+            optimizer.step()
+
+    model_dir = os.path.join(settings.MEDIA_ROOT, "trained_models")
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, f"{obj.id}.pt")
+    torch.save(model.state_dict(), model_path)
+    return model_path, None

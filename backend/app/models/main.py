@@ -1,5 +1,7 @@
-from django.core.validators import FileExtensionValidator
+import os
+import zipfile
 from django.db import models
+from django.conf import settings
 from core.models import (
     BaseModel,
 )
@@ -7,12 +9,26 @@ from app.models.choices import ModelStatus, ModelType
 
 
 class Dataset(BaseModel):
-    name = models.CharField(max_length=255, default="Untitled Dataset")
-    file = models.FileField(
-        upload_to="datasets/",
-        validators=[FileExtensionValidator(["csv"])],
-        help_text="Upload a CSV file",
-    )
+    name = models.CharField(max_length=255, default="Unnamed Dataset")
+    csv_file = models.FileField(upload_to="csv_datasets/", blank=True, null=True)
+    image_folder = models.FileField(upload_to="image_zips/", blank=True, null=True)
+    extracted_path = models.CharField(max_length=512, blank=True, null=True)
+    is_image_dataset = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.image_folder and self.image_folder.name.endswith(".zip"):
+            extract_to = os.path.join(
+                settings.MEDIA_ROOT, "image_datasets", str(self.id)
+            )
+            os.makedirs(extract_to, exist_ok=True)
+
+            with zipfile.ZipFile(self.image_folder.path, "r") as zip_ref:
+                zip_ref.extractall(extract_to)
+
+            self.extracted_path = extract_to
+            super().save(update_fields=["extracted_path"])
 
     def __str__(self):
         return self.name

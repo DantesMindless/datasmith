@@ -1,4 +1,3 @@
-from django.conf import settings
 import pandas as pd
 import logging
 from django.http import HttpResponse
@@ -6,10 +5,9 @@ from django.utils.html import escape
 from django.middleware import csrf
 from django.contrib import admin
 from io import StringIO
-from sklearn.model_selection import train_test_split
 from app.models import ModelType, TrainingRun, ModelStatus
 from app.models.main import MLModel
-from .training import train_nn, train_sklearn_model
+from app.functions.celery_tasks import train_cnn_task, train_nn_task, train_sklearn_task
 from .prediction import predict_nn, predict_sklearn_model
 
 
@@ -20,55 +18,36 @@ logger = logging.getLogger(__name__)
 def train_model(self, request, queryset):
     for obj in queryset:
         try:
-            df = pd.read_csv(obj.dataset.file.path)
-            target = obj.target_column
-            config = obj.training_config or {}
-            features = (
-                config.get("features") or df.drop(columns=[target]).columns.tolist()
-            )
-
-            if df.isnull().values.any():
-                raise ValueError("Dataset contains missing values.")
-            if target not in df.columns:
-                raise ValueError(f"Target column '{target}' not found.")
-            if not all(df[features].dtypes.apply(lambda dt: dt.kind in "biufc")):
-                raise ValueError("Non-numeric values in input features.")
-
-            X = df[features]
-            y = df[target]
-
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=obj.test_size, random_state=obj.random_state
-            )
-
-            run, _ = TrainingRun.objects.get_or_create(model=obj)
-            run.add_entry(status=ModelStatus.TRAINING)
             obj.status = ModelStatus.TRAINING
             obj.save()
 
-            if obj.model_type == ModelType.NEURAL_NETWORK:
-                model_path, acc = train_nn(obj, X_train, y_train, X_test, y_test)
+            run, _ = TrainingRun.objects.get_or_create(model=obj)
+            run.add_entry(status=ModelStatus.TRAINING)
+
+            if obj.dataset.is_image_dataset:
+                train_cnn_task.delay(obj.id)
+            elif obj.model_type == ModelType.NEURAL_NETWORK:
+                train_nn_task.delay(obj.id)
             else:
-                model_path, acc = train_sklearn_model(
-                    obj, X_train, y_train, X_test, y_test
-                )
+                train_sklearn_task.delay(obj.id)
 
-            obj.model_file.name = model_path.replace(settings.MEDIA_ROOT + "/", "")
-            obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
-            obj.status = ModelStatus.COMPLETE
-            obj.save()
-
-            run.add_entry(status=ModelStatus.COMPLETE, accuracy=acc)
-            self.message_user(request, f"Model '{obj.name}' trained successfully.")
+            self.message_user(
+                request, f"Model '{obj.name}' training has started (async via Celery)."
+            )
 
         except Exception as e:
-            error_message = f"Training failed for '{obj.name}': {str(e)}"
-            logger.error(error_message, exc_info=True)
+            logger.error(
+                f"Failed to queue training task for '{obj.name}': {e}", exc_info=True
+            )
             obj.status = ModelStatus.FAILED
-            obj.training_log = error_message
+            obj.training_log = f"Error queuing training: {e}"
             obj.save()
             run.add_entry(status=ModelStatus.FAILED, error=str(e))
-            self.message_user(request, error_message, level="error")
+            self.message_user(
+                request,
+                f"Error: Failed to start training for '{obj.name}': {e}",
+                level="error",
+            )
 
 
 @admin.action(description="Upload CSV and Predict")
