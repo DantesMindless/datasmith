@@ -11,7 +11,7 @@ from app.models.main import TrainingRun
 @shared_task
 def train_sklearn_task(model_id):
     obj = MLModel.objects.get(id=model_id)
-    df = pd.read_csv(obj.dataset.file.path)
+    df = pd.read_csv(obj.dataset.csv_file.path)
     target = obj.target_column
     config = obj.training_config or {}
     features = config.get("features") or df.drop(columns=[target]).columns.tolist()
@@ -42,7 +42,7 @@ def train_sklearn_task(model_id):
 @shared_task
 def train_nn_task(model_id):
     obj = MLModel.objects.get(id=model_id)
-    df = pd.read_csv(obj.dataset.file.path)
+    df = pd.read_csv(obj.dataset.csv_file.path)
     target = obj.target_column
     config = obj.training_config or {}
     features = config.get("features") or df.drop(columns=[target]).columns.tolist()
