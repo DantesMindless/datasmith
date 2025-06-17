@@ -4,33 +4,32 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0008_dataset_image_folder_dataset_is_image_dataset'),
+        ("app", "0008_dataset_image_folder_dataset_is_image_dataset"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='dataset',
-            name='file',
+            model_name="dataset",
+            name="file",
         ),
         migrations.RemoveField(
-            model_name='dataset',
-            name='is_image_dataset',
+            model_name="dataset",
+            name="is_image_dataset",
         ),
         migrations.AddField(
-            model_name='dataset',
-            name='extracted_path',
+            model_name="dataset",
+            name="extracted_path",
             field=models.CharField(blank=True, max_length=512, null=True),
         ),
         migrations.AlterField(
-            model_name='dataset',
-            name='image_folder',
-            field=models.FileField(blank=True, null=True, upload_to='image_zips/'),
+            model_name="dataset",
+            name="image_folder",
+            field=models.FileField(blank=True, null=True, upload_to="image_zips/"),
         ),
         migrations.AlterField(
-            model_name='dataset',
-            name='name',
+            model_name="dataset",
+            name="name",
             field=models.CharField(max_length=255),
         ),
     ]

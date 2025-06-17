@@ -4,25 +4,24 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0009_remove_dataset_file_remove_dataset_is_image_dataset_and_more'),
+        ("app", "0009_remove_dataset_file_remove_dataset_is_image_dataset_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='dataset',
-            name='csv_file',
-            field=models.FileField(blank=True, null=True, upload_to='csv_datasets/'),
+            model_name="dataset",
+            name="csv_file",
+            field=models.FileField(blank=True, null=True, upload_to="csv_datasets/"),
         ),
         migrations.AddField(
-            model_name='dataset',
-            name='is_image_dataset',
+            model_name="dataset",
+            name="is_image_dataset",
             field=models.BooleanField(default=False),
         ),
         migrations.AlterField(
-            model_name='dataset',
-            name='name',
-            field=models.CharField(default='Unnamed Dataset', max_length=255),
+            model_name="dataset",
+            name="name",
+            field=models.CharField(default="Unnamed Dataset", max_length=255),
         ),
     ]

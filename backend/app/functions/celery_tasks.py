@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from app.models.choices import ModelStatus
 from app.models.main import TrainingRun
 
+
 @shared_task
 def train_sklearn_task(model_id):
     obj = MLModel.objects.get(id=model_id)
@@ -37,6 +38,7 @@ def train_sklearn_task(model_id):
         run, _ = TrainingRun.objects.get_or_create(model=obj)
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
 
+
 @shared_task
 def train_nn_task(model_id):
     obj = MLModel.objects.get(id=model_id)
@@ -65,7 +67,7 @@ def train_nn_task(model_id):
         obj.save()
         run, _ = TrainingRun.objects.get_or_create(model=obj)
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
-    
+
 
 @shared_task
 def train_cnn_task(model_id):
@@ -81,7 +83,9 @@ def train_cnn_task(model_id):
 
         obj.model_file.name = model_path.replace(settings.MEDIA_ROOT + "/", "")
         obj.status = ModelStatus.COMPLETE
-        obj.training_log = f"Training complete for CNN. Accuracy not calculated (no validation set)."
+        obj.training_log = (
+            "Training complete for CNN. Accuracy not calculated (no validation set)."
+        )
         obj.save()
 
         run.add_entry(status=ModelStatus.COMPLETE)
