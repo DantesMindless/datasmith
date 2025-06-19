@@ -1,4 +1,6 @@
+from django.conf import settings
 import pandas as pd
+import os
 import logging
 from django.http import HttpResponse
 from django.utils.html import escape
@@ -8,8 +10,7 @@ from io import StringIO
 from app.models import ModelType, TrainingRun, ModelStatus
 from app.models.main import MLModel
 from app.functions.celery_tasks import train_cnn_task, train_nn_task, train_sklearn_task
-from .prediction import predict_nn, predict_sklearn_model
-
+from .prediction import predict_nn, predict_sklearn_model, predict_cnn
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +62,11 @@ def make_prediction(self, request, queryset):
         try:
             selected_model = MLModel.objects.get(pk=selected_model_id)
             df = pd.read_csv(StringIO(csv_text))
-
             if selected_model.model_type == ModelType.NEURAL_NETWORK:
                 df = predict_nn(selected_model, df)
             else:
                 df = predict_sklearn_model(selected_model, df)
+
             if df is None:
                 raise ValueError(
                     "Prediction returned no result — check model compatibility and input features."
@@ -104,7 +105,7 @@ def make_prediction(self, request, queryset):
             """)
 
         except Exception as e:
-            self.message_user(request, f" Prediction failed: {str(e)}", level="error")
+            self.message_user(request, f"Prediction failed: {str(e)}", level="error")
             return None
 
     options_html = "\n".join(
@@ -125,6 +126,42 @@ def make_prediction(self, request, queryset):
                 {options_html}
             </select><br><br>
             <textarea name="csv_input" rows="10" cols="80" placeholder="Paste CSV test data here"></textarea><br>
+            <button type="submit">Predict</button>
+        </form>
+    """)
+    
+@admin.action(description="Upload single image and Predict")
+def predict_single_image(self, request, queryset):
+    from django.core.files.storage import default_storage
+    from app.functions.prediction import predict_cnn
+
+    model = queryset.first()
+    token = csrf.get_token(request)
+
+    if request.method == "POST" and "apply" in request.POST:
+        uploaded_file = request.FILES.get("image_file")
+        if not uploaded_file:
+            self.message_user(request, "No image uploaded", level="error")
+            return None
+
+        image_path = default_storage.save(f"predict_tmp/{uploaded_file.name}", uploaded_file)
+        full_path = os.path.join(settings.MEDIA_ROOT, image_path)
+
+        try:
+            prediction = predict_cnn(model, full_path)
+            return HttpResponse(f"<h3>Predicted class index: {prediction}</h3>")
+        except Exception as e:
+            self.message_user(request, f"Prediction failed: {e}", level="error")
+            return None
+
+    return HttpResponse(f"""
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{token}">
+            <input type="hidden" name="action" value="predict_single_image">
+            <input type="hidden" name="_selected_action" value="{model.pk}">
+            <input type="hidden" name="apply" value="1">
+            <label for="image_file">Upload Image:</label>
+            <input type="file" name="image_file" id="image_file" accept="image/*"><br><br>
             <button type="submit">Predict</button>
         </form>
     """)

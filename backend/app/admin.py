@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from .models import Dataset, MLModel, TrainingRun
-from app.functions.admin_actions import make_prediction, train_model
+from app.functions.admin_actions import make_prediction, train_model, predict_single_image
 import json
 
 
@@ -20,7 +20,7 @@ class MLModelAdmin(admin.ModelAdmin):
         "created_by",
         "created_at",
     )
-    actions = [train_model, make_prediction]
+    actions = [train_model, make_prediction, predict_single_image]
 
     def response_action(self, request, queryset):
         """
@@ -42,7 +42,6 @@ class TrainingRunAdmin(admin.ModelAdmin):
         if not obj.history:
             return "(no history)"
 
-        # Format each entry as an indented JSON block
         formatted = [
             f"<pre>{json.dumps(entry, indent=2)}</pre>" for entry in obj.history
         ]

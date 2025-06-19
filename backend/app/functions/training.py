@@ -65,7 +65,6 @@ class ConfigurableCNN(nn.Module):
 
         self.conv = nn.Sequential(*layers)
 
-        # Assuming square image and pooling halves it each time
         conv_output_size = input_size // (2 ** len(conv_layers))
         self.flatten = nn.Flatten()
         fc_input_dim = in_channels * conv_output_size * conv_output_size
@@ -168,9 +167,16 @@ def train_nn(obj, X_train, y_train, X_test, y_test):
 
 
 def train_cnn(obj):
-    image_path = obj.dataset.extracted_path
+    image_path = None
+
+    if hasattr(obj.dataset, "extracted_path") and obj.dataset.extracted_path:
+        image_path = obj.dataset.extracted_path
+    elif hasattr(obj.dataset, "image_folder") and obj.dataset.image_folder:
+        image_path = obj.dataset.image_folder.path 
+
     if not image_path or not os.path.isdir(image_path):
-        raise ValueError("Extracted image path is invalid or missing.")
+        raise ValueError(f"Image path is invalid or missing: {image_path}")
+
     config = obj.training_config or {}
     conv_layers = config.get("conv_layers", [{"out_channels": 32}])
     fc_layers = config.get("fc_layers", [{"units": 128}])
@@ -179,16 +185,15 @@ def train_cnn(obj):
     lr = config.get("learning_rate", 0.001)
     epochs = config.get("epochs", 10)
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize((input_size, input_size)),
-            transforms.ToTensor(),
-        ]
-    )
+    transform = transforms.Compose([
+        transforms.Resize((input_size, input_size)),
+        transforms.ToTensor(),
+    ])
     dataset = datasets.ImageFolder(image_path, transform=transform)
     loader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    model = ConfigurableCNN(3, conv_layers, fc_layers, len(dataset.classes), input_size)
+    num_classes = len(dataset.classes)
+    model = ConfigurableCNN(3, conv_layers, fc_layers, num_classes, input_size)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
@@ -204,4 +209,9 @@ def train_cnn(obj):
     os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, f"{obj.id}.pt")
     torch.save(model.state_dict(), model_path)
+
+    obj.training_config["num_classes"] = len(dataset.classes)
+    obj.training_config["class_names"] = list(dataset.class_to_idx.keys())
+    obj.save(update_fields=["training_config"])
+
     return model_path, None

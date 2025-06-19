@@ -16,6 +16,8 @@ class ModelType(models.TextChoices):
     KNN = "knn", "k-Nearest Neighbours"
     GRADIENT_BOOSTING = "GRADIENT_BOOSTING", "Gradient Boosting"
     NEURAL_NETWORK = "neural_network", "Neural Network (PyTorch)"
+    CNN = "cnn", "Convolutional Neural Network (CNN)"
+
 
 
 class ActivationFunction(models.TextChoices):
