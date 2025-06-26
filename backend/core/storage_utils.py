@@ -1,24 +1,25 @@
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
-from django.conf import settings
+import boto3
 import os
+from botocore.client import Config
 
-def save_file(path: str, content: bytes) -> str:
-    """Save a file to the storage backend."""
-    content_file = ContentFile(content)
-    return default_storage.save(path, content_file)
+def get_minio_client():
+    return boto3.client(
+        's3',
+        endpoint_url=os.getenv("MINIO_ENDPOINT"),
+        aws_access_key_id=os.getenv("MINIO_ACCESS_KEY"),
+        aws_secret_access_key=os.getenv("MINIO_SECRET_KEY"),
+    )
+def upload_to_minio(file_bytes: bytes, key: str, content_type: str = "application/octet-stream"):
+    client = get_minio_client()
+    client.put_object(
+        Bucket=os.getenv("MINIO_BUCKET_NAME"),
+        Key=key,
+        Body=file_bytes,
+        ContentType=content_type,
+    )
+    return key
 
-def file_exists(path: str) -> bool:
-    """Check if a file exists in the storage backend."""
-    return default_storage.exists(path)
-
-def load_file(path: str) -> bytes:
-    """Load a file's content from the storage backend."""
-    if not default_storage.exists(path):
-        raise FileNotFoundError(f"File not found: {path}")
-    with default_storage.open(path, "rb") as f:
-        return f.read()
-
-def get_media_path(*parts) -> str:
-    """Get full path in 'mediafiles/' directory using given parts."""
-    return os.path.join("mediafiles", *parts)
+def download_from_minio(key: str) -> bytes:
+    client = get_minio_client()
+    response = client.get_object(Bucket=os.getenv("MINIO_BUCKET_NAME"), Key=key)
+    return response["Body"].read()

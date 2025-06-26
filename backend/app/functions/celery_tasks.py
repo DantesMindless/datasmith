@@ -23,8 +23,8 @@ def train_sklearn_task(model_id):
     )
 
     try:
-        model_path, acc = train_sklearn_model(obj, X_train, y_train, X_test, y_test)
-        obj.model_file.name = model_path.replace(settings.MEDIA_ROOT + "/", "")
+        s3_path, acc = train_sklearn_model(obj, X_train, y_train, X_test, y_test)
+        obj.model_file.name = s3_path
         obj.status = ModelStatus.COMPLETE
         obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
         obj.save()
@@ -37,6 +37,8 @@ def train_sklearn_task(model_id):
         obj.save()
         run, _ = TrainingRun.objects.get_or_create(model=obj)
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
+
+    return acc
 
 
 @shared_task
@@ -53,8 +55,7 @@ def train_nn_task(model_id):
         X, y, test_size=obj.test_size, random_state=obj.random_state
     )
     try:
-        model_path, acc = train_nn(obj, X_train, y_train, X_test, y_test)
-        obj.model_file.name = model_path.replace(settings.MEDIA_ROOT + "/", "")
+        s3_path, acc = train_nn(obj, X_train, y_train, X_test, y_test)
         obj.status = ModelStatus.COMPLETE
         obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
         obj.save()
@@ -81,7 +82,6 @@ def train_cnn_task(model_id):
 
         model_path, acc = train_cnn(obj)
 
-        obj.model_file.name = model_path.replace(settings.MEDIA_ROOT + "/", "")
         obj.status = ModelStatus.COMPLETE
         obj.training_log = (
             "Training complete for CNN. Accuracy not calculated (no validation set)."
@@ -94,4 +94,4 @@ def train_cnn_task(model_id):
         obj.training_log = f"CNN training failed: {str(e)}"
         obj.save()
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
-        raise  # Let Celery log the error as well
+        raise  
