@@ -13,9 +13,19 @@ class RedisConnectionSerializer(
     VerifyInputsMixin, SerializerVerifyInputsMixin, serializers.Serializer
 ):
     host = serializers.CharField(max_length=255)
-    database = serializers.CharField(default="0", max_length=255, required=False, allow_blank=True, allow_null=True)
-    user = serializers.CharField(default="", max_length=255, required=False, allow_blank=True, allow_null=True)
-    password = serializers.CharField(max_length=255, write_only=True, required=False, allow_null=True, allow_blank=True)
+    database = serializers.CharField(
+        default="0", max_length=255, required=False, allow_blank=True, allow_null=True
+    )
+    user = serializers.CharField(
+        default="", max_length=255, required=False, allow_blank=True, allow_null=True
+    )
+    password = serializers.CharField(
+        max_length=255,
+        write_only=True,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+    )
     port = serializers.IntegerField(default=6379, min_value=1, max_value=65535)
 
     def validate_host(self, value: str) -> str:
@@ -23,8 +33,8 @@ class RedisConnectionSerializer(
 
     def validate_database(self, value: str) -> str:
         """Convert database string to integer if possible"""
-        if value == '':
-            value = '0'
+        if value == "":
+            value = "0"
         try:
             int(value)
             return value
@@ -36,12 +46,12 @@ class RedisConnection(VerifyInputsMixin):
     serializer_class = RedisConnectionSerializer
 
     def __init__(
-            self,
-            host: str,
-            database: str,
-            user: Optional[str] = None,
-            password: Optional[str] = None,
-            port: int = 6379,
+        self,
+        host: str,
+        database: str,
+        user: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 6379,
     ) -> None:
         """
         Initialize the Redis connection.
@@ -54,11 +64,11 @@ class RedisConnection(VerifyInputsMixin):
             port (int): The port number of the Redis server (default: 6379).
         """
         self.host: str = host
-        if database == '':
-            database = '0'
+        if database == "":
+            database = "0"
         self.db: int = int(database)
-        if user == '':
-            user = 'default'
+        if user == "":
+            user = "default"
         self.user: Optional[str] = user
         self.password: Optional[str] = password
         self.port: int = port
@@ -76,7 +86,7 @@ class RedisConnection(VerifyInputsMixin):
                 "host": self.host,
                 "port": self.port,
                 "db": self.db,
-                "decode_responses": True
+                "decode_responses": True,
             }
 
             if self.password:
@@ -94,7 +104,7 @@ class RedisConnection(VerifyInputsMixin):
             return False
 
     def query(
-            self, key: str, operation: str = "GET"
+        self, key: str, operation: str = "GET"
     ) -> Tuple[bool, Optional[Any], str]:
         """
         Execute a Redis command.
@@ -156,7 +166,7 @@ class RedisConnection(VerifyInputsMixin):
                         port=self.port,
                         db=db_num,
                         password=self.password,
-                        decode_responses=True
+                        decode_responses=True,
                     )
                     if temp_conn.dbsize() > 0:
                         databases.append(db_num)
@@ -166,9 +176,7 @@ class RedisConnection(VerifyInputsMixin):
         except redis_exceptions.RedisError as e:
             return False, None, f"Error retrieving databases: {str(e)}"
 
-    def get_keys(
-            self, pattern: str = "*"
-    ) -> Tuple[bool, Optional[List[str]], str]:
+    def get_keys(self, pattern: str = "*") -> Tuple[bool, Optional[List[str]], str]:
         """
         Retrieve a list of keys matching the pattern.
 
@@ -215,10 +223,7 @@ class RedisConnection(VerifyInputsMixin):
         Returns:
             Dict[str, Any]: Metadata including key patterns, types, and sizes.
         """
-        metadata: Dict[str, Any] = {
-            "keys": {},
-            "statistics": {}
-        }
+        metadata: Dict[str, Any] = {"keys": {}, "statistics": {}}
 
         if not self.connection:
             return metadata
@@ -230,7 +235,7 @@ class RedisConnection(VerifyInputsMixin):
                 "total_keys": self.connection.dbsize(),
                 "memory_used": info.get("used_memory_human"),
                 "connected_clients": info.get("connected_clients"),
-                "uptime_days": info.get("uptime_in_days")
+                "uptime_days": info.get("uptime_in_days"),
             }
 
             # Get key patterns and their types
@@ -242,10 +247,7 @@ class RedisConnection(VerifyInputsMixin):
                         metadata["keys"][key_type] = []
 
                     # Get additional information based on key type
-                    key_info = {
-                        "name": key,
-                        "ttl": self.connection.ttl(key)
-                    }
+                    key_info = {"name": key, "ttl": self.connection.ttl(key)}
 
                     if key_type == "string":
                         key_info["length"] = len(self.connection.get(key) or "")

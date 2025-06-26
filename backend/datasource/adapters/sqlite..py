@@ -2,6 +2,7 @@ import logging
 import sqlite3
 from typing import Tuple
 
+
 class SQLiteConnection:
     def __init__(self, database: str):
         self.database = database

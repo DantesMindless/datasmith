@@ -9,9 +9,10 @@ class Command(BaseCommand):
         from django.contrib.auth import get_user_model
 
         User = get_user_model()
-        User.objects.filter(is_superuser=True).delete()
         if not User.objects.filter(username="admin", email="u@u.com").exists():
             User.objects.create_superuser(
                 username="admin", email="u@u.com", password="password"
             )
             self.stdout.write(self.style.SUCCESS("Superuser created successfully."))
+        else:
+            self.stdout.write(self.style.WARNING("Superuser already exists."))

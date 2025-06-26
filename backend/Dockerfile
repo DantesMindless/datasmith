@@ -1,38 +1,35 @@
 # Use the official Python image with a slim variant
 FROM python:3.12-slim-bookworm
 
-# Set environment variables
+# Environment settings
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV DOCKER True
 
-# Install dependencies
-RUN pip install --upgrade pip
-RUN pip install poetry
+# Install Poetry
+RUN pip install --upgrade pip && pip install poetry
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
-# Copy only the dependency files to leverage Docker cache
-COPY pyproject.toml /app/
+# Copy dependency files
+COPY pyproject.toml poetry.lock* /app/
 
 # Install dependencies
-RUN poetry config virtualenvs.create false
-RUN poetry install --no-root
+RUN poetry config virtualenvs.create false \
+  && poetry install --no-root
 
-# Copy project files and entrypoint.sh
+# Copy project files
 COPY . /app/
-COPY entrypoint.sh /entrypoint.sh
 
 # Collect static files
 RUN poetry run python manage.py collectstatic --noinput
 
-# Make entrypoint executable
+# Add and make entrypoint executable
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Expose port 8000
 EXPOSE 8000
 
-# Set the entrypoint
-
+# Delegate behavior to entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

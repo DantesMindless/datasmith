@@ -13,6 +13,7 @@ services:
       - "3000:3000"
     depends_on:
       - db
+      - redis
 
   frontend:
     build:
@@ -56,7 +57,31 @@ services:
       depends_on:
         - django
         - frontend
-
+  redis:
+    image: redis:7
+    expose:
+            - 6379
+  celery:
+    build:
+      dockerfile: Dockerfile
+    command: poetry run celery -A datasmith worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - django
+    env_file:
+      - .env.development
+    environment:
+     ENV: development
+  flower:
+    image: mher/flower
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
 volumes:
   postgres_data:
   static_volume:

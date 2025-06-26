@@ -426,7 +426,9 @@ class PostgresConnection(VerifyInputsMixin):
                                 rel["table_name"]: {
                                     "joiner": f"LEFT JOIN {rel["table_name"]} ON {rel["foreign_table_name"]}.{rel["foreign_column_name"]} = {rel["table_name"]}.{rel["column_name"]}",
                                     "related": PostgresConnection.generate_joins(
-                                        rel["table_name"], relations_metadata, joined_copy
+                                        rel["table_name"],
+                                        relations_metadata,
+                                        joined_copy,
                                     ),
                                 }
                             }

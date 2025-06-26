@@ -1,7 +1,12 @@
 from django.db import models
 from typing import List, Optional, Union
 
-from ..adapters import PostgresConnection, MySQLConnection, MongoDBConnection, RedisConnection
+from ..adapters import (
+    PostgresConnection,
+    MySQLConnection,
+    MongoDBConnection,
+    RedisConnection,
+)
 
 import logging
 
@@ -29,7 +34,9 @@ class DatasourceTypeChoices(models.TextChoices):
 
     def get_adapter(
         self,
-    ) -> Optional[Union[PostgresConnection, MySQLConnection, MongoDBConnection, RedisConnection]]:
+    ) -> Optional[
+        Union[PostgresConnection, MySQLConnection, MongoDBConnection, RedisConnection]
+    ]:
         """
         Returns the appropriate adapter class based on the datasource type.
 

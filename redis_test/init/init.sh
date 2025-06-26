@@ -2,7 +2,7 @@
 redis-cli -a redis << EOF
 AUTH redis redis
 HSET product:1 name "Laptop" price 999.99 stock 50 category "Electronics"
-HSET product:2 name "Phone" price 599.99 stock 100 category "Electronics" 
+HSET product:2 name "Phone" price 599.99 stock 100 category "Electronics"
 HSET product:3 name "Desk" price 299.99 stock 25 category "Furniture"
 HSET product:4 name "Chair" price 149.99 stock 75 category "Furniture"
 HSET product:5 name "Monitor" price 399.99 stock 30 category "Electronics"
