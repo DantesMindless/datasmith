@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('app', '0011_remove_mlmodel_model_file_alter_mlmodel_model_type'),
+        ("app", "0011_remove_mlmodel_model_file_alter_mlmodel_model_type"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='mlmodel',
-            name='model_file',
-            field=models.FileField(blank=True, help_text='Path to the trained model file', null=True, upload_to='trained_models/'),
+            model_name="mlmodel",
+            name="model_file",
+            field=models.FileField(
+                blank=True,
+                help_text="Path to the trained model file",
+                null=True,
+                upload_to="trained_models/",
+            ),
         ),
     ]

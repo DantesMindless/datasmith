@@ -21,9 +21,11 @@ class Dataset(BaseModel):
         super().save(*args, **kwargs)
 
         if self.image_folder and self.image_folder.name.endswith(".zip"):
-            extract_to = os.path.join(settings.MEDIA_ROOT, "image_datasets", str(self.id))
+            extract_to = os.path.join(
+                settings.MEDIA_ROOT, "image_datasets", str(self.id)
+            )
             os.makedirs(extract_to, exist_ok=True)
-            
+
             temp_dir = os.path.join(extract_to, "tmp_extraction")
             with zipfile.ZipFile(self.image_folder.path, "r") as zip_ref:
                 zip_ref.extractall(temp_dir)
@@ -67,7 +69,7 @@ class MLModel(BaseModel):
     )
     test_size = models.FloatField(default=0.2)
     random_state = models.IntegerField(default=42)
-    max_iter = models.IntegerField(default=1000) 
+    max_iter = models.IntegerField(default=1000)
 
     def __str__(self):
         return self.name
@@ -77,9 +79,8 @@ class TrainingRun(models.Model):
     model = models.OneToOneField(
         "MLModel", on_delete=models.CASCADE, related_name="training_run"
     )
-    history = models.JSONField(
-        default=list, blank=True
-    )  
+    history = models.JSONField(default=list, blank=True)
+
     def add_entry(self, status: str, accuracy: float = None, error: str = None):
         from django.utils.timezone import now
 

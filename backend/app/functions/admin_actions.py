@@ -10,7 +10,7 @@ from io import StringIO
 from app.models import ModelType, TrainingRun, ModelStatus
 from app.models.main import MLModel
 from app.functions.celery_tasks import train_cnn_task, train_nn_task, train_sklearn_task
-from .prediction import predict_nn, predict_sklearn_model, predict_cnn
+from .prediction import predict_nn, predict_sklearn_model
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,8 @@ def make_prediction(self, request, queryset):
             <button type="submit">Predict</button>
         </form>
     """)
-    
+
+
 @admin.action(description="Upload single image and Predict")
 def predict_single_image(self, request, queryset):
     from django.core.files.storage import default_storage
@@ -144,7 +145,9 @@ def predict_single_image(self, request, queryset):
             self.message_user(request, "No image uploaded", level="error")
             return None
 
-        image_path = default_storage.save(f"predict_tmp/{uploaded_file.name}", uploaded_file)
+        image_path = default_storage.save(
+            f"predict_tmp/{uploaded_file.name}", uploaded_file
+        )
         full_path = os.path.join(settings.MEDIA_ROOT, image_path)
 
         try:

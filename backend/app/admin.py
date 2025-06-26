@@ -1,7 +1,11 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from .models import Dataset, MLModel, TrainingRun
-from app.functions.admin_actions import make_prediction, train_model, predict_single_image
+from app.functions.admin_actions import (
+    make_prediction,
+    train_model,
+    predict_single_image,
+)
 import json
 
 

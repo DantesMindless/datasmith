@@ -15,7 +15,6 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.preprocessing import LabelEncoder
-from django.conf import settings
 from app.models.choices import ActivationFunction, ModelType
 from core.storage_utils import upload_to_minio
 
@@ -106,7 +105,6 @@ def get_model_instance(model_type, obj):
         raise ValueError(f"Unsupported model type: {model_type}")
 
 
-
 def train_sklearn_model(obj, X_train, y_train, X_test, y_test):
     clf = get_model_instance(obj.model_type, obj)
     clf.fit(X_train, y_train)
@@ -161,27 +159,27 @@ def train_nn(obj, X_train, y_train, X_test, y_test):
         X_test_tensor = torch.tensor(X_test.values, dtype=torch.float32)
         preds = model(X_test_tensor).argmax(dim=1).numpy()
         acc = accuracy_score(y_test_encoded, preds)
-        
-    
-    
+
     buffer = io.BytesIO()
     torch.save(model.state_dict(), buffer)
     buffer.seek(0)
     model_path = f"trained_models/{obj.id}.pt"
-    
+
     upload_to_minio(buffer.read(), model_path, content_type="application/octet-stream")
-    
+
     enc_buf = io.BytesIO()
     joblib.dump(le, enc_buf)
     enc_buf.seek(0)
     encoder_path = f"trained_models/{obj.id}_encoder.joblib"
-    
-    upload_to_minio(enc_buf.read(), encoder_path, content_type="application/octet-stream")
-    
+
+    upload_to_minio(
+        enc_buf.read(), encoder_path, content_type="application/octet-stream"
+    )
+
     obj.training_config["output_dim"] = output_dim
     obj.training_config["class_names"] = le.classes_.tolist()
     obj.save(update_fields=["training_config"])
-    
+
     return model_path, acc
 
 
@@ -191,7 +189,7 @@ def train_cnn(obj):
     if hasattr(obj.dataset, "extracted_path") and obj.dataset.extracted_path:
         image_path = obj.dataset.extracted_path
     elif hasattr(obj.dataset, "image_folder") and obj.dataset.image_folder:
-        image_path = obj.dataset.image_folder.path 
+        image_path = obj.dataset.image_folder.path
 
     if not image_path or not os.path.isdir(image_path):
         raise ValueError(f"Image path is invalid or missing: {image_path}")
@@ -204,10 +202,12 @@ def train_cnn(obj):
     lr = config.get("learning_rate", 0.001)
     epochs = config.get("epochs", 10)
 
-    transform = transforms.Compose([
-        transforms.Resize((input_size, input_size)),
-        transforms.ToTensor(),
-    ])
+    transform = transforms.Compose(
+        [
+            transforms.Resize((input_size, input_size)),
+            transforms.ToTensor(),
+        ]
+    )
     dataset = datasets.ImageFolder(image_path, transform=transform)
     loader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
@@ -230,11 +230,8 @@ def train_cnn(obj):
     model_path = f"trained_models/{obj.id}.pt"
     upload_to_minio(buffer.read(), model_path, content_type="application/octet-stream")
 
-
     obj.training_config["num_classes"] = num_classes
     obj.training_config["class_names"] = list(dataset.class_to_idx.keys())
     obj.save(update_fields=["training_config"])
-
-
 
     return model_path, None

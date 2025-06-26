@@ -25,7 +25,7 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio_data:/data
-    
+
 
   frontend:
     build:

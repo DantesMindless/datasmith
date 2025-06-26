@@ -1,5 +1,4 @@
 from celery import shared_task
-from django.conf import settings
 from app.models import MLModel
 from app.functions.training import train_cnn, train_nn, train_sklearn_model
 import pandas as pd
@@ -94,4 +93,4 @@ def train_cnn_task(model_id):
         obj.training_log = f"CNN training failed: {str(e)}"
         obj.save()
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
-        raise  
+        raise
