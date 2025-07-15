@@ -19,7 +19,6 @@ class ModelType(models.TextChoices):
     CNN = "cnn", "Convolutional Neural Network (CNN)"
 
 
-
 class ActivationFunction(models.TextChoices):
     RELU = "relu", "ReLU"
     TANH = "tanh", "Tanh"
