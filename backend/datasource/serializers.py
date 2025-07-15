@@ -50,27 +50,4 @@ class DataSourceSerializer(serializers.ModelSerializer):
             )
         return value
 
-        Ensures the credentials are a dictionary, not empty, and contain the
-        required parameters for the selected datasource type.
-
-        Args:
-            value (Dict[str, str]): The credentials dictionary.
-
-        Returns:
-            Dict[str, str]: The validated credentials dictionary.
-
-        Raises:
-            serializers.ValidationError: If the credentials are invalid or incomplete.
-        """
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("Credentials must be a dictionary.")
-        if not value:
-            raise serializers.ValidationError("Credentials cannot be empty")
-        if not (
-            adapter := DatasourceTypeChoices.get_adapter(self.initial_data.get("type"))
-        ):
-            raise serializers.ValidationError("Connection type")
-        _, message = adapter.verify_params(value)
-        if message:
-            raise serializers.ValidationError(f"Missing credentials: {message}")
-        return value
+      

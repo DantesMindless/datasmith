@@ -2,6 +2,10 @@ import logging
 from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple, Union, Type
 
+from datasource.adapters.mongo import MongoDBConnection
+from datasource.adapters.mysql import MySQLConnection
+from datasource.adapters.postgres import PostgresConnection
+from datasource.adapters.redis_adapter import RedisConnection
 from core.models import BaseModel
 from django.core.exceptions import ValidationError
 from django.db import models
