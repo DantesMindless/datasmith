@@ -50,4 +50,16 @@ class DataSourceSerializer(serializers.ModelSerializer):
             )
         return value
 
-      
+    def validate_credentials(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Credentials must be a dictionary")
+        if not value:
+            raise serializers.ValidationError("Credentials cannot be empty")
+        if not (
+            adapter := DatasourceTypeChoices.get_adapter(self.initial_data.get("type"))
+        ):
+            raise serializers.ValidationError("Connection type")
+        _, message = adapter.verify_params(value)
+        if message:
+            raise serializers.ValidationError(f"Missing credentials: {message}")
+        return value

@@ -376,7 +376,6 @@ version = "4.6.0"
 description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
 files = [
     {file = "django_cors_headers-4.6.0-py3-none-any.whl", hash = "sha256:8edbc0497e611c24d5150e0055d3b178c6534b8ed826fb6f53b21c63f5d48ba3"},
     {file = "django_cors_headers-4.6.0.tar.gz", hash = "sha256:14d76b4b4c8d39375baeddd89e4f08899051eeaf177cb02a29bd6eae8cf63aa8"},
@@ -2617,4 +2616,4 @@ scikit-learn = ["scikit-learn"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "184701857b000b4ec6fce1cf533dcd0b318d3d2cf65db047232bc03cbb8f43ab"
+content-hash = "de710b9569ed11d709f00a10282995a08311bf1cb0fdb4d920ac61c67481d83d"
