@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Container,
   Box,
@@ -13,13 +13,24 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
+  CircularProgress
 } from "@mui/material";
 import { modelConfigSchemas, ConfigField } from "../utils/modelSchema";
+import httpfetch from "../utils/axios";
+
+const uname = "u@u.com";
+const pass = "password";
 
 export default function CreateModelPage() {
   const [name, setName] = useState("");
   const [modelType, setModelType] = useState("");
+  const [datasetId, setDatasetId] = useState("");
+  const [datasets, setDatasets] = useState([]);
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const [dialogOpenKey, setDialogOpenKey] = useState<string | null>(null);
   const [layerDraft, setLayerDraft] = useState<Record<string, any>>({});
@@ -45,15 +56,62 @@ export default function CreateModelPage() {
     closeLayerDialog();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!datasetId) {
+      setError("Please select a dataset");
+      return;
+    }
+    
     const payload = {
       name,
-      type: modelType,
+      model_type: modelType,
+      dataset: datasetId,
       config: configValues,
     };
-    console.log("Payload:", payload);
+    
+    try {
+      setLoading(true);
+      setError("");
+      const response = await httpfetch.post('/models/', payload, {
+        auth: {
+          username: uname,
+          password: pass,
+        },
+      });
+      setSuccess("Model created successfully!");
+      console.log("Model created:", response.data);
+      // Reset form
+      setName("");
+      setModelType("");
+      setDatasetId("");
+      setConfigValues({});
+    } catch (err: any) {
+      console.error("Error creating model:", err);
+      setError(err.response?.data?.error || "Failed to create model");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const fetchDatasets = async () => {
+    try {
+      const response = await httpfetch.get('/datasets/', {
+        auth: {
+          username: uname,
+          password: pass,
+        },
+      });
+      setDatasets(response.data.results || response.data);
+    } catch (err) {
+      console.error('Error fetching datasets:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchDatasets();
+  }, []);
 
   const fields: ConfigField[] = modelType ? modelConfigSchemas[modelType] || [] : [];
 
@@ -71,6 +129,19 @@ export default function CreateModelPage() {
         <Typography variant="h5" gutterBottom>
           Create New Model
         </Typography>
+        
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
+          </Alert>
+        )}
+        
         <form onSubmit={handleSubmit}>
           <TextField
             fullWidth
@@ -80,6 +151,22 @@ export default function CreateModelPage() {
             margin="normal"
             required
           />
+
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="dataset-label">Dataset</InputLabel>
+            <Select
+              labelId="dataset-label"
+              value={datasetId}
+              onChange={(e) => setDatasetId(e.target.value)}
+              required
+            >
+              {datasets.map((dataset: any) => (
+                <MenuItem key={dataset.id} value={dataset.id}>
+                  {dataset.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <FormControl fullWidth margin="normal">
             <InputLabel id="model-type-label">Model Type</InputLabel>
@@ -223,8 +310,14 @@ export default function CreateModelPage() {
           )}
 
           <Box sx={{ mt: 4, textAlign: "right" }}>
-            <Button type="submit" variant="contained" size="large">
-              Create Model
+            <Button 
+              type="submit" 
+              variant="contained" 
+              size="large"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} /> : null}
+            >
+              {loading ? 'Creating...' : 'Create Model'}
             </Button>
           </Box>
         </form>

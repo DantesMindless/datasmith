@@ -10,15 +10,20 @@ import {
   Button,
   Grid,
   Chip,
-  LinearProgress
+  LinearProgress,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import CreateModel from '../CreateModel';
+import httpfetch from '../../utils/axios';
 
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
 }
+const uname = "u@u.com";
+const pass = "password";
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
@@ -42,29 +47,30 @@ function TabPanel(props: TabPanelProps) {
 
 function ModelsList() {
   const [models, setModels] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // TODO: Replace with actual API call once backend is connected
+  const fetchModels = async () => {
+    try {
+      setLoading(true);
+      const response = await httpfetch.get('/models/', {
+        auth: {
+          username: uname,
+          password: pass,
+        },
+      });
+      setModels(response.data.results || response.data);
+      setError('');
+    } catch (err: any) {
+      console.error('Error fetching models:', err);
+      setError(err.response?.data?.error || 'Failed to fetch models');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Mock data for now
-    setModels([
-      {
-        id: 1,
-        name: 'Iris Classification Model',
-        type: 'Random Forest',
-        status: 'Completed',
-        accuracy: 0.95,
-        dataset: 'iris.csv'
-      },
-      {
-        id: 2,
-        name: 'Image Classification CNN',
-        type: 'CNN',
-        status: 'Training',
-        accuracy: null,
-        dataset: 'butterfly_images'
-      }
-    ]);
+    fetchModels();
   }, []);
 
   const getStatusColor = (status: string) => {
@@ -76,13 +82,26 @@ function ModelsList() {
     }
   };
 
-  const handleTrain = (modelId: number) => {
-    // TODO: Implement training API call
-    console.log('Training model:', modelId);
+  const handleTrain = async (modelId: number) => {
+    try {
+      const response = await httpfetch.post(`/models/${modelId}/train/`, {}, {
+        auth: {
+          username: uname,
+          password: pass,
+        },
+      });
+      alert(response.data.message || 'Training started');
+      // Refresh models to show updated status
+      await fetchModels();
+    } catch (err: any) {
+      console.error('Error training model:', err);
+      alert(err.response?.data?.error || 'Failed to start training');
+    }
   };
 
-  const handlePredict = (modelId: number) => {
-    // TODO: Implement prediction functionality
+  const handlePredict = async (modelId: number) => {
+    // TODO: Implement prediction UI/workflow
+    alert('Prediction functionality coming soon!');
     console.log('Making prediction with model:', modelId);
   };
 
@@ -92,7 +111,17 @@ function ModelsList() {
         Your Models
       </Typography>
       
-      {models.length === 0 ? (
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {loading ? (
+        <Box display="flex" justifyContent="center" p={4}>
+          <CircularProgress />
+        </Box>
+      ) : models.length === 0 ? (
         <Typography variant="body1" color="textSecondary">
           No models created yet. Create your first model to get started!
         </Typography>
@@ -107,11 +136,11 @@ function ModelsList() {
                   </Typography>
                   
                   <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Type: {model.type}
+                    Type: {model.model_type || model.type}
                   </Typography>
                   
                   <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Dataset: {model.dataset}
+                    Dataset: {model.dataset?.name || model.dataset || 'N/A'}
                   </Typography>
                   
                   <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
@@ -122,7 +151,7 @@ function ModelsList() {
                     />
                     {model.accuracy && (
                       <Typography variant="body2" sx={{ ml: 2 }}>
-                        Accuracy: {(model.accuracy * 100).toFixed(1)}%
+                        Accuracy: {(typeof model.accuracy === 'number' ? (model.accuracy * 100).toFixed(1) : model.accuracy)}%
                       </Typography>
                     )}
                   </Box>
@@ -174,28 +203,30 @@ function ModelsList() {
 
 function DatasetsList() {
   const [datasets, setDatasets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // TODO: Replace with actual API call once backend is connected
+  const fetchDatasets = async () => {
+    try {
+      setLoading(true);
+      const response = await httpfetch.get('/datasets/', {
+        auth: {
+          username: uname,
+          password: pass,
+        },
+      });
+      setDatasets(response.data.results || response.data);
+      setError('');
+    } catch (err: any) {
+      console.error('Error fetching datasets:', err);
+      setError(err.response?.data?.error || 'Failed to fetch datasets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Mock data for now
-    setDatasets([
-      {
-        id: 1,
-        name: 'Iris Dataset',
-        type: 'CSV',
-        rows: 150,
-        columns: 4,
-        uploadDate: '2024-01-15'
-      },
-      {
-        id: 2,
-        name: 'Butterfly Images',
-        type: 'Image',
-        files: 300,
-        size: '45 MB',
-        uploadDate: '2024-01-10'
-      }
-    ]);
+    fetchDatasets();
   }, []);
 
   return (
@@ -204,7 +235,17 @@ function DatasetsList() {
         Your Datasets
       </Typography>
       
-      {datasets.length === 0 ? (
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {loading ? (
+        <Box display="flex" justifyContent="center" p={4}>
+          <CircularProgress />
+        </Box>
+      ) : datasets.length === 0 ? (
         <Typography variant="body1" color="textSecondary">
           No datasets uploaded yet. Upload datasets to train models!
         </Typography>
@@ -219,31 +260,29 @@ function DatasetsList() {
                   </Typography>
                   
                   <Typography variant="body2" color="textSecondary">
-                    Type: {dataset.type}
+                    Type: {dataset.file_type || dataset.type || 'Unknown'}
                   </Typography>
                   
-                  {dataset.type === 'CSV' ? (
-                    <>
-                      <Typography variant="body2" color="textSecondary">
-                        Rows: {dataset.rows}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Columns: {dataset.columns}
-                      </Typography>
-                    </>
-                  ) : (
-                    <>
-                      <Typography variant="body2" color="textSecondary">
-                        Files: {dataset.files}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Size: {dataset.size}
-                      </Typography>
-                    </>
+                  {dataset.file_size && (
+                    <Typography variant="body2" color="textSecondary">
+                      Size: {dataset.file_size}
+                    </Typography>
+                  )}
+                  
+                  {dataset.rows_count && (
+                    <Typography variant="body2" color="textSecondary">
+                      Rows: {dataset.rows_count}
+                    </Typography>
+                  )}
+                  
+                  {dataset.columns_count && (
+                    <Typography variant="body2" color="textSecondary">
+                      Columns: {dataset.columns_count}
+                    </Typography>
                   )}
                   
                   <Typography variant="body2" color="textSecondary">
-                    Uploaded: {dataset.uploadDate}
+                    Created: {new Date(dataset.created_at || dataset.uploadDate).toLocaleDateString()}
                   </Typography>
                 </CardContent>
                 

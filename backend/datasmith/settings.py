@@ -45,6 +45,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://datasmith.local",
     "https://localhost",
     "http://localhost",
+    "http://localhost:5173"
 ]
 
 LOGGING = LOGGING
@@ -192,6 +193,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",  # Alternate local frontend
     "https://localhost",
     "http://localhost",  # Local frontend
+    "http://localhost:5173",
 ]
 
 CORS_ALLOW_METHODS = [
@@ -210,12 +212,27 @@ CELERY_TASK_SERIALIZER = "json"
 # Django REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }

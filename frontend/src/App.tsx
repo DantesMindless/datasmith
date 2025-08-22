@@ -2,10 +2,13 @@ import Box from "@mui/material/Box";
 import MainNavigation from "./components/MainNavigation";
 import DataManagementPage from "./components/pages/DataManagementPage";
 import MLManagementPage from "./components/pages/MLManagementPage";
+import Login from "./components/Login";
 import { useState } from "react";
+import { useAppContext } from "./providers/useAppContext";
 
 export default function JoyOrderDashboardTemplate() {
   const [currentPage, setCurrentPage] = useState('dataManagement');
+  const { isAuthenticated } = useAppContext();
 
   const handlePageChange = (page: string) => {
     setCurrentPage(page);
@@ -21,6 +24,10 @@ export default function JoyOrderDashboardTemplate() {
         return <DataManagementPage />;
     }
   };
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   return (
     <Box sx={{ display: "flex", minHeight: "100dvh", width: '100dvw'}}>

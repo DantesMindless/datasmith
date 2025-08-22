@@ -17,12 +17,15 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import StorageIcon from "@mui/icons-material/Storage";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
 
+import { useAppContext } from "../providers/useAppContext";
+
 interface MainNavigationProps {
   activePage: string;
   onPageChange: (page: string) => void;
 }
 
 export default function MainNavigation({ activePage, onPageChange }: MainNavigationProps) {
+  const { user, logout } = useAppContext();
   
   const navigationItems = [
     {
@@ -127,17 +130,16 @@ export default function MainNavigation({ activePage, onPageChange }: MainNavigat
       </Box>
 
       <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-        <Avatar
-          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=286"
-          alt="Avatar"
-        />
+        <Avatar alt={user?.username || 'User'}>
+          {user?.username?.charAt(0).toUpperCase()}
+        </Avatar>
         <Box>
-          <Typography variant="body1">Siriwat K.</Typography>
+          <Typography variant="body1">{user?.username}</Typography>
           <Typography variant="body2" color="textSecondary">
-            siriwatk@test.com
+            {user?.email}
           </Typography>
         </Box>
-        <IconButton>
+        <IconButton onClick={logout} title="Logout">
           <LogoutRoundedIcon />
         </IconButton>
       </Box>
