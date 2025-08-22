@@ -108,7 +108,7 @@ export default function CreateModelPage() {
               <MenuItem value="svm">Support Vector Machine</MenuItem>
               <MenuItem value="naive_bayes">Naive Bayes</MenuItem>
               <MenuItem value="knn">k-Nearest Neighbours</MenuItem>
-              <MenuItem value="GRADIENT_BOOSTING">Gradient Boosting</MenuItem>
+              <MenuItem value="gradient_boosting">Gradient Boosting</MenuItem>
               <MenuItem value="neural_network">Neural Network (PyTorch)</MenuItem>
               <MenuItem value="cnn">Convolutional Neural Network (CNN)</MenuItem>
             </Select>

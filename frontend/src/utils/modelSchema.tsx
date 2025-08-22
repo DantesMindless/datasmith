@@ -97,7 +97,7 @@ export const modelConfigSchemas: Record<string, ConfigField[]> = {
     },
   ],
 
-  GRADIENT_BOOSTING: [
+  gradient_boosting: [
     { key: "n_estimators", label: "Estimators", type: "number", default: 100 },
     { key: "learning_rate", label: "Learning Rate", type: "number", default: 0.1 },
     { key: "max_depth", label: "Max Depth", type: "number", default: 3 },
