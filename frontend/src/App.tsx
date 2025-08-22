@@ -1,48 +1,45 @@
 import Box from "@mui/material/Box";
-import Sidebar from "./components/Sidebar";
-import Tabs from "./components/Tabs";
-import { useAppContext } from "./providers/useAppContext";
-
-import { pageComponents } from "./utils/constants";
+import MainNavigation from "./components/MainNavigation";
+import DataManagementPage from "./components/pages/DataManagementPage";
+import MLManagementPage from "./components/pages/MLManagementPage";
+import { useState } from "react";
 
 export default function JoyOrderDashboardTemplate() {
-  const { activePage } = useAppContext();
+  const [currentPage, setCurrentPage] = useState('dataManagement');
 
-  const renderActivePage = () => {
-    const activePageConfig = pageComponents[activePage];
-    if (activePageConfig && activePageConfig.component) {
-      const ActiveComponent = activePageConfig.component;
-      return <ActiveComponent />;
+  const handlePageChange = (page: string) => {
+    setCurrentPage(page);
+  };
+
+  const renderCurrentPage = () => {
+    switch (currentPage) {
+      case 'dataManagement':
+        return <DataManagementPage />;
+      case 'mlManagement':
+        return <MLManagementPage />;
+      default:
+        return <DataManagementPage />;
     }
-    return null;
   };
 
   return (
     <Box sx={{ display: "flex", minHeight: "100dvh", width: '100dvw'}}>
-      {/* <Header /> */}
-      <Sidebar />
+      <MainNavigation 
+        activePage={currentPage} 
+        onPageChange={handlePageChange} 
+      />
       <Box
         component="main"
         className="MainContent"
         sx={{
-          // px: { xs: 1, md: 1 },
-          pt: {
-            xs: "calc(4px + var(--Header-height))",
-            sm: "calc(4px + var(--Header-height))",
-            md: 1,
-          },
-          pb: { xs: 1, sm: 1, md: 1 },
           flex: 1,
           display: "flex",
           flexDirection: "column",
           minWidth: 0,
           height: "100dvh",
-          gap: 1,
-          overflowY: 'scroll'
         }}
       >
-        <Tabs />
-        {renderActivePage()}
+        {renderCurrentPage()}
       </Box>
     </Box>
   );
