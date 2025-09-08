@@ -4,3 +4,15 @@
 backend/staticfiles/
 backend/poetry.lock
 .rest
+
+# MCP Server files
+backend/mcp_server/
+claude_code_config.json
+MCP_SETUP_GUIDE.md
+setup_mcp.sh
+backend/test_mcp_server.py
+backend/mcp_server/requirements.txt
+
+# MCP-related environment variables
+.env.mcp
+**/mcp_config.json
