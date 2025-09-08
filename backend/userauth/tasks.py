@@ -48,16 +48,395 @@ def bulk_grant_column_permissions(
     else:
         set_correlation_id(generate_correlation_id())
     
-    try:\n        logger.info(\n            f\"Starting bulk column permission grant task: {len(user_ids)} users, \"\n            f\"{len(column_names)} columns\",\n            extra={\n                'task_id': self.request.id,\n                'user_count': len(user_ids),\n                'column_count': len(column_names),\n                'datasource_id': datasource_id,\n                'table_name': table_name\n            }\n        )\n        \n        # Get valid users\n        users = User.objects.filter(id__in=user_ids)\n        granted_by = User.objects.get(id=granted_by_id) if granted_by_id else None\n        \n        # Use PermissionService bulk operation\n        total_created, created_permissions = PermissionService.bulk_grant_permissions(\n            users=list(users),\n            datasource_id=datasource_id,\n            table_name=table_name,\n            column_names=column_names,\n            access_type=access_type,\n            allow_in_segments=allow_in_segments,\n            granted_by=granted_by\n        )\n        \n        # Log bulk operation\n        if granted_by:\n            permission_logger.bulk_operation(\n                operation_type='bulk_grant_column_permissions',\n                user=granted_by,\n                affected_count=total_created,\n                operation_details={\n                    'target_user_count': len(user_ids),\n                    'datasource_id': datasource_id,\n                    'table_name': table_name,\n                    'column_names': column_names,\n                    'access_type': access_type,\n                    'allow_in_segments': allow_in_segments,\n                    'task_id': self.request.id\n                }\n            )\n        \n        # Warm cache for affected users\n        for user in users:\n            cache_manager.warm_user_cache(str(user.id), [datasource_id])\n        \n        result = {\n            'status': 'success',\n            'total_created': total_created,\n            'created_permissions': created_permissions[:100],  # Limit response size\n            'total_users_processed': len(users),\n            'task_id': self.request.id\n        }\n        \n        logger.info(\n            f\"Completed bulk column permission grant: {total_created} permissions created\",\n            extra=result\n        )\n        \n        return result\n        \n    except Exception as exc:\n        logger.error(\n            f\"Bulk column permission grant failed: {exc}\",\n            extra={\n                'task_id': self.request.id,\n                'error': str(exc),\n                'user_ids': user_ids,\n                'datasource_id': datasource_id\n            },\n            exc_info=True\n        )\n        \n        # Log security violation if this looks suspicious\n        if granted_by:\n            permission_logger.security_violation(\n                user=granted_by,\n                violation_type='bulk_permission_failure',\n                details={\n                    'task_id': self.request.id,\n                    'error': str(exc),\n                    'attempted_user_count': len(user_ids),\n                    'datasource_id': datasource_id\n                }\n            )\n        \n        # Retry logic\n        if self.request.retries < self.max_retries:\n            logger.info(f\"Retrying bulk permission task {self.request.id} (attempt {self.request.retries + 1})\")\n            raise self.retry(countdown=60 * (2 ** self.request.retries))  # Exponential backoff\n        \n        raise exc
+    try:
+        logger.info(
+            f"Starting bulk column permission grant task: {len(user_ids)} users, "
+            f"{len(column_names)} columns",
+            extra={
+                'task_id': self.request.id,
+                'user_count': len(user_ids),
+                'column_count': len(column_names),
+                'datasource_id': datasource_id,
+                'table_name': table_name
+            }
+        )
+        
+        # Get valid users
+        users = User.objects.filter(id__in=user_ids)
+        granted_by = User.objects.get(id=granted_by_id) if granted_by_id else None
+        
+        # Use PermissionService bulk operation
+        total_created, created_permissions = PermissionService.bulk_grant_permissions(
+            users=list(users),
+            datasource_id=datasource_id,
+            table_name=table_name,
+            column_names=column_names,
+            access_type=access_type,
+            allow_in_segments=allow_in_segments,
+            granted_by=granted_by
+        )
+        
+        # Log bulk operation
+        if granted_by:
+            permission_logger.bulk_operation(
+                operation_type='bulk_grant_column_permissions',
+                user=granted_by,
+                affected_count=total_created,
+                operation_details={
+                    'target_user_count': len(user_ids),
+                    'datasource_id': datasource_id,
+                    'table_name': table_name,
+                    'column_names': column_names,
+                    'access_type': access_type,
+                    'allow_in_segments': allow_in_segments,
+                    'task_id': self.request.id
+                }
+            )
+        
+        # Warm cache for affected users
+        for user in users:
+            cache_manager.warm_user_cache(str(user.id), [datasource_id])
+        
+        result = {
+            'status': 'success',
+            'total_created': total_created,
+            'created_permissions': created_permissions[:100],  # Limit response size
+            'total_users_processed': len(users),
+            'task_id': self.request.id
+        }
+        
+        logger.info(
+            f"Completed bulk column permission grant: {total_created} permissions created",
+            extra=result
+        )
+        
+        return result
+        
+    except Exception as exc:
+        logger.error(
+            f"Bulk column permission grant failed: {exc}",
+            extra={
+                'task_id': self.request.id,
+                'error': str(exc),
+                'user_ids': user_ids,
+                'datasource_id': datasource_id
+            },
+            exc_info=True
+        )
+        
+        # Log security violation if this looks suspicious
+        if granted_by:
+            permission_logger.security_violation(
+                user=granted_by,
+                violation_type='bulk_permission_failure',
+                details={
+                    'task_id': self.request.id,
+                    'error': str(exc),
+                    'attempted_user_count': len(user_ids),
+                    'datasource_id': datasource_id
+                }
+            )
+        
+        # Retry logic
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying bulk permission task {self.request.id} (attempt {self.request.retries + 1})")
+            raise self.retry(countdown=60 * (2 ** self.request.retries))  # Exponential backoff
+        
+        raise exc
 
 
-@shared_task(bind=True)\ndef revoke_user_all_permissions(\n    self,\n    user_id: str,\n    permission_types: List[str] = None,\n    revoked_by_id: str = None,\n    correlation_id: str = None\n):\n    \"\"\"\n    Celery task for revoking all permissions for a user\n    \n    Args:\n        user_id: User ID to revoke permissions from\n        permission_types: Types of permissions to revoke ['datasource', 'table', 'column']\n        revoked_by_id: ID of user performing revocation\n        correlation_id: Correlation ID for tracking\n    \"\"\"\n    if correlation_id:\n        set_correlation_id(correlation_id)\n    else:\n        set_correlation_id(generate_correlation_id())\n    \n    if permission_types is None:\n        permission_types = ['datasource', 'table', 'column']\n    \n    try:\n        user = User.objects.get(id=user_id)\n        revoked_by = User.objects.get(id=revoked_by_id) if revoked_by_id else None\n        \n        logger.info(\n            f\"Starting permission revocation for user {user.email}\",\n            extra={\n                'task_id': self.request.id,\n                'target_user_id': user_id,\n                'permission_types': permission_types\n            }\n        )\n        \n        revoked_counts = {\n            'datasource': 0,\n            'table': 0,\n            'column': 0\n        }\n        \n        with transaction.atomic():\n            if 'datasource' in permission_types:\n                # Revoke all datasource permissions\n                datasource_perms = DataSourcePermission.objects.filter(user=user)\n                for perm in datasource_perms:\n                    count, _ = PermissionService.revoke_datasource_permission(\n                        user=user,\n                        datasource_id=perm.datasource_id,\n                        access_type=perm.access_type,\n                        revoked_by=revoked_by\n                    )\n                    revoked_counts['datasource'] += count\n            \n            if 'column' in permission_types:\n                # Revoke all column permissions\n                column_perms = ColumnPermission.objects.filter(user=user)\n                for perm in column_perms:\n                    count, _ = PermissionService.revoke_column_permission(\n                        user=user,\n                        datasource_id=perm.datasource_id,\n                        table_name=perm.table_name,\n                        column_name=perm.column_name,\n                        access_type=perm.access_type,\n                        revoked_by=revoked_by\n                    )\n                    revoked_counts['column'] += count\n        \n        # Clear all user caches\n        cache_manager.invalidate_user_cache(str(user.id))\n        \n        # Log bulk revocation\n        if revoked_by:\n            permission_logger.bulk_operation(\n                operation_type='revoke_all_user_permissions',\n                user=revoked_by,\n                affected_count=sum(revoked_counts.values()),\n                operation_details={\n                    'target_user_id': user_id,\n                    'target_user_email': user.email,\n                    'permission_types': permission_types,\n                    'revoked_counts': revoked_counts,\n                    'task_id': self.request.id\n                }\n            )\n        \n        result = {\n            'status': 'success',\n            'revoked_counts': revoked_counts,\n            'total_revoked': sum(revoked_counts.values()),\n            'user_email': user.email,\n            'task_id': self.request.id\n        }\n        \n        logger.info(\n            f\"Completed permission revocation for user {user.email}: {sum(revoked_counts.values())} permissions\",\n            extra=result\n        )\n        \n        return result\n        \n    except Exception as exc:\n        logger.error(\n            f\"Permission revocation failed for user {user_id}: {exc}\",\n            extra={\n                'task_id': self.request.id,\n                'user_id': user_id,\n                'error': str(exc)\n            },\n            exc_info=True\n        )\n        raise exc
+@shared_task(bind=True)
+def revoke_user_all_permissions(
+    self,
+    user_id: str,
+    permission_types: List[str] = None,
+    revoked_by_id: str = None,
+    correlation_id: str = None
+):
+    """
+    Celery task for revoking all permissions for a user
+    
+    Args:
+        user_id: User ID to revoke permissions from
+        permission_types: Types of permissions to revoke ['datasource', 'table', 'column']
+        revoked_by_id: ID of user performing revocation
+        correlation_id: Correlation ID for tracking
+    """
+    if correlation_id:
+        set_correlation_id(correlation_id)
+    else:
+        set_correlation_id(generate_correlation_id())
+    
+    if permission_types is None:
+        permission_types = ['datasource', 'table', 'column']
+    
+    try:
+        user = User.objects.get(id=user_id)
+        revoked_by = User.objects.get(id=revoked_by_id) if revoked_by_id else None
+        
+        logger.info(
+            f"Starting permission revocation for user {user.email}",
+            extra={
+                'task_id': self.request.id,
+                'target_user_id': user_id,
+                'permission_types': permission_types
+            }
+        )
+        
+        revoked_counts = {
+            'datasource': 0,
+            'table': 0,
+            'column': 0
+        }
+        
+        with transaction.atomic():
+            if 'datasource' in permission_types:
+                # Revoke all datasource permissions
+                datasource_perms = DataSourcePermission.objects.filter(user=user)
+                for perm in datasource_perms:
+                    count, _ = PermissionService.revoke_datasource_permission(
+                        user=user,
+                        datasource_id=perm.datasource_id,
+                        access_type=perm.access_type,
+                        revoked_by=revoked_by
+                    )
+                    revoked_counts['datasource'] += count
+            
+            if 'column' in permission_types:
+                # Revoke all column permissions
+                column_perms = ColumnPermission.objects.filter(user=user)
+                for perm in column_perms:
+                    count, _ = PermissionService.revoke_column_permission(
+                        user=user,
+                        datasource_id=perm.datasource_id,
+                        table_name=perm.table_name,
+                        column_name=perm.column_name,
+                        access_type=perm.access_type,
+                        revoked_by=revoked_by
+                    )
+                    revoked_counts['column'] += count
+        
+        # Clear all user caches
+        cache_manager.invalidate_user_cache(str(user.id))
+        
+        # Log bulk revocation
+        if revoked_by:
+            permission_logger.bulk_operation(
+                operation_type='revoke_all_user_permissions',
+                user=revoked_by,
+                affected_count=sum(revoked_counts.values()),
+                operation_details={
+                    'target_user_id': user_id,
+                    'target_user_email': user.email,
+                    'permission_types': permission_types,
+                    'revoked_counts': revoked_counts,
+                    'task_id': self.request.id
+                }
+            )
+        
+        result = {
+            'status': 'success',
+            'revoked_counts': revoked_counts,
+            'total_revoked': sum(revoked_counts.values()),
+            'user_email': user.email,
+            'task_id': self.request.id
+        }
+        
+        logger.info(
+            f"Completed permission revocation for user {user.email}: {sum(revoked_counts.values())} permissions",
+            extra=result
+        )
+        
+        return result
+        
+    except Exception as exc:
+        logger.error(
+            f"Permission revocation failed for user {user_id}: {exc}",
+            extra={
+                'task_id': self.request.id,
+                'user_id': user_id,
+                'error': str(exc)
+            },
+            exc_info=True
+        )
+        raise exc
 
 
-@shared_task(bind=True)\ndef copy_user_permissions(\n    self,\n    source_user_id: str,\n    target_user_ids: List[str],\n    permission_types: List[str] = None,\n    copied_by_id: str = None,\n    correlation_id: str = None\n):\n    \"\"\"\n    Celery task for copying permissions from one user to multiple users\n    \n    Args:\n        source_user_id: ID of user to copy permissions from\n        target_user_ids: List of user IDs to copy permissions to\n        permission_types: Types of permissions to copy\n        copied_by_id: ID of user performing the copy\n        correlation_id: Correlation ID for tracking\n    \"\"\"\n    if correlation_id:\n        set_correlation_id(correlation_id)\n    else:\n        set_correlation_id(generate_correlation_id())\n    \n    if permission_types is None:\n        permission_types = ['datasource', 'table', 'column']\n    \n    try:\n        source_user = User.objects.get(id=source_user_id)\n        target_users = User.objects.filter(id__in=target_user_ids)\n        copied_by = User.objects.get(id=copied_by_id) if copied_by_id else None\n        \n        logger.info(\n            f\"Starting permission copy from {source_user.email} to {len(target_users)} users\",\n            extra={\n                'task_id': self.request.id,\n                'source_user_id': source_user_id,\n                'target_user_count': len(target_users),\n                'permission_types': permission_types\n            }\n        )\n        \n        results = []\n        total_copied = 0\n        \n        for target_user in target_users:\n            copied_counts = PermissionService.copy_user_permissions(\n                source_user=source_user,\n                target_user=target_user,\n                permission_types=permission_types,\n                copied_by=copied_by\n            )\n            \n            user_total = sum(copied_counts.values())\n            total_copied += user_total\n            \n            results.append({\n                'target_user_id': str(target_user.id),\n                'target_user_email': target_user.email,\n                'copied_counts': copied_counts,\n                'total_copied': user_total\n            })\n            \n            # Warm cache for target user\n            cache_manager.warm_user_cache(str(target_user.id))\n        \n        # Log bulk copy operation\n        if copied_by:\n            permission_logger.bulk_operation(\n                operation_type='copy_user_permissions',\n                user=copied_by,\n                affected_count=total_copied,\n                operation_details={\n                    'source_user_id': source_user_id,\n                    'source_user_email': source_user.email,\n                    'target_user_count': len(target_users),\n                    'permission_types': permission_types,\n                    'task_id': self.request.id\n                }\n            )\n        \n        result = {\n            'status': 'success',\n            'source_user_email': source_user.email,\n            'target_results': results,\n            'total_permissions_copied': total_copied,\n            'task_id': self.request.id\n        }\n        \n        logger.info(\n            f\"Completed permission copy: {total_copied} permissions copied to {len(target_users)} users\",\n            extra=result\n        )\n        \n        return result\n        \n    except Exception as exc:\n        logger.error(\n            f\"Permission copy failed: {exc}\",\n            extra={\n                'task_id': self.request.id,\n                'source_user_id': source_user_id,\n                'target_user_ids': target_user_ids,\n                'error': str(exc)\n            },\n            exc_info=True\n        )\n        raise exc
+@shared_task(bind=True)
+def copy_user_permissions(
+    self,
+    source_user_id: str,
+    target_user_ids: List[str],
+    permission_types: List[str] = None,
+    copied_by_id: str = None,
+    correlation_id: str = None
+):
+    """
+    Celery task for copying permissions from one user to multiple users
+    
+    Args:
+        source_user_id: ID of user to copy permissions from
+        target_user_ids: List of user IDs to copy permissions to
+        permission_types: Types of permissions to copy
+        copied_by_id: ID of user performing the copy
+        correlation_id: Correlation ID for tracking
+    """
+    if correlation_id:
+        set_correlation_id(correlation_id)
+    else:
+        set_correlation_id(generate_correlation_id())
+    
+    if permission_types is None:
+        permission_types = ['datasource', 'table', 'column']
+    
+    try:
+        source_user = User.objects.get(id=source_user_id)
+        target_users = User.objects.filter(id__in=target_user_ids)
+        copied_by = User.objects.get(id=copied_by_id) if copied_by_id else None
+        
+        logger.info(
+            f"Starting permission copy from {source_user.email} to {len(target_users)} users",
+            extra={
+                'task_id': self.request.id,
+                'source_user_id': source_user_id,
+                'target_user_count': len(target_users),
+                'permission_types': permission_types
+            }
+        )
+        
+        results = []
+        total_copied = 0
+        
+        for target_user in target_users:
+            copied_counts = PermissionService.copy_user_permissions(
+                source_user=source_user,
+                target_user=target_user,
+                permission_types=permission_types,
+                copied_by=copied_by
+            )
+            
+            user_total = sum(copied_counts.values())
+            total_copied += user_total
+            
+            results.append({
+                'target_user_id': str(target_user.id),
+                'target_user_email': target_user.email,
+                'copied_counts': copied_counts,
+                'total_copied': user_total
+            })
+            
+            # Warm cache for target user
+            cache_manager.warm_user_cache(str(target_user.id))
+        
+        # Log bulk copy operation
+        if copied_by:
+            permission_logger.bulk_operation(
+                operation_type='copy_user_permissions',
+                user=copied_by,
+                affected_count=total_copied,
+                operation_details={
+                    'source_user_id': source_user_id,
+                    'source_user_email': source_user.email,
+                    'target_user_count': len(target_users),
+                    'permission_types': permission_types,
+                    'task_id': self.request.id
+                }
+            )
+        
+        result = {
+            'status': 'success',
+            'source_user_email': source_user.email,
+            'target_results': results,
+            'total_permissions_copied': total_copied,
+            'task_id': self.request.id
+        }
+        
+        logger.info(
+            f"Completed permission copy: {total_copied} permissions copied to {len(target_users)} users",
+            extra=result
+        )
+        
+        return result
+        
+    except Exception as exc:
+        logger.error(
+            f"Permission copy failed: {exc}",
+            extra={
+                'task_id': self.request.id,
+                'source_user_id': source_user_id,
+                'target_user_ids': target_user_ids,
+                'error': str(exc)
+            },
+            exc_info=True
+        )
+        raise exc
 
 
-@shared_task\ndef warm_user_caches(user_ids: List[str], datasources: List[str] = None):\n    \"\"\"\n    Celery task to warm caches for multiple users\n    \n    Args:\n        user_ids: List of user IDs to warm caches for\n        datasources: Optional list of datasource IDs to focus on\n    \"\"\"\n    logger.info(f\"Starting cache warming for {len(user_ids)} users\")\n    \n    warmed_count = 0\n    for user_id in user_ids:\n        try:\n            cache_manager.warm_user_cache(user_id, datasources)\n            warmed_count += 1\n        except Exception as e:\n            logger.warning(f\"Failed to warm cache for user {user_id}: {e}\")\n    \n    logger.info(f\"Cache warming completed: {warmed_count}/{len(user_ids)} users\")\n    \n    return {\n        'status': 'success',\n        'users_requested': len(user_ids),\n        'users_warmed': warmed_count,\n        'datasources': datasources\n    }
+@shared_task
+def warm_user_caches(user_ids: List[str], datasources: List[str] = None):
+    """
+    Celery task to warm caches for multiple users
+    
+    Args:
+        user_ids: List of user IDs to warm caches for
+        datasources: Optional list of datasource IDs to focus on
+    """
+    logger.info(f"Starting cache warming for {len(user_ids)} users")
+    
+    warmed_count = 0
+    for user_id in user_ids:
+        try:
+            cache_manager.warm_user_cache(user_id, datasources)
+            warmed_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to warm cache for user {user_id}: {e}")
+    
+    logger.info(f"Cache warming completed: {warmed_count}/{len(user_ids)} users")
+    
+    return {
+        'status': 'success',
+        'users_requested': len(user_ids),
+        'users_warmed': warmed_count,
+        'datasources': datasources
+    }
 
 
-@shared_task\ndef cleanup_expired_permissions():\n    \"\"\"\n    Celery task to clean up expired permissions\n    \"\"\"\n    from datetime import timezone as tz\n    from datetime import datetime\n    \n    logger.info(\"Starting expired permissions cleanup\")\n    \n    now = datetime.now(tz.utc)\n    \n    # Clean expired datasource permissions\n    expired_ds = DataSourcePermission.objects.filter(expires_at__lt=now)\n    ds_count = expired_ds.count()\n    expired_ds.delete()\n    \n    # Clean expired column permissions\n    expired_col = ColumnPermission.objects.filter(expires_at__lt=now)\n    col_count = expired_col.count()\n    expired_col.delete()\n    \n    # Clear permission cache to ensure consistency\n    cleared_keys = cache_manager.clear_all_permission_cache()\n    \n    result = {\n        'status': 'success',\n        'expired_datasource_permissions': ds_count,\n        'expired_column_permissions': col_count,\n        'total_expired': ds_count + col_count,\n        'cache_keys_cleared': cleared_keys\n    }\n    \n    logger.info(\n        f\"Expired permissions cleanup completed: {ds_count + col_count} permissions removed\",\n        extra=result\n    )\n    \n    return result
+@shared_task
+def cleanup_expired_permissions():
+    """
+    Celery task to clean up expired permissions
+    """
+    from datetime import timezone as tz
+    from datetime import datetime
+    
+    logger.info("Starting expired permissions cleanup")
+    
+    now = datetime.now(tz.utc)
+    
+    # Clean expired datasource permissions
+    expired_ds = DataSourcePermission.objects.filter(expires_at__lt=now)
+    ds_count = expired_ds.count()
+    expired_ds.delete()
+    
+    # Clean expired column permissions
+    expired_col = ColumnPermission.objects.filter(expires_at__lt=now)
+    col_count = expired_col.count()
+    expired_col.delete()
+    
+    # Clear permission cache to ensure consistency
+    cleared_keys = cache_manager.clear_all_permission_cache()
+    
+    result = {
+        'status': 'success',
+        'expired_datasource_permissions': ds_count,
+        'expired_column_permissions': col_count,
+        'total_expired': ds_count + col_count,
+        'cache_keys_cleared': cleared_keys
+    }
+    
+    logger.info(
+        f"Expired permissions cleanup completed: {ds_count + col_count} permissions removed",
+        extra=result
+    )
+    
+    return result
