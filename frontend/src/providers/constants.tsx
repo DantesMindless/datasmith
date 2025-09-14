@@ -61,6 +61,10 @@ interface ContextType {
     setTabs: React.Dispatch<React.SetStateAction<TableViewTab[] | null>>
     addTableViewTab: (connection: Connection, schema: string, table: string) => void
     removeTab: (index: number) => void
+    activePage: string | null;
+    setActivePage: React.Dispatch<React.SetStateAction<string | null>>;
+    activeTab: number | null;
+    updateActiveTab: (index: number | null) => void;
     user: User | null;
     isAuthenticated: boolean;
     login: (username: string, password: string) => Promise<boolean>;

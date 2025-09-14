@@ -19,7 +19,7 @@ export const pageComponents = {
     component: QueryTables,
   },
     createModel: {
-    skip: false,
+    skip: true,
     name: "Create Model",
     component: CreateModel,
   },

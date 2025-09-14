@@ -90,7 +90,7 @@ export default function OrderTable() {
   const [skipIndexes, setSkipIndexes] = useState<number[]>([]);
   const [headers, setHeaders] = useState<{ title: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const { connections, setConnections, showAlert, showInfo, updateConnections } = useAppContext();
+  const { connections, showAlert, showInfo, updateConnections } = useAppContext();
 
   const renderFilters = () => (
     <React.Fragment>
@@ -111,11 +111,9 @@ export default function OrderTable() {
 
   const handleDelete = async (id: string) => {
     try {
+      setLoading(true);
       const response: AxiosResponse = await httpfetch.delete(
-        `datasource/detail/${id}/`,
-        {
-        auth: { username: "u@u.com", password: "password" },
-      }
+        `datasource/detail/${id}/`
       );
       if (response.status === 204 || response.status === 200) {
         await updateConnections();
@@ -124,6 +122,8 @@ export default function OrderTable() {
     } catch (error: any) {
       console.error("Error details:", error.response?.data || error.message);
       showAlert(`Failed to delete DataSource: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -147,7 +147,16 @@ export default function OrderTable() {
   }, [connections]);
 
   return (
-      <Box mt={2} border={1} borderColor="divider" borderRadius={1} overflow="auto">
+      <Box
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 2,
+          overflow: "hidden",
+          bgcolor: "background.paper",
+          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)"
+        }}
+      >
         <Table stickyHeader>
           <TableHead>
             <TableRow>
@@ -177,13 +186,31 @@ export default function OrderTable() {
                   <TableRow key={uuidv4()}>
                     {rowData}
                     <TableCell key={uuidv4()}>
-                      <Box display="flex" justifyContent="space-between">
-                        <Button size="small" variant="contained" color="primary">
+                      <Box display="flex" gap={1} justifyContent="center">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          sx={{
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontSize: "0.75rem"
+                          }}
+                        >
                           View
                         </Button>
-                        <Button size="small" variant="contained" color="error"
-                        disabled={loading} // Lock the button during the request
-                          onClick={() => handleDelete(row.id)}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          disabled={loading}
+                          onClick={() => handleDelete(row.id)}
+                          sx={{
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontSize: "0.75rem"
+                          }}
+                        >
                           Delete
                         </Button>
                       </Box>

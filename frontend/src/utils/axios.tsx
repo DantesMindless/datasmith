@@ -1,4 +1,5 @@
-const baseURL = "http://localhost:8000/api";
+
+const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/";
 
 const getAccessToken = () => {
   return localStorage.getItem("access_token") || "";
@@ -28,7 +29,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
   if (!refreshToken) return null;
   
   try {
-    const response = await fetch(`${baseURL}/refresh/`, {
+    const response = await fetch(`${baseURL}refresh/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,16 +101,45 @@ const httpfetch = {
     }
     
     if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.text();
+        // Try to parse as JSON if possible
+        try {
+          errorData = JSON.parse(errorData);
+        } catch {
+          // Keep as text if not valid JSON
+        }
+      } catch {
+        errorData = null;
+      }
+
       const error = new Error(`Request failed with status ${response.status}`);
       (error as any).response = {
         status: response.status,
-        data: await response.text(),
+        data: errorData,
       };
       throw error;
     }
-    
-    const data = await response.json();
-    return { data };
+
+    // For successful responses, handle different content types
+    const contentType = response.headers.get('Content-Type') || '';
+    let data;
+
+    if (response.status === 204 || response.status === 205) {
+      // No content responses
+      data = null;
+    } else if (contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+    } else {
+      data = await response.text();
+    }
+
+    return { data, status: response.status, statusText: response.statusText };
   },
   
   get(url: string, options?: RequestOptions) {

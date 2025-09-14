@@ -2,35 +2,22 @@ import httpfetch from './axios';
 import { UUIDTypes } from 'uuid';
 import { TableViewTab } from '../providers/constants';
 
-const uname = "u@u.com";
-const pass = "password";
-
 async function getData(url: string){
   try {
-    const response = await httpfetch.get(url, {
-      auth: {
-        username: uname,
-        password: pass,
-      },
-    });
+    const response = await httpfetch.get(url);
     return response.data; // Returning fetched data
   } catch (error) {
-    console.error("Error fetching orders:", error);
+    console.error("Error fetching data:", error);
     return [];
   }
 }
 
 async function putData(url: string, body: Record<string, string>){
   try {
-    const response = await httpfetch.put(url, body,  {
-      auth: {
-        username: uname,
-        password: pass,
-      },
-    });
+    const response = await httpfetch.put(url, body);
     return response.data; // Returning fetched data
   } catch (error) {
-    console.error("Error fetching orders:", error);
+    console.error("Error submitting data:", error);
     return [];
   }
 }

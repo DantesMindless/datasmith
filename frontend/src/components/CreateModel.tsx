@@ -19,14 +19,15 @@ import {
 import { modelConfigSchemas, ConfigField } from "../utils/modelSchema";
 import httpfetch from "../utils/axios";
 
-const uname = "u@u.com";
-const pass = "password";
+// Authentication is now handled by httpfetch via JWT tokens
 
 export default function CreateModelPage() {
   const [name, setName] = useState("");
   const [modelType, setModelType] = useState("");
   const [datasetId, setDatasetId] = useState("");
+  const [targetColumn, setTargetColumn] = useState("");
   const [datasets, setDatasets] = useState([]);
+  const [datasetColumns, setDatasetColumns] = useState<string[]>([]);
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -63,29 +64,32 @@ export default function CreateModelPage() {
       setError("Please select a dataset");
       return;
     }
-    
+
+    if (!targetColumn) {
+      setError("Please select a target column");
+      return;
+    }
+
     const payload = {
       name,
       model_type: modelType,
       dataset: datasetId,
+      target_column: targetColumn,
       config: configValues,
     };
     
     try {
       setLoading(true);
       setError("");
-      const response = await httpfetch.post('/models/', payload, {
-        auth: {
-          username: uname,
-          password: pass,
-        },
-      });
+      const response = await httpfetch.post('models/', payload);
       setSuccess("Model created successfully!");
       console.log("Model created:", response.data);
       // Reset form
       setName("");
       setModelType("");
       setDatasetId("");
+      setTargetColumn("");
+      setDatasetColumns([]);
       setConfigValues({});
     } catch (err: any) {
       console.error("Error creating model:", err);
@@ -97,15 +101,40 @@ export default function CreateModelPage() {
 
   const fetchDatasets = async () => {
     try {
-      const response = await httpfetch.get('/datasets/', {
-        auth: {
-          username: uname,
-          password: pass,
-        },
-      });
+      const response = await httpfetch.get('datasets/');
       setDatasets(response.data.results || response.data);
     } catch (err) {
       console.error('Error fetching datasets:', err);
+    }
+  };
+
+  const fetchDatasetColumns = async (datasetId: string) => {
+    try {
+      const response = await httpfetch.get(`datasets/${datasetId}/columns/`);
+      setDatasetColumns(response.data.columns || []);
+    } catch (err) {
+      console.error('Error fetching dataset columns:', err);
+      // Fallback: try to get columns from dataset metadata
+      try {
+        const dataset = datasets.find(d => d.id == datasetId);
+        if (dataset && dataset.columns) {
+          setDatasetColumns(dataset.columns);
+        } else {
+          setError('Could not fetch dataset columns. Please select a different dataset.');
+        }
+      } catch (fallbackErr) {
+        setError('Could not fetch dataset columns. Please select a different dataset.');
+      }
+    }
+  };
+
+  const handleDatasetChange = (newDatasetId: string) => {
+    setDatasetId(newDatasetId);
+    setTargetColumn(""); // Reset target column when dataset changes
+    setDatasetColumns([]); // Clear existing columns
+
+    if (newDatasetId) {
+      fetchDatasetColumns(newDatasetId);
     }
   };
 
@@ -157,7 +186,7 @@ export default function CreateModelPage() {
             <Select
               labelId="dataset-label"
               value={datasetId}
-              onChange={(e) => setDatasetId(e.target.value)}
+              onChange={(e) => handleDatasetChange(e.target.value)}
               required
             >
               {datasets.map((dataset: any) => (
@@ -167,6 +196,24 @@ export default function CreateModelPage() {
               ))}
             </Select>
           </FormControl>
+
+          {datasetColumns.length > 0 && (
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="target-column-label">Target Column</InputLabel>
+              <Select
+                labelId="target-column-label"
+                value={targetColumn}
+                onChange={(e) => setTargetColumn(e.target.value)}
+                required
+              >
+                {datasetColumns.map((column: string) => (
+                  <MenuItem key={column} value={column}>
+                    {column}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
 
           <FormControl fullWidth margin="normal">
             <InputLabel id="model-type-label">Model Type</InputLabel>

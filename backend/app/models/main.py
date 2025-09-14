@@ -70,6 +70,7 @@ class MLModel(BaseModel):
     test_size = models.FloatField(default=0.2)
     random_state = models.IntegerField(default=42)
     max_iter = models.IntegerField(default=1000)
+    accuracy = models.FloatField(null=True, blank=True, help_text="Model accuracy score")
 
     def __str__(self):
         return self.name

@@ -34,7 +34,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
   const [activeConnections, setActiveConnections] = useState<string[]>(
     getDataStorage("activeConnections", {})
   );
-  const [activePage, setActivePage] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState<string | null>("listConnections");
   const [activeTab, setActiveTab] = useState<number | null>(null);
   const [tabs, setTabs] = useState<TableViewTab[]>(
     getDataStorage("activeTabs")
@@ -47,9 +47,11 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     if (accessToken) {
       setIsAuthenticated(true);
       // Optional: validate token by making a test request
-      httpfetch.get('/test_token/')
+      httpfetch.get('test_token/')
         .then((response) => {
           setUser(response.data.user || null);
+          // Load connections after successful authentication
+          updateConnections();
         })
         .catch(() => {
           // Token is invalid, clear it
@@ -149,7 +151,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      const response = await httpfetch.post('/login/', {
+      const response = await httpfetch.post('login/', {
         username,
         password
       });
@@ -159,6 +161,8 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         setUser(response.data.user);
         setIsAuthenticated(true);
         showAlert('Login successful!', 'success');
+        // Load connections after successful login
+        updateConnections();
         return true;
       }
       return false;
@@ -199,6 +203,10 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         setTabs,
         addTableViewTab,
         removeTab,
+        activePage,
+        setActivePage,
+        activeTab,
+        updateActiveTab,
         user,
         isAuthenticated,
         login,

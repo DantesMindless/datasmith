@@ -5,6 +5,9 @@ from django.contrib.auth import get_user_model
 from django.http import HttpRequest
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from datasource.models import DataSource
 from datasource.serializers import DataSourceSerializer, DatasourceViewSerializer
@@ -12,6 +15,7 @@ from enum import StrEnum
 from core.views import BaseAuthApiView
 from django.db.models import Q
 from .constants.choices import DatasourceTypeChoices
+from .permissions import IsOwnerOrReadOnly, CanAccessDatasource
 
 # Import permission utilities
 from userauth.permissions import (
@@ -30,6 +34,14 @@ class DatasourceResponses(StrEnum):
 
 
 class DataSourceView(BaseAuthApiView, DataSourcePermissionMixin):
+    """
+    ViewSet for managing data sources with proper DRF authentication and permissions.
+    
+    Uses custom permission classes to handle access control based on ownership
+    and the existing permission system.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(self, request: HttpRequest, id: Optional[UUID] = None) -> Response:
         if id:
             # Check if user has permission to access this datasource
@@ -148,6 +160,11 @@ class DataSourceView(BaseAuthApiView, DataSourcePermissionMixin):
 
 
 class DataSourceDetailMetadataView(BaseAuthApiView):
+    """
+    View for retrieving datasource metadata with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(
         self,
         request: HttpRequest,
@@ -188,6 +205,11 @@ class DataSourceDetailMetadataView(BaseAuthApiView):
 
 
 class DataSourceTablesMetadataView(BaseAuthApiView):
+    """
+    View for retrieving datasource table metadata with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(self, request: HttpRequest, id: UUID, schema: str) -> Response:
         """
         Retrieve tables lists
@@ -203,6 +225,11 @@ class DataSourceTablesMetadataView(BaseAuthApiView):
 
 
 class DataSourceSchemasMetadataView(BaseAuthApiView):
+    """
+    View for retrieving datasource schema metadata with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(self, request: HttpRequest, id: UUID) -> Response:
         """
         Retrieve database schemas
@@ -218,6 +245,11 @@ class DataSourceSchemasMetadataView(BaseAuthApiView):
 
 
 class DataSourceTestConnectionView(BaseAuthApiView):
+    """
+    View for testing datasource connections with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest, id: UUID) -> Response:
         """
         Connections test for existing DS
@@ -258,6 +290,11 @@ class DataSourceTestConnectionView(BaseAuthApiView):
 
 
 class DataSourceConnectionTypesView(BaseAuthApiView):
+    """
+    View for retrieving supported connection types with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest) -> Response:
         """
         Retrieve Supported Connection Adapters
@@ -268,6 +305,11 @@ class DataSourceConnectionTypesView(BaseAuthApiView):
 
 
 class DataSourceConnectionTypesFormFieldsView(BaseAuthApiView):
+    """
+    View for retrieving connection form fields with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest, id: DatasourceTypeChoices) -> Response:
         """
         Retrieve Supported Connection Adapters

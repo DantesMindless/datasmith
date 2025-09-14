@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box } from '@mui/material';
+import { Box, Container, Typography, Fade } from '@mui/material';
 import Sidebar from '../Sidebar';
 import Tabs from '../Tabs';
 import { useAppContext } from '../../providers/useAppContext';
@@ -18,30 +18,29 @@ export default function DataManagementPage() {
   };
 
   return (
-    <Box sx={{ display: "flex", width: '100%', height: '100%' }}>
-      <Box
-        component="main"
-        className="MainContent"
-        sx={{
-          // px: { xs: 1, md: 1 },
-          pt: {
-            xs: "calc(4px + var(--Header-height))",
-            sm: "calc(4px + var(--Header-height))",
-            md: 1,
-          },
-          pb: { xs: 1, sm: 1, md: 1 },
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
-          height: "100dvh",
-          gap: 1,
-          overflowY: 'scroll'
-        }}
-      >
-        <Tabs />
-        {renderActivePage()}
+    <Container maxWidth="xl" sx={{ py: 3, height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Page Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h3" fontWeight={700} gutterBottom>
+          Data Management
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Connect to databases, explore data, and manage your data sources
+        </Typography>
       </Box>
-    </Box>
+
+      {/* Content Area */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Tabs />
+        
+        <Box sx={{ flex: 1, overflowY: 'auto' }}>
+          <Fade in timeout={300}>
+            <Box>
+              {renderActivePage()}
+            </Box>
+          </Fade>
+        </Box>
+      </Box>
+    </Container>
   );
 }

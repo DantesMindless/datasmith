@@ -209,20 +209,43 @@ def train_cnn(obj):
         ]
     )
     dataset = datasets.ImageFolder(image_path, transform=transform)
-    loader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    # Split dataset for training and validation
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = data.random_split(dataset, [train_size, val_size])
+
+    train_loader = data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     num_classes = len(dataset.classes)
     model = ConfigurableCNN(3, conv_layers, fc_layers, num_classes, input_size)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
+    # Training loop
     model.train()
-    for _ in range(epochs):
-        for batch_x, batch_y in loader:
+    for epoch in range(epochs):
+        running_loss = 0.0
+        for batch_x, batch_y in train_loader:
             optimizer.zero_grad()
             loss = criterion(model(batch_x), batch_y)
             loss.backward()
             optimizer.step()
+            running_loss += loss.item()
+
+    # Calculate validation accuracy
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch_x, batch_y in val_loader:
+            outputs = model(batch_x)
+            _, predicted = torch.max(outputs.data, 1)
+            total += batch_y.size(0)
+            correct += (predicted == batch_y).sum().item()
+
+    accuracy = correct / total if total > 0 else 0.0
 
     buffer = io.BytesIO()
     torch.save(model.state_dict(), buffer)
@@ -234,4 +257,4 @@ def train_cnn(obj):
     obj.training_config["class_names"] = list(dataset.class_to_idx.keys())
     obj.save(update_fields=["training_config"])
 
-    return model_path, None
+    return model_path, accuracy

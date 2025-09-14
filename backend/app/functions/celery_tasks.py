@@ -9,6 +9,11 @@ from app.models.main import TrainingRun
 
 @shared_task
 def train_sklearn_task(model_id):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Starting sklearn training task for model {model_id}")
+
+    acc = None  # Initialize accuracy variable
     obj = MLModel.objects.get(id=model_id)
     df = pd.read_csv(obj.dataset.csv_file.path)
     target = obj.target_column
@@ -25,6 +30,7 @@ def train_sklearn_task(model_id):
         s3_path, acc = train_sklearn_model(obj, X_train, y_train, X_test, y_test)
         obj.model_file.name = s3_path
         obj.status = ModelStatus.COMPLETE
+        obj.accuracy = acc
         obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
         obj.save()
 
@@ -37,11 +43,12 @@ def train_sklearn_task(model_id):
         run, _ = TrainingRun.objects.get_or_create(model=obj)
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
 
-    return acc
+    return acc if acc is not None else 0.0
 
 
 @shared_task
 def train_nn_task(model_id):
+    acc = None  # Initialize accuracy variable
     obj = MLModel.objects.get(id=model_id)
     df = pd.read_csv(obj.dataset.csv_file.path)
     target = obj.target_column
@@ -56,6 +63,7 @@ def train_nn_task(model_id):
     try:
         s3_path, acc = train_nn(obj, X_train, y_train, X_test, y_test)
         obj.status = ModelStatus.COMPLETE
+        obj.accuracy = acc
         obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
         obj.save()
 
@@ -68,9 +76,12 @@ def train_nn_task(model_id):
         run, _ = TrainingRun.objects.get_or_create(model=obj)
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
 
+    return acc if acc is not None else 0.0
+
 
 @shared_task
 def train_cnn_task(model_id):
+    acc = None  # Initialize accuracy variable
     obj = MLModel.objects.get(id=model_id)
     run, _ = TrainingRun.objects.get_or_create(model=obj)
 
@@ -82,15 +93,15 @@ def train_cnn_task(model_id):
         model_path, acc = train_cnn(obj)
 
         obj.status = ModelStatus.COMPLETE
-        obj.training_log = (
-            "Training complete for CNN. Accuracy not calculated (no validation set)."
-        )
+        obj.accuracy = acc
+        obj.training_log = f"Training complete for CNN. Validation Accuracy: {acc:.4f}" if acc else "Training complete for CNN."
         obj.save()
 
-        run.add_entry(status=ModelStatus.COMPLETE)
+        run.add_entry(status=ModelStatus.COMPLETE, accuracy=acc)
     except Exception as e:
         obj.status = ModelStatus.FAILED
         obj.training_log = f"CNN training failed: {str(e)}"
         obj.save()
         run.add_entry(status=ModelStatus.FAILED, error=str(e))
-        raise
+
+    return acc if acc is not None else 0.0

@@ -15,11 +15,12 @@ class MLModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = MLModel
         fields = [
-            'id', 'name', 'dataset', 'dataset_name', 'target_column', 
-            'training_config', 'status', 'model_type', 'test_size', 
-            'random_state', 'max_iter', 'created_at', 'created_by'
+            'id', 'name', 'dataset', 'dataset_name', 'target_column',
+            'training_config', 'status', 'model_type', 'test_size',
+            'random_state', 'max_iter', 'accuracy', 'training_log',
+            'created_at', 'created_by'
         ]
-        read_only_fields = ['id', 'created_at', 'created_by', 'status']
+        read_only_fields = ['id', 'created_at', 'created_by', 'status', 'accuracy', 'training_log']
 
 
 class TrainingRunSerializer(serializers.ModelSerializer):
