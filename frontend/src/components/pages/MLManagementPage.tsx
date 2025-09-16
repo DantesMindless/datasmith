@@ -50,6 +50,10 @@ interface TabPanelProps {
   index: number;
   value: number;
 }
+
+interface MLManagementPageProps {
+  onNavigateToAnalysis?: (modelId: number) => void;
+}
 // Authentication is now handled by httpfetch via JWT tokens
 
 function TabPanel(props: TabPanelProps) {
@@ -72,7 +76,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-function ModelsList() {
+function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId: number) => void }) {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -436,43 +440,62 @@ Status: ${results.status}`;
                   </CardContent>
                   
                   <CardActions sx={{ p: 2, pt: 0 }}>
-                    {model.status === 'Completed' ? (
-                      <Stack direction="row" spacing={0.5} width="100%">
-                        <Button
-                          size="small"
-                          variant="contained"
-                          startIcon={<PlayArrow />}
-                          onClick={() => handlePredictClick(model.id, model.name)}
-                          sx={{ flex: 1 }}
-                        >
-                          Predict
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<Assessment />}
-                          onClick={() => handleTest(model.id)}
-                          sx={{ flex: 1 }}
-                        >
-                          Test
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="text"
-                          onClick={() => handleTrain(model.id)}
-                        >
-                          Retrain
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="text"
-                          onClick={() => handleForceTrain(model.id)}
-                          sx={{ fontSize: '0.75rem' }}
-                        >
-                          Force
-                        </Button>
+                    {(model.status?.toLowerCase() === 'completed' ||
+                      model.status?.toLowerCase() === 'complete' ||
+                      model.status?.toLowerCase() === 'finished' ||
+                      model.status?.toLowerCase() === 'success') ? (
+                      <Stack direction="column" spacing={1} width="100%">
+                        <Stack direction="row" spacing={0.5}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<PlayArrow />}
+                            onClick={() => handlePredictClick(model.id, model.name)}
+                            sx={{ flex: 1 }}
+                          >
+                            Predict
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<Assessment />}
+                            onClick={() => handleTest(model.id)}
+                            sx={{ flex: 1 }}
+                          >
+                            Test
+                          </Button>
+                          {onNavigateToAnalysis && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<Analytics />}
+                              onClick={() => onNavigateToAnalysis(model.id)}
+                              sx={{ flex: 1 }}
+                            >
+                              Analyze
+                            </Button>
+                          )}
+                        </Stack>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="text"
+                            onClick={() => handleTrain(model.id)}
+                            sx={{ flex: 1 }}
+                          >
+                            Retrain
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="text"
+                            onClick={() => handleForceTrain(model.id)}
+                            sx={{ flex: 1, fontSize: '0.75rem' }}
+                          >
+                            Force
+                          </Button>
+                        </Stack>
                       </Stack>
-                    ) : model.status === 'Pending' ? (
+                    ) : model.status?.toLowerCase() === 'pending' ? (
                       <Stack direction="row" spacing={1} width="100%">
                         <Button
                           size="small"
@@ -859,7 +882,7 @@ function DatasetsList() {
   );
 }
 
-export default function MLManagementPage() {
+export default function MLManagementPage({ onNavigateToAnalysis }: MLManagementPageProps = {}) {
   const [activeTab, setActiveTab] = useState(0);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -923,7 +946,7 @@ export default function MLManagementPage() {
       {/* Tab Content */}
       <Box sx={{ flex: 1, overflowY: 'auto' }}>
         <TabPanel value={activeTab} index={0}>
-          <ModelsList />
+          <ModelsList onNavigateToAnalysis={onNavigateToAnalysis} />
         </TabPanel>
         
         <TabPanel value={activeTab} index={1}>

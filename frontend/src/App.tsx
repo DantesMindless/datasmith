@@ -2,6 +2,7 @@ import Box from "@mui/material/Box";
 import MainNavigation from "./components/MainNavigation";
 import DataManagementPage from "./components/pages/DataManagementPage";
 import MLManagementPage from "./components/pages/MLManagementPage";
+import ModelAnalysisPage from "./components/pages/ModelAnalysisPage";
 import Login from "./components/Login";
 import { useState } from "react";
 import { useAppContext } from "./providers/useAppContext";
@@ -10,10 +11,19 @@ import "./App.css";
 
 export default function DataSmithApp() {
   const [currentPage, setCurrentPage] = useState('dataManagement');
+  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const { isAuthenticated } = useAppContext();
 
   const handlePageChange = (page: string) => {
     setCurrentPage(page);
+    if (page !== 'modelAnalysis') {
+      setSelectedModelId(null);
+    }
+  };
+
+  const handleNavigateToAnalysis = (modelId: number) => {
+    setSelectedModelId(modelId);
+    setCurrentPage('modelAnalysis');
   };
 
   const renderCurrentPage = () => {
@@ -21,7 +31,14 @@ export default function DataSmithApp() {
       case 'dataManagement':
         return <DataManagementPage />;
       case 'mlManagement':
-        return <MLManagementPage />;
+        return <MLManagementPage onNavigateToAnalysis={handleNavigateToAnalysis} />;
+      case 'modelAnalysis':
+        return (
+          <ModelAnalysisPage
+            modelId={selectedModelId}
+            onBack={() => handlePageChange('mlManagement')}
+          />
+        );
       default:
         return <DataManagementPage />;
     }

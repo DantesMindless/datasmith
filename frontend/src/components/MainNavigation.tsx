@@ -19,6 +19,7 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import StorageIcon from "@mui/icons-material/Storage";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
 import DataObjectIcon from "@mui/icons-material/DataObject";
+import AnalyticsIcon from "@mui/icons-material/Analytics";
 
 import { useAppContext } from "../providers/useAppContext";
 
@@ -38,10 +39,16 @@ export default function MainNavigation({ activePage, onPageChange }: MainNavigat
       description: 'Manage database connections and query data'
     },
     {
-      key: 'mlManagement', 
+      key: 'mlManagement',
       label: 'ML Management',
       icon: <ModelTrainingIcon />,
       description: 'Create and train ML models'
+    },
+    {
+      key: 'modelAnalysis',
+      label: 'Model Analysis',
+      icon: <AnalyticsIcon />,
+      description: 'Analyze model performance and metrics'
     }
   ];
 
