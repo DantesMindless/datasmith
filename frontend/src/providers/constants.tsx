@@ -42,6 +42,12 @@ interface TableViewTab{
 
 type Connections = Connection[] | null
 
+interface User {
+    id: number;
+    username: string;
+    email: string;
+}
+
 interface ContextType {
     alert: Alert | null;
     showAlert: (message: string, type?: 'error' | 'success' | 'info' | 'warning') => void;
@@ -55,6 +61,14 @@ interface ContextType {
     setTabs: React.Dispatch<React.SetStateAction<TableViewTab[] | null>>
     addTableViewTab: (connection: Connection, schema: string, table: string) => void
     removeTab: (index: number) => void
+    activePage: string | null;
+    setActivePage: React.Dispatch<React.SetStateAction<string | null>>;
+    activeTab: number | null;
+    updateActiveTab: (index: number | null) => void;
+    user: User | null;
+    isAuthenticated: boolean;
+    login: (username: string, password: string) => Promise<boolean>;
+    logout: () => void;
 }
 
-export type {ContextType, ProviderProps, Alert, Info, Connections, Connection, TableViewTab }
+export type {ContextType, ProviderProps, Alert, Info, Connections, Connection, TableViewTab, User }

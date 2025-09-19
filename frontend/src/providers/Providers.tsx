@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type {
   Alert,
   Info,
@@ -6,9 +6,11 @@ import type {
   Connections,
   TableViewTab,
   ProviderProps,
+  User,
 } from "./constants";
 import { getConnections } from "../utils/requests";
 import { Context } from "./context";
+import httpfetch, { setTokens, clearTokens, getAccessToken } from "../utils/axios";
 
 function getDataStorage(objName: string, defaultValue: any = []): [] {
   const storageObject: string | null = sessionStorage.getItem(objName);
@@ -32,11 +34,32 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
   const [activeConnections, setActiveConnections] = useState<string[]>(
     getDataStorage("activeConnections", {})
   );
-  const [activePage, setActivePage] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState<string | null>("listConnections");
   const [activeTab, setActiveTab] = useState<number | null>(null);
   const [tabs, setTabs] = useState<TableViewTab[]>(
     getDataStorage("activeTabs")
   );
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+  useEffect(() => {
+    const accessToken = getAccessToken();
+    if (accessToken) {
+      setIsAuthenticated(true);
+      // Optional: validate token by making a test request
+      httpfetch.get('test_token/')
+        .then((response) => {
+          setUser(response.data.user || null);
+          // Load connections after successful authentication
+          updateConnections();
+        })
+        .catch(() => {
+          // Token is invalid, clear it
+          clearTokens();
+          setIsAuthenticated(false);
+        });
+    }
+  }, []);
 
   const showAlert = (
     message: string,
@@ -126,10 +149,48 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     setActiveTab(index);
   };
 
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const response = await httpfetch.post('login/', {
+        username,
+        password
+      });
+      
+      if (response.data.access && response.data.refresh) {
+        setTokens(response.data.access, response.data.refresh);
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        showAlert('Login successful!', 'success');
+        // Load connections after successful login
+        updateConnections();
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      showAlert(error.response?.data?.error || 'Login failed', 'error');
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        await httpfetch.post('/logout/', { refresh: refreshToken });
+      }
+    } catch (error) {
+      // Continue with logout even if request fails
+    }
+    
+    clearTokens();
+    setUser(null);
+    setIsAuthenticated(false);
+    showAlert('Logged out successfully', 'success');
+  };
+
   return (
     <Context.Provider
       value={{
-        activeTab,
         alert,
         showAlert,
         info,
@@ -137,14 +198,19 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         connections,
         updateConnections,
         activeConnections,
-        updateActiveConnections,
-        updateActiveTab,
+        setActiveConnections,
         tabs,
+        setTabs,
         addTableViewTab,
         removeTab,
         activePage,
         setActivePage,
-        setTabs
+        activeTab,
+        updateActiveTab,
+        user,
+        isAuthenticated,
+        login,
+        logout
       }}
     >
       {children}

@@ -5,6 +5,9 @@ from django.contrib.auth import get_user_model
 from django.http import HttpRequest
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from datasource.models import DataSource
 from datasource.serializers import DataSourceSerializer, DatasourceViewSerializer
@@ -12,6 +15,14 @@ from enum import StrEnum
 from core.views import BaseAuthApiView
 from django.db.models import Q
 from .constants.choices import DatasourceTypeChoices
+from .permissions import IsOwnerOrReadOnly, CanAccessDatasource
+
+# Import permission utilities
+from userauth.permissions import (
+    require_permission, require_role, PermissionManager, 
+    DataSourcePermissionMixin
+)
+from userauth.models import UserRole, AccessType
 
 User = get_user_model()
 
@@ -22,23 +33,51 @@ class DatasourceResponses(StrEnum):
     DS_CONNECTIONS_FAIL = "Connection Fail"
 
 
-class DataSourceView(BaseAuthApiView):
+class DataSourceView(BaseAuthApiView, DataSourcePermissionMixin):
+    """
+    ViewSet for managing data sources with proper DRF authentication and permissions.
+    
+    Uses custom permission classes to handle access control based on ownership
+    and the existing permission system.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(self, request: HttpRequest, id: Optional[UUID] = None) -> Response:
         if id:
+            # Check if user has permission to access this datasource
+            if not PermissionManager.can_user_access_resource(
+                request.user, 'datasource', str(id), AccessType.READ
+            ):
+                return Response(
+                    "Insufficient permissions", status=status.HTTP_403_FORBIDDEN
+                )
+            
             if (
-                datasource := DataSource.objects.filter(id=id)
-                .filter((Q(user_id=request.user.id) | Q(created_by=request.user.id)))
-                .first()
+                datasource := DataSource.objects.filter(id=id, deleted=False).first()
             ):
                 serializer = DatasourceViewSerializer(datasource)
-                return Response(serializer.data)
+                # Filter response based on user permissions
+                filtered_data = self.filter_datasource_response(
+                    request.user, datasource, serializer.data
+                )
+                return Response(filtered_data)
             return Response(
                 DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
             )
         else:
-            datasources = DataSource.objects.all()
+            # Get only datasources user can access
+            datasources = self.get_accessible_datasources(request.user)
             serializer = DatasourceViewSerializer(datasources, many=True)
-            return Response(serializer.data)
+            
+            # Filter each datasource response
+            filtered_data = []
+            for i, datasource in enumerate(datasources):
+                filtered_item = self.filter_datasource_response(
+                    request.user, datasource, serializer.data[i]
+                )
+                filtered_data.append(filtered_item)
+            
+            return Response(filtered_data)
 
     def post(self, request: HttpRequest) -> Response:
         if not User.objects.first():
@@ -87,12 +126,30 @@ class DataSourceView(BaseAuthApiView):
         )
 
     def put(self, request: HttpRequest, id: UUID) -> Response:
+        # Check datasource access permission
+        if not PermissionManager.can_user_access_resource(
+            request.user, 'datasource', str(id), AccessType.READ
+        ):
+            return Response(
+                "Insufficient permissions", status=status.HTTP_403_FORBIDDEN
+            )
+        
         data = request.data
         if not (query := data.get("query")):
             return Response("Query not provided", status=status.HTTP_400_BAD_REQUEST)
-        if datasource := DataSource.objects.filter(id=id).first():
-            success, response_data, message = datasource.get_table_rows(query)
+        
+        if datasource := DataSource.objects.filter(id=id, deleted=False).first():
+            # Filter query based on user's column permissions
+            filtered_query = PermissionManager.filter_query_columns(
+                request.user, str(id), query
+            )
+            
+            success, response_data, message = datasource.get_table_rows(filtered_query)
             if success and response_data is not None:
+                # Additional filtering of response data based on column permissions
+                if not request.user.has_role(UserRole.DATABASE_ADMIN):
+                    # TODO: Implement column-level filtering of response data
+                    pass
                 return Response(response_data)
             elif success:
                 return Response(message)
@@ -103,6 +160,11 @@ class DataSourceView(BaseAuthApiView):
 
 
 class DataSourceDetailMetadataView(BaseAuthApiView):
+    """
+    View for retrieving datasource metadata with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(
         self,
         request: HttpRequest,
@@ -143,6 +205,11 @@ class DataSourceDetailMetadataView(BaseAuthApiView):
 
 
 class DataSourceTablesMetadataView(BaseAuthApiView):
+    """
+    View for retrieving datasource table metadata with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(self, request: HttpRequest, id: UUID, schema: str) -> Response:
         """
         Retrieve tables lists
@@ -158,6 +225,11 @@ class DataSourceTablesMetadataView(BaseAuthApiView):
 
 
 class DataSourceSchemasMetadataView(BaseAuthApiView):
+    """
+    View for retrieving datasource schema metadata with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
     def get(self, request: HttpRequest, id: UUID) -> Response:
         """
         Retrieve database schemas
@@ -173,6 +245,11 @@ class DataSourceSchemasMetadataView(BaseAuthApiView):
 
 
 class DataSourceTestConnectionView(BaseAuthApiView):
+    """
+    View for testing datasource connections with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest, id: UUID) -> Response:
         """
         Connections test for existing DS
@@ -213,6 +290,11 @@ class DataSourceTestConnectionView(BaseAuthApiView):
 
 
 class DataSourceConnectionTypesView(BaseAuthApiView):
+    """
+    View for retrieving supported connection types with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest) -> Response:
         """
         Retrieve Supported Connection Adapters
@@ -223,6 +305,11 @@ class DataSourceConnectionTypesView(BaseAuthApiView):
 
 
 class DataSourceConnectionTypesFormFieldsView(BaseAuthApiView):
+    """
+    View for retrieving connection form fields with proper authentication.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest, id: DatasourceTypeChoices) -> Response:
         """
         Retrieve Supported Connection Adapters
