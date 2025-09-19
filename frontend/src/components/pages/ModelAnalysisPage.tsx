@@ -46,8 +46,30 @@ import {
   PieChart,
   ShowChart,
 } from '@mui/icons-material';
-// Charts will be implemented with simple progress bars and basic visualizations for now
 import httpfetch from '../../utils/axios';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart as RechartsBarChart,
+  Bar,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Area,
+  AreaChart,
+  RadialBarChart,
+  RadialBar,
+  ComposedChart,
+  Scatter,
+  ScatterChart,
+  ReferenceLine,
+} from 'recharts';
 
 interface ModelAnalysisPageProps {
   modelId?: string | number;
@@ -92,6 +114,51 @@ interface ModelStatistics {
 }
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1', '#d084d0'];
+
+// Custom Tooltip Components
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <Box sx={{
+        bgcolor: 'background.paper',
+        p: 2,
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1,
+        boxShadow: 2
+      }}>
+        <Typography variant="body2" fontWeight={600}>{`Epoch: ${label}`}</Typography>
+        {payload.map((entry: any, index: number) => (
+          <Typography key={index} variant="body2" sx={{ color: entry.color }}>
+            {`${entry.dataKey}: ${entry.value?.toFixed(4)}`}
+          </Typography>
+        ))}
+      </Box>
+    );
+  }
+  return null;
+};
+
+const MetricsTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <Box sx={{
+        bgcolor: 'background.paper',
+        p: 2,
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1,
+        boxShadow: 2
+      }}>
+        <Typography variant="body2" fontWeight={600}>{label}</Typography>
+        <Typography variant="body2">
+          {`Value: ${(payload[0].value * 100).toFixed(1)}%`}
+        </Typography>
+      </Box>
+    );
+  }
+  return null;
+};
 
 function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
   const [model, setModel] = useState<ModelData | null>(null);
@@ -497,33 +564,44 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Training History
+                  Training & Validation Accuracy
                 </Typography>
-                <Box sx={{ height: 300, display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Final Training Accuracy: {((metrics.training_history[metrics.training_history.length - 1]?.accuracy || 0) * 100).toFixed(1)}%
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(metrics.training_history[metrics.training_history.length - 1]?.accuracy || 0) * 100}
-                      sx={{ height: 8, borderRadius: 4, mb: 2 }}
-                    />
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Final Validation Accuracy: {((metrics.training_history[metrics.training_history.length - 1]?.val_accuracy || 0) * 100).toFixed(1)}%
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(metrics.training_history[metrics.training_history.length - 1]?.val_accuracy || 0) * 100}
-                      color="secondary"
-                      sx={{ height: 8, borderRadius: 4, mb: 2 }}
-                    />
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Training completed over {metrics.training_history.length} epochs
-                  </Typography>
+                <Box sx={{ height: 300, pt: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={metrics.training_history}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="epoch"
+                        tick={{ fontSize: 12 }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12 }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                        domain={[0, 1]}
+                      />
+                      <RechartsTooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="accuracy"
+                        stroke="#8884d8"
+                        strokeWidth={2}
+                        name="Training Accuracy"
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="val_accuracy"
+                        stroke="#82ca9d"
+                        strokeWidth={2}
+                        name="Validation Accuracy"
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </Box>
               </CardContent>
             </Card>
@@ -538,31 +616,35 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
                 <Typography variant="h6" fontWeight={600} gutterBottom>
                   Feature Importance
                 </Typography>
-                <Box sx={{ height: 300, display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-                  {metrics.feature_importance.map((feature, index) => (
-                    <Box key={feature.feature}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                        <Typography variant="body2" fontWeight={500}>
-                          {feature.feature}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {(feature.importance * 100).toFixed(1)}%
-                        </Typography>
-                      </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={feature.importance * 100}
-                        sx={{
-                          height: 6,
-                          borderRadius: 3,
-                          bgcolor: 'grey.200',
-                          '& .MuiLinearProgress-bar': {
-                            bgcolor: COLORS[index % COLORS.length],
-                          }
-                        }}
+                <Box sx={{ height: 300, pt: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart
+                      data={metrics.feature_importance}
+                      layout="horizontal"
+                      margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 12 }}
+                        tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
                       />
-                    </Box>
-                  ))}
+                      <YAxis
+                        type="category"
+                        dataKey="feature"
+                        tick={{ fontSize: 12 }}
+                        width={75}
+                      />
+                      <RechartsTooltip
+                        formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, 'Importance']}
+                      />
+                      <Bar
+                        dataKey="importance"
+                        fill="#8884d8"
+                        radius={[0, 4, 4, 0]}
+                      />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
                 </Box>
               </CardContent>
             </Card>
@@ -577,45 +659,27 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
                 <Typography variant="h6" fontWeight={600} gutterBottom>
                   Prediction Distribution
                 </Typography>
-                <Box sx={{ height: 300, display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-                  {metrics.prediction_distribution.map((item, index) => {
-                    const total = metrics.prediction_distribution?.reduce((sum, d) => sum + d.value, 0) || 1;
-                    const percentage = (item.value / total) * 100;
-                    return (
-                      <Box key={item.label}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box
-                              sx={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: '50%',
-                                bgcolor: COLORS[index % COLORS.length],
-                              }}
-                            />
-                            <Typography variant="body2" fontWeight={500}>
-                              {item.label}
-                            </Typography>
-                          </Box>
-                          <Typography variant="body2" color="text.secondary">
-                            {item.value} ({percentage.toFixed(1)}%)
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={percentage}
-                          sx={{
-                            height: 8,
-                            borderRadius: 4,
-                            bgcolor: 'grey.200',
-                            '& .MuiLinearProgress-bar': {
-                              bgcolor: COLORS[index % COLORS.length],
-                            }
-                          }}
-                        />
-                      </Box>
-                    );
-                  })}
+                <Box sx={{ height: 300, pt: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={metrics.prediction_distribution}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ label, percent }) => `${label}: ${(percent * 100).toFixed(1)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {metrics.prediction_distribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip formatter={(value: any) => [value, 'Count']} />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
                 </Box>
               </CardContent>
             </Card>
@@ -628,46 +692,129 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Loss Curves
+                  Training & Validation Loss
                 </Typography>
-                <Box sx={{ height: 300, display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Final Training Loss: {(metrics.training_history[metrics.training_history.length - 1]?.loss || 0).toFixed(3)}
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.max(0, 100 - (metrics.training_history[metrics.training_history.length - 1]?.loss || 0) * 100)}
-                      sx={{
-                        height: 8,
-                        borderRadius: 4,
-                        mb: 2,
-                        '& .MuiLinearProgress-bar': {
-                          bgcolor: '#ff7300',
-                        }
-                      }}
-                    />
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Final Validation Loss: {(metrics.training_history[metrics.training_history.length - 1]?.val_loss || 0).toFixed(3)}
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.max(0, 100 - (metrics.training_history[metrics.training_history.length - 1]?.val_loss || 0) * 100)}
-                      sx={{
-                        height: 8,
-                        borderRadius: 4,
-                        mb: 2,
-                        '& .MuiLinearProgress-bar': {
-                          bgcolor: '#8dd1e1',
-                        }
-                      }}
-                    />
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Lower loss values indicate better model performance
-                  </Typography>
+                <Box sx={{ height: 300, pt: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={metrics.training_history}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="epoch"
+                        tick={{ fontSize: 12 }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12 }}
+                        tickLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <RechartsTooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="loss"
+                        stroke="#ff7300"
+                        strokeWidth={2}
+                        name="Training Loss"
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="val_loss"
+                        stroke="#8dd1e1"
+                        strokeWidth={2}
+                        name="Validation Loss"
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Model Performance Radar Chart */}
+        {metrics && (
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Performance Metrics Overview
+                </Typography>
+                <Box sx={{ height: 300, pt: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="20%"
+                      outerRadius="80%"
+                      data={[
+                        { name: 'Accuracy', value: metrics.accuracy * 100, fill: '#8884d8' },
+                        { name: 'Precision', value: metrics.precision * 100, fill: '#82ca9d' },
+                        { name: 'Recall', value: metrics.recall * 100, fill: '#ffc658' },
+                        { name: 'F1 Score', value: metrics.f1_score * 100, fill: '#ff7300' },
+                      ]}
+                    >
+                      <RadialBar
+                        minAngle={15}
+                        label={{ position: 'insideStart', fill: '#fff' }}
+                        background
+                        clockWise
+                        dataKey="value"
+                      />
+                      <Legend iconSize={10} />
+                      <RechartsTooltip formatter={(value: any) => [`${value.toFixed(1)}%`, 'Score']} />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Combined Accuracy and Loss Over Time */}
+        {metrics?.training_history && (
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Training Progress Overview
+                </Typography>
+                <Box sx={{ height: 300, pt: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={metrics.training_history}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis
+                        dataKey="epoch"
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis yAxisId="left" orientation="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <RechartsTooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Area
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="accuracy"
+                        fill="#8884d8"
+                        fillOpacity={0.3}
+                        stroke="#8884d8"
+                        strokeWidth={2}
+                        name="Accuracy"
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="loss"
+                        stroke="#ff7300"
+                        strokeWidth={2}
+                        name="Loss"
+                        dot={{ r: 2 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
                 </Box>
               </CardContent>
             </Card>
@@ -765,15 +912,15 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
           </Card>
         </Grid>
 
-        {/* Confusion Matrix */}
+        {/* Enhanced Confusion Matrix with Heatmap Visualization */}
         {metrics?.confusion_matrix && (
-          <Grid item xs={12}>
+          <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
                   Confusion Matrix
                 </Typography>
-                <TableContainer component={Paper} variant="outlined">
+                <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -804,6 +951,47 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
                     </TableBody>
                   </Table>
                 </TableContainer>
+                <Typography variant="body2" color="text.secondary">
+                  True Positive Rate: {((metrics.confusion_matrix[1][1] / (metrics.confusion_matrix[1][1] + metrics.confusion_matrix[1][0])) * 100).toFixed(1)}%
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  True Negative Rate: {((metrics.confusion_matrix[0][0] / (metrics.confusion_matrix[0][0] + metrics.confusion_matrix[0][1])) * 100).toFixed(1)}%
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Model Comparison & Benchmarks */}
+        {statistics && (
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Performance Benchmarks
+                </Typography>
+                <Box sx={{ height: 250, pt: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart
+                      data={[
+                        { metric: 'Accuracy', current: (metrics?.accuracy || 0) * 100, baseline: 75, target: 90 },
+                        { metric: 'Precision', current: (metrics?.precision || 0) * 100, baseline: 70, target: 85 },
+                        { metric: 'Recall', current: (metrics?.recall || 0) * 100, baseline: 72, target: 88 },
+                        { metric: 'F1 Score', current: (metrics?.f1_score || 0) * 100, baseline: 71, target: 87 },
+                      ]}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="metric" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
+                      <RechartsTooltip formatter={(value: any) => [`${value.toFixed(1)}%`, '']} />
+                      <Legend />
+                      <Bar dataKey="current" fill="#8884d8" name="Current Model" />
+                      <Bar dataKey="baseline" fill="#82ca9d" name="Baseline" />
+                      <Bar dataKey="target" fill="#ffc658" name="Target" />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                </Box>
               </CardContent>
             </Card>
           </Grid>

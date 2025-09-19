@@ -16,3 +16,6 @@ backend/mcp_server/requirements.txt
 # MCP-related environment variables
 .env.mcp
 **/mcp_config.json
+
+# Project analysis files
+PROJECT_ANALYSIS.md
