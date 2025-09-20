@@ -46,7 +46,7 @@ import {
   PieChart,
   ShowChart,
 } from '@mui/icons-material';
-import httpfetch from '../../utils/axios';
+import httpfetch from '../../../utils/axios';
 import {
   LineChart,
   Line,

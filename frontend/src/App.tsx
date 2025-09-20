@@ -1,8 +1,8 @@
 import Box from "@mui/material/Box";
 import MainNavigation from "./components/MainNavigation";
-import DataManagementPage from "./components/pages/DataManagementPage";
+import AdvancedDatasetPage from "./components/pages/AdvancedDatasetPage";
 import MLManagementPage from "./components/pages/MLManagementPage";
-import ModelAnalysisPage from "./components/pages/ModelAnalysisPage";
+import ModelAnalysisPage from "./components/pages/subpages/ModelAnalysisPage";
 import Login from "./components/Login";
 import { useState } from "react";
 import { useAppContext } from "./providers/useAppContext";
@@ -29,7 +29,7 @@ export default function DataSmithApp() {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'dataManagement':
-        return <DataManagementPage />;
+        return <AdvancedDatasetPage />;
       case 'mlManagement':
         return <MLManagementPage onNavigateToAnalysis={handleNavigateToAnalysis} />;
       case 'modelAnalysis':
@@ -40,7 +40,7 @@ export default function DataSmithApp() {
           />
         );
       default:
-        return <DataManagementPage />;
+        return <AdvancedDatasetPage />;
     }
   };
 

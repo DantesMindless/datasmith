@@ -1,0 +1,723 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Container,
+  Grid,
+  Card,
+  CardContent,
+  Paper,
+  Chip,
+  Button,
+  IconButton,
+  Tooltip,
+  Alert,
+  CircularProgress,
+  Stack,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  LinearProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Fade,
+  Tab,
+  Tabs,
+  Badge,
+} from '@mui/material';
+import {
+  ArrowBack,
+  Analytics,
+  Assessment,
+  DataObject,
+  Refresh,
+  Download,
+  Warning,
+  CheckCircle,
+  Error,
+  Info,
+  TableChart,
+  BarChart as BarChartIcon,
+  Timeline,
+  BugReport,
+  CleaningServices,
+} from '@mui/icons-material';
+import httpfetch from '../../../utils/axios';
+import {
+  ResponsiveContainer,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  ScatterChart,
+  Scatter,
+  Histogram,
+} from 'recharts';
+
+interface DatasetAnalysisPageProps {
+  datasetId?: string | number;
+  onBack?: () => void;
+}
+
+interface DatasetData {
+  id: number;
+  name: string;
+  description?: string;
+  dataset_type: string;
+  dataset_purpose: string;
+  data_quality: string;
+  row_count?: number;
+  column_count?: number;
+  file_size_formatted?: string;
+  quality_score?: number;
+  is_processed: boolean;
+  last_analyzed?: string;
+}
+
+interface PreviewData {
+  preview_data: any[];
+  column_info: Record<string, any>;
+  statistics: Record<string, any>;
+  correlations?: any;
+  distributions?: any;
+}
+
+interface QualityReport {
+  quality_report: any;
+  recommendations: any[];
+  processing_errors?: string;
+}
+
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1', '#d084d0'];
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <Box sx={{
+        bgcolor: 'background.paper',
+        p: 2,
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1,
+        boxShadow: 2
+      }}>
+        <Typography variant="body2" fontWeight={600}>{label}</Typography>
+        {payload.map((entry: any, index: number) => (
+          <Typography key={index} variant="body2" sx={{ color: entry.color }}>
+            {`${entry.dataKey}: ${entry.value}`}
+          </Typography>
+        ))}
+      </Box>
+    );
+  }
+  return null;
+};
+
+function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
+  const [dataset, setDataset] = useState<DatasetData | null>(null);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchDatasetData = async (id: string | number) => {
+    try {
+      setLoading(true);
+      setError('');
+
+      // Fetch dataset details
+      const [datasetResponse, previewResponse, qualityResponse] = await Promise.all([
+        httpfetch.get(`datasets/${id}/`),
+        httpfetch.get(`datasets/${id}/preview/`),
+        httpfetch.get(`datasets/${id}/quality_report/`)
+      ]);
+
+      setDataset(datasetResponse.data);
+      setPreviewData(previewResponse.data);
+      setQualityReport(qualityResponse.data);
+
+    } catch (err: any) {
+      console.error('Error fetching dataset data:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to fetch dataset data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (datasetId) {
+      setRefreshing(true);
+      await fetchDatasetData(datasetId);
+      setRefreshing(false);
+    }
+  };
+
+  const handleReanalyze = async () => {
+    if (!datasetId) return;
+
+    try {
+      setRefreshing(true);
+      await httpfetch.post(`datasets/${datasetId}/reanalyze/`);
+      await fetchDatasetData(datasetId);
+    } catch (err: any) {
+      console.error('Error reanalyzing dataset:', err);
+      setError('Failed to reanalyze dataset');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (datasetId) {
+      fetchDatasetData(datasetId);
+    }
+  }, [datasetId]);
+
+  const getQualityColor = (quality: string) => {
+    switch (quality.toLowerCase()) {
+      case 'excellent': return 'success';
+      case 'good': return 'info';
+      case 'fair': return 'warning';
+      case 'poor': return 'error';
+      default: return 'default';
+    }
+  };
+
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case 'high': return <Error color="error" />;
+      case 'medium': return <Warning color="warning" />;
+      case 'low': return <Info color="info" />;
+      default: return <Info />;
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 3, height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Stack alignItems="center" spacing={2}>
+          <CircularProgress size={48} />
+          <Typography variant="body1" color="text.secondary">
+            Loading dataset analysis...
+          </Typography>
+        </Stack>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+        {onBack && (
+          <Button startIcon={<ArrowBack />} onClick={onBack}>
+            Back to Datasets
+          </Button>
+        )}
+      </Container>
+    );
+  }
+
+  if (!dataset) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Typography variant="h6" color="text.secondary">
+          No dataset selected
+        </Typography>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+        {onBack && (
+          <IconButton onClick={onBack} sx={{ mr: 2 }}>
+            <ArrowBack />
+          </IconButton>
+        )}
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="h4" fontWeight={700} gutterBottom>
+            Dataset Analysis
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Comprehensive analysis and insights for your dataset
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={2}>
+          <Tooltip title="Refresh data">
+            <IconButton onClick={handleRefresh} disabled={refreshing}>
+              <Refresh />
+            </IconButton>
+          </Tooltip>
+          <Button
+            variant="outlined"
+            startIcon={<Analytics />}
+            onClick={handleReanalyze}
+            disabled={refreshing}
+          >
+            Reanalyze
+          </Button>
+        </Stack>
+      </Box>
+
+      {/* Dataset Overview */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={8}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2,
+                    bgcolor: 'primary.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <DataObject sx={{ color: 'white', fontSize: 28 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h5" fontWeight={600}>
+                    {dataset.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {dataset.description || 'No description provided'}
+                  </Typography>
+                </Box>
+                <Chip
+                  label={dataset.data_quality}
+                  color={getQualityColor(dataset.data_quality)}
+                  sx={{ ml: 'auto' }}
+                />
+              </Box>
+
+              <Grid container spacing={3}>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">
+                    Rows
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>
+                    {dataset.row_count?.toLocaleString() || 'N/A'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">
+                    Columns
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>
+                    {dataset.column_count || 'N/A'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">
+                    File Size
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>
+                    {dataset.file_size_formatted || 'N/A'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">
+                    Type
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>
+                    {dataset.dataset_type}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Box sx={{ textAlign: 'right' }}>
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <Button variant="outlined" startIcon={<Download />} size="small">
+                    Export
+                  </Button>
+                  <Button variant="contained" startIcon={<TableChart />} size="small">
+                    View Data
+                  </Button>
+                </Stack>
+              </Box>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Tabs Navigation */}
+      <Paper sx={{ mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(e, newValue) => setActiveTab(newValue)}
+          variant="scrollable"
+          scrollButtons="auto"
+        >
+          <Tab label="Overview" icon={<Analytics />} />
+          <Tab
+            label={
+              <Badge
+                badgeContent={qualityReport?.recommendations?.length || 0}
+                color="warning"
+                sx={{ '& .MuiBadge-badge': { right: -12, top: 8 } }}
+              >
+                Quality Report
+              </Badge>
+            }
+            icon={<Assessment />}
+          />
+          <Tab label="Data Preview" icon={<TableChart />} />
+          <Tab label="Statistics" icon={<BarChartIcon />} />
+          <Tab label="Distributions" icon={<Timeline />} />
+        </Tabs>
+      </Paper>
+
+      {/* Tab Content */}
+      {activeTab === 0 && (
+        <Grid container spacing={3}>
+          {/* Basic Statistics */}
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Dataset Statistics
+                </Typography>
+                {previewData?.statistics && (
+                  <Stack spacing={2}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Numeric Columns
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {previewData.statistics.numeric_columns}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Categorical Columns
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {previewData.statistics.categorical_columns}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Completeness
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {previewData.statistics.completeness?.toFixed(1)}%
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Duplicate Rows
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {previewData.statistics.duplicate_rows}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Column Types Distribution */}
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Column Types
+                </Typography>
+                {previewData?.column_info && (
+                  <Box sx={{ height: 300, pt: 2 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Pie
+                          data={Object.entries(
+                            Object.values(previewData.column_info).reduce((acc: any, col: any) => {
+                              acc[col.type] = (acc[col.type] || 0) + 1;
+                              return acc;
+                            }, {})
+                          ).map(([type, count]) => ({ type, count }))}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="count"
+                          label={({ type, percent }) => `${type}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {Object.keys(previewData.column_info).map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {activeTab === 1 && qualityReport && (
+        <Grid container spacing={3}>
+          {/* Quality Score */}
+          <Grid item xs={12} md={4}>
+            <Card>
+              <CardContent sx={{ textAlign: 'center' }}>
+                <CheckCircle sx={{ fontSize: 48, color: 'success.main', mb: 2 }} />
+                <Typography variant="h4" fontWeight={700} color="success.main">
+                  {qualityReport.quality_report?.completeness_score?.toFixed(1) || 'N/A'}%
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Data Completeness
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Recommendations */}
+          <Grid item xs={12} md={8}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Quality Recommendations
+                </Typography>
+                {qualityReport.recommendations.length > 0 ? (
+                  <Stack spacing={2}>
+                    {qualityReport.recommendations.map((rec, index) => (
+                      <Alert
+                        key={index}
+                        severity={rec.severity}
+                        icon={getSeverityIcon(rec.severity)}
+                      >
+                        {rec.message}
+                      </Alert>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No quality issues detected. Your dataset looks good!
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Quality Issues */}
+          {qualityReport.quality_report?.potential_issues && (
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Potential Issues
+                  </Typography>
+                  {qualityReport.quality_report.potential_issues.length > 0 ? (
+                    <Stack spacing={1}>
+                      {qualityReport.quality_report.potential_issues.map((issue: string, index: number) => (
+                        <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <BugReport fontSize="small" color="warning" />
+                          <Typography variant="body2">{issue}</Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      No issues detected
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+        </Grid>
+      )}
+
+      {activeTab === 2 && previewData && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} gutterBottom>
+              Data Preview ({previewData.preview_data?.length || 0} rows)
+            </Typography>
+            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600 }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    {previewData.preview_data?.[0] && Object.keys(previewData.preview_data[0]).map((col) => (
+                      <TableCell key={col} sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>{col}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {previewData.column_info?.[col]?.type || 'unknown'}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {previewData.preview_data?.map((row, index) => (
+                    <TableRow key={index}>
+                      {Object.values(row).map((value: any, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          {value !== null && value !== undefined ? String(value) : (
+                            <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                              null
+                            </Typography>
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 3 && previewData?.column_info && (
+        <Grid container spacing={3}>
+          {/* Column Information */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Column Statistics
+                </Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Column</TableCell>
+                        <TableCell>Type</TableCell>
+                        <TableCell>Unique Values</TableCell>
+                        <TableCell>Null Count</TableCell>
+                        <TableCell>Null %</TableCell>
+                        <TableCell>Statistics</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(previewData.column_info).map(([col, info]: [string, any]) => (
+                        <TableRow key={col}>
+                          <TableCell>{col}</TableCell>
+                          <TableCell>
+                            <Chip label={info.type} size="small" />
+                          </TableCell>
+                          <TableCell>{info.unique_count}</TableCell>
+                          <TableCell>{info.null_count}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={info.null_percentage}
+                                sx={{ flex: 1, height: 8 }}
+                                color={info.null_percentage > 30 ? 'error' : 'primary'}
+                              />
+                              <Typography variant="caption">
+                                {info.null_percentage?.toFixed(1)}%
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {info.type === 'numeric' && info.mean && (
+                              <Typography variant="caption">
+                                μ={info.mean.toFixed(2)}, σ={info.std?.toFixed(2)}
+                              </Typography>
+                            )}
+                            {info.type === 'categorical' && info.top_values && (
+                              <Typography variant="caption">
+                                Top: {Object.keys(info.top_values)[0]}
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {activeTab === 4 && previewData?.distributions && (
+        <Grid container spacing={3}>
+          {Object.entries(previewData.distributions).slice(0, 6).map(([col, dist]: [string, any]) => (
+            <Grid item xs={12} md={6} key={col}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    {col} Distribution
+                  </Typography>
+                  <Box sx={{ height: 300, pt: 2 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      {dist.type === 'histogram' ? (
+                        <RechartsBarChart data={
+                          dist.bins.slice(0, -1).map((bin: number, i: number) => ({
+                            bin: bin.toFixed(2),
+                            count: dist.counts[i]
+                          }))
+                        }>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="bin" />
+                          <YAxis />
+                          <RechartsTooltip content={<CustomTooltip />} />
+                          <Bar dataKey="count" fill="#8884d8" />
+                        </RechartsBarChart>
+                      ) : (
+                        <RechartsBarChart data={
+                          dist.values.map((value: string, i: number) => ({
+                            value: value.length > 15 ? value.substring(0, 15) + '...' : value,
+                            count: dist.counts[i]
+                          }))
+                        }>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="value" />
+                          <YAxis />
+                          <RechartsTooltip content={<CustomTooltip />} />
+                          <Bar dataKey="count" fill="#82ca9d" />
+                        </RechartsBarChart>
+                      )}
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+    </Container>
+  );
+}
+
+export default DatasetAnalysisPage;

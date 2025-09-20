@@ -102,6 +102,269 @@ class DatasetViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=True, methods=['get'])
+    def preview(self, request, pk=None) -> Response:
+        """
+        Get preview data and analysis for a dataset.
+
+        Returns:
+            Response with preview data, column info, and basic statistics
+        """
+        dataset = self.get_object()
+
+        if not dataset.is_processed:
+            dataset.analyze_dataset()
+
+        return Response({
+            'preview_data': dataset.preview_data,
+            'column_info': dataset.column_info,
+            'statistics': dataset.statistics,
+            'data_quality': dataset.data_quality,
+            'dataset_type': dataset.dataset_type,
+            'dataset_purpose': dataset.dataset_purpose,
+            'row_count': dataset.row_count,
+            'column_count': dataset.column_count,
+            'file_size': dataset.file_size,
+            'last_analyzed': dataset.last_analyzed
+        })
+
+    @action(detail=True, methods=['get'])
+    def quality_report(self, request, pk=None) -> Response:
+        """
+        Get comprehensive data quality report.
+
+        Returns:
+            Response with detailed quality analysis
+        """
+        dataset = self.get_object()
+
+        if not dataset.is_processed:
+            dataset.analyze_dataset()
+
+        return Response({
+            'quality_report': dataset.quality_report,
+            'data_quality': dataset.data_quality,
+            'processing_errors': dataset.processing_errors,
+            'recommendations': self._get_quality_recommendations(dataset)
+        })
+
+    @action(detail=True, methods=['get'])
+    def statistics(self, request, pk=None) -> Response:
+        """
+        Get detailed statistical analysis of the dataset.
+
+        Returns:
+            Response with comprehensive statistics
+        """
+        dataset = self.get_object()
+
+        if not dataset.is_processed:
+            dataset.analyze_dataset()
+
+        return Response({
+            'basic_stats': dataset.statistics,
+            'column_stats': dataset.column_info,
+            'correlations': self._calculate_correlations(dataset),
+            'distributions': self._get_distributions(dataset)
+        })
+
+    @action(detail=True, methods=['get'])
+    def sample(self, request, pk=None) -> Response:
+        """
+        Get a random sample of the dataset.
+
+        Query params:
+            - size: number of rows to sample (default: 100)
+            - random_state: seed for reproducible sampling
+        """
+        dataset = self.get_object()
+
+        if not dataset.csv_file:
+            return Response(
+                {"error": "No CSV file associated with this dataset"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            import pandas as pd
+
+            size = int(request.query_params.get('size', 100))
+            random_state = request.query_params.get('random_state', 42)
+
+            df = pd.read_csv(dataset.csv_file.path)
+
+            if len(df) <= size:
+                sample_df = df
+            else:
+                sample_df = df.sample(n=size, random_state=int(random_state))
+
+            return Response({
+                'sample_data': sample_df.to_dict('records'),
+                'sample_size': len(sample_df),
+                'total_size': len(df),
+                'columns': list(df.columns)
+            })
+
+        except Exception as e:
+            logger.error(f"Error sampling dataset {pk}: {e}", exc_info=True)
+            return Response(
+                {"error": f"Failed to sample dataset: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['post'])
+    def reanalyze(self, request, pk=None) -> Response:
+        """
+        Force reanalysis of the dataset.
+
+        Returns:
+            Response with updated analysis results
+        """
+        dataset = self.get_object()
+        dataset.is_processed = False
+        dataset.analyze_dataset()
+
+        return Response({
+            'message': 'Dataset reanalyzed successfully',
+            'statistics': dataset.statistics,
+            'data_quality': dataset.data_quality,
+            'last_analyzed': dataset.last_analyzed
+        })
+
+    def _get_quality_recommendations(self, dataset):
+        """Generate data quality recommendations"""
+        recommendations = []
+
+        if not dataset.quality_report:
+            return recommendations
+
+        quality_report = dataset.quality_report
+
+        # High null columns
+        if quality_report.get('highly_null_columns'):
+            recommendations.append({
+                'type': 'missing_data',
+                'severity': 'high',
+                'message': f"Consider removing or imputing columns with >50% missing values: {', '.join(quality_report['highly_null_columns'])}",
+                'columns': quality_report['highly_null_columns']
+            })
+
+        # Duplicate rows
+        if quality_report.get('duplicate_rows', 0) > 0:
+            recommendations.append({
+                'type': 'duplicates',
+                'severity': 'medium',
+                'message': f"Remove {quality_report['duplicate_rows']} duplicate rows to improve data quality",
+                'count': quality_report['duplicate_rows']
+            })
+
+        # Data quality score
+        completeness = quality_report.get('completeness_score', 0)
+        if completeness < 80:
+            recommendations.append({
+                'type': 'completeness',
+                'severity': 'high',
+                'message': f"Data completeness is {completeness:.1f}%. Consider data cleaning or imputation strategies",
+                'score': completeness
+            })
+
+        # Column-specific recommendations
+        for col, info in dataset.column_info.items():
+            if info.get('unique_count') == 1:
+                recommendations.append({
+                    'type': 'constant_column',
+                    'severity': 'low',
+                    'message': f"Column '{col}' has only one unique value and may not be useful for analysis",
+                    'column': col
+                })
+
+        return recommendations
+
+    def _calculate_correlations(self, dataset):
+        """Calculate correlation matrix for numeric columns"""
+        if not dataset.csv_file:
+            return {}
+
+        try:
+            import pandas as pd
+
+            df = pd.read_csv(dataset.csv_file.path)
+            numeric_df = df.select_dtypes(include=['number'])
+
+            if len(numeric_df.columns) < 2:
+                return {}
+
+            corr_matrix = numeric_df.corr()
+
+            # Convert to format suitable for visualization
+            correlations = []
+            for i, col1 in enumerate(corr_matrix.columns):
+                for j, col2 in enumerate(corr_matrix.columns):
+                    if i < j:  # Avoid duplicates
+                        correlations.append({
+                            'column1': col1,
+                            'column2': col2,
+                            'correlation': float(corr_matrix.loc[col1, col2])
+                        })
+
+            return {
+                'matrix': corr_matrix.to_dict(),
+                'pairs': correlations,
+                'strong_correlations': [
+                    pair for pair in correlations
+                    if abs(pair['correlation']) > 0.7
+                ]
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating correlations: {e}")
+            return {}
+
+    def _get_distributions(self, dataset):
+        """Get distribution data for visualization"""
+        if not dataset.csv_file:
+            return {}
+
+        try:
+            import pandas as pd
+            import numpy as np
+
+            df = pd.read_csv(dataset.csv_file.path)
+            distributions = {}
+
+            # Numeric columns - histograms
+            numeric_cols = df.select_dtypes(include=['number']).columns
+            for col in numeric_cols[:10]:  # Limit to first 10 for performance
+                series = df[col].dropna()
+                if len(series) > 0:
+                    hist, bins = np.histogram(series, bins=20)
+                    distributions[col] = {
+                        'type': 'histogram',
+                        'bins': bins.tolist(),
+                        'counts': hist.tolist(),
+                        'mean': float(series.mean()),
+                        'std': float(series.std())
+                    }
+
+            # Categorical columns - value counts
+            categorical_cols = df.select_dtypes(include=['object']).columns
+            for col in categorical_cols[:10]:  # Limit to first 10
+                series = df[col].dropna()
+                if len(series) > 0:
+                    value_counts = series.value_counts().head(20)  # Top 20 values
+                    distributions[col] = {
+                        'type': 'categorical',
+                        'values': value_counts.index.tolist(),
+                        'counts': value_counts.values.tolist(),
+                        'total_unique': int(series.nunique())
+                    }
+
+            return distributions
+
+        except Exception as e:
+            logger.error(f"Error calculating distributions: {e}")
+            return {}
+
 
 class MLModelViewSet(viewsets.ModelViewSet):
     """

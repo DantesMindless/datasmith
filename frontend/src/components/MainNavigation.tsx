@@ -43,12 +43,6 @@ export default function MainNavigation({ activePage, onPageChange }: MainNavigat
       label: 'ML Management',
       icon: <ModelTrainingIcon />,
       description: 'Create and train ML models'
-    },
-    {
-      key: 'modelAnalysis',
-      label: 'Model Analysis',
-      icon: <AnalyticsIcon />,
-      description: 'Analyze model performance and metrics'
     }
   ];
 

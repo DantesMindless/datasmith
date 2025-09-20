@@ -7,6 +7,7 @@ poetry install --no-root
 
 if [ "$ENV" = "development" ]; then
     echo "Running in development mode"
+    poetry run python manage.py makemigrations
     poetry run python manage.py migrate
     poetry run python manage.py create_superuser
 fi
