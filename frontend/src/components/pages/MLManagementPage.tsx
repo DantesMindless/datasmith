@@ -27,6 +27,7 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Snackbar,
 } from '@mui/material';
 import {
   PlayArrow,
@@ -41,6 +42,9 @@ import {
   Edit,
   Download,
   FileCopy,
+  CheckCircle,
+  Error as ErrorIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import CreateModel from '../CreateModel';
 import httpfetch from '../../utils/axios';
@@ -84,13 +88,29 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
     open: false,
     modelId: null,
     modelName: '',
-    inputData: ''
+    inputData: '',
+    schema: null,
+    tips: []
+  });
+  const [predictionResult, setPredictionResult] = useState({
+    open: false,
+    result: null,
+    isLoading: false
+  });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'info' | 'warning'
   });
   const [optionsMenu, setOptionsMenu] = useState({
     anchorEl: null,
     modelId: null,
     model: null
   });
+
+  const showNotification = (message: string, severity: 'success' | 'error' | 'info' | 'warning' = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   const fetchModels = async () => {
     try {
@@ -122,12 +142,12 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
   const handleTrain = async (modelId: number) => {
     try {
       const response = await httpfetch.post(`models/${modelId}/train/`, {});
-      alert(response.data.message || 'Training started');
+      showNotification(response.data.message || 'Training started', 'success');
       // Refresh models to show updated status
       await fetchModels();
     } catch (err: any) {
       console.error('Error training model:', err);
-      alert(err.response?.data?.error || 'Failed to start training');
+      showNotification(err.response?.data?.error || 'Failed to start training', 'error');
     }
   };
 
@@ -140,61 +160,173 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
 
     try {
       const response = await httpfetch.post(`models/${modelId}/force_train/`, {});
-      alert(`Training completed!\nStatus: ${response.data.status}\nAccuracy: ${response.data.accuracy || 'N/A'}`);
+      showNotification(`Training completed! Status: ${response.data.status}, Accuracy: ${response.data.accuracy || 'N/A'}`, 'success');
       // Refresh models to show updated status
       await fetchModels();
     } catch (err: any) {
       console.error('Error force training model:', err);
-      alert(err.response?.data?.error || 'Failed to train model');
+      showNotification(err.response?.data?.error || 'Failed to train model', 'error');
     }
   };
 
-  const handlePredictClick = (modelId: number, modelName: string) => {
-    setPredictionDialog({
-      open: true,
-      modelId,
-      modelName,
-      inputData: JSON.stringify({
-        feature1: 1.0,
-        feature2: 2.0,
-        feature3: 3.0
-      }, null, 2)
+  // Helper function to parse CSV input (supports single or multiple rows)
+  function parseCsvInput(csv: string): Record<string, string | number> | Array<Record<string, string | number>> {
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) throw new Error('CSV must have header and at least one data row');
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const dataRows = lines.slice(1); // Get all rows after header
+
+    // Parse all data rows
+    const parsedRows = dataRows.map(row => {
+      const values = row.split(',').map(v => v.trim());
+      if (headers.length !== values.length) throw new Error('Header and row length mismatch');
+
+      const data: Record<string, string | number> = {};
+      headers.forEach((h, i) => {
+        data[h] = isNaN(Number(values[i])) ? values[i] : Number(values[i]);
+      });
+      return data;
     });
+
+    // Return single object if only one row, otherwise return array
+    return parsedRows.length === 1 ? parsedRows[0] : parsedRows;
+  }
+
+  const handlePredictClick = async (modelId: number, modelName: string) => {
+    try {
+      // Fetch prediction schema from the API
+      const response = await httpfetch.get(`models/${modelId}/prediction_info/`);
+      const schema = response.data.schema;
+
+      let exampleData = '';
+      if (schema?.input_type === 'image') {
+        // For image models, provide image upload instruction
+        exampleData = 'Image prediction - please upload an image file';
+      } else if (schema?.input_features && schema.input_features.length > 0) {
+        // Use actual feature names from the model
+        const features = schema.input_features;
+        const header = features.join(',');
+        const sampleValues = features.map(() => '0.0').join(',');
+        exampleData = `${header}\n${sampleValues}`;
+      } else {
+        // Fallback to generic example
+        exampleData = `feature1,feature2,feature3\n1.0,2.0,3.0`;
+      }
+
+      setPredictionDialog({
+        open: true,
+        modelId,
+        modelName,
+        inputData: exampleData,
+        schema: schema,
+        tips: response.data.tips || []
+      });
+    } catch (err: any) {
+      console.error('Error fetching prediction schema:', err);
+      // Fallback to generic example if API call fails
+      setPredictionDialog({
+        open: true,
+        modelId,
+        modelName,
+        inputData: `feature1,feature2,feature3\n1.0,2.0,3.0`,
+        schema: null,
+        tips: []
+      });
+    }
   };
 
   const handlePredictSubmit = async () => {
     try {
+      setPredictionResult({ open: false, result: null, isLoading: true });
+
       let parsedData;
-      try {
-        parsedData = JSON.parse(predictionDialog.inputData);
-      } catch (parseError) {
-        alert('Invalid JSON format. Please enter valid JSON data.');
-        return;
-      }
+      let response;
 
-      const requestData = {
-        data: parsedData
-      };
+      // Handle image prediction differently
+      if (predictionDialog.schema?.input_type === 'image') {
+        if (!predictionDialog.inputData || typeof predictionDialog.inputData !== 'object') {
+          setPredictionResult({
+            open: true,
+            result: {
+              success: false,
+              error: 'Please select an image file.'
+            },
+            isLoading: false
+          });
+          return;
+        }
 
-      const response = await httpfetch.post(`models/${predictionDialog.modelId}/predict/`, requestData);
+        // Use FormData for file upload
+        const formData = new FormData();
+        formData.append('image', predictionDialog.inputData);
 
-      if (response.data.prediction !== undefined) {
-        alert(`Prediction result: ${response.data.prediction}`);
-      } else if (response.data.predictions) {
-        alert(`Predictions: ${response.data.predictions.join(', ')}`);
+        response = await httpfetch.post(
+          `models/${predictionDialog.modelId}/predict/`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+
+        parsedData = { filename: predictionDialog.inputData.name };
       } else {
-        alert('Prediction completed successfully');
+        // Handle tabular data (CSV)
+        try {
+          parsedData = parseCsvInput(predictionDialog.inputData);
+        } catch (parseError: any) {
+          setPredictionResult({
+            open: true,
+            result: {
+              success: false,
+              error: 'Invalid CSV format. Please enter valid CSV data.'
+            },
+            isLoading: false
+          });
+          return;
+        }
+
+        const requestData = {
+          data: parsedData
+        };
+
+        response = await httpfetch.post(`models/${predictionDialog.modelId}/predict/`, requestData);
       }
 
-      setPredictionDialog({ open: false, modelId: null, modelName: '', inputData: '' });
+      // Close input dialog and show results
+      setPredictionDialog({ open: false, modelId: null, modelName: '', inputData: '', schema: null, tips: [] });
+
+      setPredictionResult({
+        open: true,
+        result: {
+          success: true,
+          prediction: response.data.prediction,
+          predictions: response.data.predictions,
+          count: response.data.count,
+          inputData: parsedData,
+          modelName: predictionDialog.modelName,
+          modelId: predictionDialog.modelId
+        },
+        isLoading: false
+      });
+
     } catch (err: any) {
       console.error('Error making prediction:', err);
-      alert(err.response?.data?.error || 'Failed to make prediction');
+      setPredictionResult({
+        open: true,
+        result: {
+          success: false,
+          error: err.response?.data?.error || 'Failed to make prediction'
+        },
+        isLoading: false
+      });
     }
   };
 
   const handlePredictCancel = () => {
-    setPredictionDialog({ open: false, modelId: null, modelName: '', inputData: '' });
+    setPredictionDialog({ open: false, modelId: null, modelName: '', inputData: '', schema: null, tips: [] });
   };
 
   const handleOptionsClick = (event, modelId, model) => {
@@ -229,7 +361,7 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
       if (response.status >= 200 && response.status < 300) {
         await fetchModels(); // Refresh the models list
         handleOptionsClose();
-        alert('Model deleted successfully');
+        showNotification('Model deleted successfully', 'success');
       } else {
         throw new Error(`Unexpected response status: ${response.status}`);
       }
@@ -240,14 +372,14 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
         const errorMessage = typeof err.response?.data === 'object'
           ? err.response?.data?.error || err.response?.data?.detail || 'Failed to delete model'
           : err.response?.data || 'Failed to delete model';
-        alert(errorMessage);
+        showNotification(errorMessage, 'error');
       } else {
         // For other errors, try refreshing to see if delete actually worked
         try {
           await fetchModels();
-          alert('Model deletion completed - please verify in the list');
+          showNotification('Model deletion completed - please verify in the list', 'warning');
         } catch {
-          alert('Failed to delete model and unable to refresh list');
+          showNotification('Failed to delete model and unable to refresh list', 'error');
         }
       }
       handleOptionsClose();
@@ -267,28 +399,25 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
       await httpfetch.post('models/', duplicateData);
       await fetchModels(); // Refresh the models list
       handleOptionsClose();
-      alert('Model duplicated successfully');
+      showNotification('Model duplicated successfully', 'success');
     } catch (err: any) {
       console.error('Error duplicating model:', err);
-      alert(err.response?.data?.error || 'Failed to duplicate model');
+      showNotification(err.response?.data?.error || 'Failed to duplicate model', 'error');
       handleOptionsClose();
     }
   };
 
   const handleTest = async (modelId: number) => {
     try {
-      const response = await httpfetch.post(`models/${modelId}test/`, {});
+      const response = await httpfetch.post(`models/${modelId}/test/`, {});
 
       const results = response.data;
-      const message = `Test Results for ${results.model_name}:
-Accuracy: ${(results.accuracy * 100).toFixed(2)}%
-Model Type: ${results.model_type}
-Status: ${results.status}`;
+      const message = `${results.model_name}: ${(results.accuracy * 100).toFixed(2)}% accuracy`;
 
-      alert(message);
+      showNotification(message, 'success');
     } catch (err: any) {
       console.error('Error testing model:', err);
-      alert(err.response?.data?.error || 'Failed to test model');
+      showNotification(err.response?.data?.error || 'Failed to test model', 'error');
     }
   };
 
@@ -413,7 +542,7 @@ Status: ${results.status}`;
                           Dataset
                         </Typography>
                         <Typography variant="body2" fontWeight={500}>
-                          {model.dataset?.name || model.dataset || 'N/A'}
+                          {model.dataset_name || 'N/A'}
                         </Typography>
                       </Box>
                       
@@ -544,25 +673,104 @@ Status: ${results.status}`;
           Make Prediction - {predictionDialog.modelName}
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Enter the input data for prediction in JSON format:
-          </Typography>
-          <TextField
-            fullWidth
-            multiline
-            rows={10}
-            variant="outlined"
-            value={predictionDialog.inputData}
-            onChange={(e) => setPredictionDialog(prev => ({
-              ...prev,
-              inputData: e.target.value
-            }))}
-            placeholder='{"feature1": 1.0, "feature2": 2.0}'
-            sx={{ fontFamily: 'monospace' }}
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Example: {"{\"feature1\": 1.0, \"feature2\": 2.0, \"feature3\": 3.0}"}
-          </Typography>
+          {/* Show tips if available */}
+          {predictionDialog.tips && predictionDialog.tips.length > 0 && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                Tips for prediction:
+              </Typography>
+              <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                {predictionDialog.tips.map((tip, index) => (
+                  <li key={index}>
+                    <Typography variant="body2">{tip}</Typography>
+                  </li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+
+          {/* Show required features for tabular data */}
+          {predictionDialog.schema?.input_features && predictionDialog.schema?.input_type !== 'image' && (
+            <Box sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                Required Features ({predictionDialog.schema.input_features.length}):
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {predictionDialog.schema.input_features.map((feature, index) => (
+                  <Chip key={index} label={feature} size="small" color="primary" variant="outlined" />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Image upload for image models */}
+          {predictionDialog.schema?.input_type === 'image' ? (
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Upload an image file for classification
+              </Typography>
+              <Button
+                variant="outlined"
+                component="label"
+                fullWidth
+                sx={{ mb: 2, p: 2, height: 100, borderStyle: 'dashed' }}
+              >
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="body1" fontWeight={500}>
+                    Click to select image
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Supported: JPG, PNG, BMP, GIF
+                  </Typography>
+                </Box>
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPredictionDialog(prev => ({
+                        ...prev,
+                        inputData: file
+                      }));
+                    }
+                  }}
+                />
+              </Button>
+              {predictionDialog.inputData && typeof predictionDialog.inputData === 'object' && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    Selected: {predictionDialog.inputData.name} ({(predictionDialog.inputData.size / 1024).toFixed(2)} KB)
+                  </Typography>
+                </Alert>
+              )}
+            </Box>
+          ) : (
+            // CSV input for tabular models
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter the input data for prediction in <strong>CSV format</strong>:
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={6}
+                variant="outlined"
+                value={predictionDialog.inputData}
+                onChange={(e) => setPredictionDialog(prev => ({
+                  ...prev,
+                  inputData: e.target.value
+                }))}
+                placeholder={predictionDialog.inputData}
+                sx={{ fontFamily: 'monospace' }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Example:<br />
+                <code style={{ whiteSpace: 'pre-wrap' }}>{predictionDialog.inputData}</code>
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handlePredictCancel}>
@@ -575,6 +783,196 @@ Status: ${results.status}`;
           >
             Predict
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Prediction Results Dialog */}
+      <Dialog
+        open={predictionResult.open}
+        onClose={() => setPredictionResult({ open: false, result: null, isLoading: false })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Assessment color="primary" />
+            <Typography variant="h6" fontWeight={600}>
+              Prediction Results
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {predictionResult.isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+              <Stack alignItems="center" spacing={2}>
+                <CircularProgress size={48} />
+                <Typography variant="body2" color="text.secondary">
+                  Making prediction...
+                </Typography>
+              </Stack>
+            </Box>
+          ) : predictionResult.result?.success ? (
+            <Box>
+              {/* Success Alert */}
+              <Alert severity="success" sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Prediction completed successfully!
+                </Typography>
+              </Alert>
+
+              {/* Model Info */}
+              {predictionResult.result.modelName && (
+                <Box sx={{ mb: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Model
+                  </Typography>
+                  <Typography variant="body1" fontWeight={600}>
+                    {predictionResult.result.modelName}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Input Data - Only show for single predictions */}
+              {!Array.isArray(predictionResult.result.inputData) && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                    Input Data:
+                  </Typography>
+                  <Card variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Stack spacing={1}>
+                      {Object.entries(predictionResult.result.inputData || {}).map(([key, value]) => (
+                        <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            {key}:
+                          </Typography>
+                          <Typography variant="body2" fontWeight={500}>
+                            {String(value)}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Card>
+                </Box>
+              )}
+
+              {/* Prediction Result */}
+              <Box>
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  Prediction Results:
+                </Typography>
+                {predictionResult.result.prediction !== undefined ? (
+                  // Single prediction
+                  <Card
+                    variant="outlined"
+                    sx={{
+                      p: 3,
+                      bgcolor: 'primary.lighter',
+                      border: '2px solid',
+                      borderColor: 'primary.main'
+                    }}
+                  >
+                    <Typography
+                      variant="h4"
+                      fontWeight={700}
+                      color="primary.main"
+                      sx={{ textAlign: 'center' }}
+                    >
+                      {String(predictionResult.result.prediction)}
+                    </Typography>
+                  </Card>
+                ) : predictionResult.result.predictions && predictionResult.result.predictions.length > 0 ? (
+                  // Multiple predictions - show as table with input data
+                  <Box>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        Predicted {predictionResult.result.predictions.length} rows successfully
+                      </Typography>
+                    </Alert>
+                    <Card variant="outlined" sx={{ overflow: 'hidden' }}>
+                      <Box sx={{ overflowX: 'auto', maxHeight: 400 }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #e0e0e0' }}>
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem' }}>
+                                #
+                              </th>
+                              {Array.isArray(predictionResult.result.inputData) && predictionResult.result.inputData[0] &&
+                                Object.keys(predictionResult.result.inputData[0]).map(key => (
+                                  <th key={key} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#666' }}>
+                                    {key}
+                                  </th>
+                                ))
+                              }
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#1976d2' }}>
+                                Prediction
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {predictionResult.result.predictions.map((pred, index) => (
+                              <tr
+                                key={index}
+                                style={{
+                                  borderBottom: '1px solid #e0e0e0',
+                                  backgroundColor: index % 2 === 0 ? '#fafafa' : 'white'
+                                }}
+                              >
+                                <td style={{ padding: '12px 16px', fontSize: '0.875rem', fontWeight: 500 }}>
+                                  {index + 1}
+                                </td>
+                                {Array.isArray(predictionResult.result.inputData) && predictionResult.result.inputData[index] &&
+                                  Object.values(predictionResult.result.inputData[index]).map((value, i) => (
+                                    <td key={i} style={{ padding: '12px 16px', fontSize: '0.875rem', color: '#666' }}>
+                                      {String(value)}
+                                    </td>
+                                  ))
+                                }
+                                <td style={{ padding: '12px 16px', fontSize: '0.875rem', fontWeight: 600, color: '#1976d2' }}>
+                                  {String(pred)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </Box>
+                    </Card>
+                  </Box>
+                ) : (
+                  <Alert severity="info">
+                    Prediction completed but no results returned.
+                  </Alert>
+                )}
+              </Box>
+            </Box>
+          ) : (
+            <Alert severity="error">
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                Prediction Failed
+              </Typography>
+              <Typography variant="body2">
+                {predictionResult.result?.error || 'An unknown error occurred'}
+              </Typography>
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setPredictionResult({ open: false, result: null, isLoading: false })}
+            variant="contained"
+          >
+            Close
+          </Button>
+          {predictionResult.result?.success && (
+            <Button
+              onClick={() => {
+                setPredictionResult({ open: false, result: null, isLoading: false });
+                handlePredictClick(predictionResult.result.modelId, predictionResult.result.modelName);
+              }}
+              variant="outlined"
+            >
+              Make Another Prediction
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -599,6 +997,23 @@ Status: ${results.status}`;
           <ListItemText sx={{ color: 'error.main' }}>Delete Model</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

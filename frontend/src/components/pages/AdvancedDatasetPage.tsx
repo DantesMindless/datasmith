@@ -83,6 +83,7 @@ interface Dataset {
   file_size_formatted?: string;
   quality_score?: number;
   is_processed: boolean;
+  processing_errors?: string;
   last_analyzed?: string;
   created_at: string;
 }
@@ -164,19 +165,33 @@ function DatasetManagement() {
     is_processed: null,
   });
 
-  const fetchDatasets = async () => {
+  const fetchDatasets = async (isPolling: boolean = false) => {
     try {
-      setLoading(true);
+      if (!isPolling) {
+        setLoading(true);
+      }
       setError('');
       const response = await httpfetch.get('datasets/');
       const datasetsData = response.data.results || response.data;
       setDatasets(datasetsData);
       setFilteredDatasets(datasetsData);
+
+      // Check for image datasets that are still processing
+      const processingDatasets = datasetsData.filter(
+        (d: Dataset) => d.dataset_type === 'image' && !d.is_processed && !d.processing_errors?.toLowerCase().includes('failed')
+      );
+
+      // If there are processing datasets, poll for status updates
+      if (processingDatasets.length > 0) {
+        setTimeout(() => fetchDatasets(true), 5000); // Poll every 5 seconds
+      }
     } catch (err: any) {
       console.error('Error fetching datasets:', err);
       setError(err.response?.data?.error || err.message || 'Failed to fetch datasets');
     } finally {
-      setLoading(false);
+      if (!isPolling) {
+        setLoading(false);
+      }
     }
   };
 
@@ -257,6 +272,18 @@ function DatasetManagement() {
     } catch (err: any) {
       console.error('Error deleting dataset:', err);
       setError('Failed to delete dataset');
+    }
+  };
+
+  const handleRetryExtraction = async (datasetId: number) => {
+    try {
+      await httpfetch.post(`datasets/${datasetId}/retry_extraction/`);
+      setError('');
+      await fetchDatasets(); // Refresh the list
+      handleMenuClose();
+    } catch (err: any) {
+      console.error('Error retrying extraction:', err);
+      setError('Failed to retry extraction');
     }
   };
 
@@ -573,12 +600,24 @@ function DatasetManagement() {
                       <TableCell>{dataset.row_count?.toLocaleString() || '-'}</TableCell>
                       <TableCell>{dataset.column_count || '-'}</TableCell>
                       <TableCell>
-                        <Chip
-                          label={dataset.is_processed ? 'Processed' : 'Pending'}
-                          size="small"
-                          color={dataset.is_processed ? 'success' : 'warning'}
-                          variant="outlined"
-                        />
+                        {dataset.dataset_type === 'image' && !dataset.is_processed ? (
+                          <Tooltip title={dataset.processing_errors || 'Processing...'}>
+                            <Chip
+                              label="Extracting..."
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                              icon={<CircularProgress size={12} />}
+                            />
+                          </Tooltip>
+                        ) : (
+                          <Chip
+                            label={dataset.is_processed ? 'Processed' : 'Pending'}
+                            size="small"
+                            color={dataset.is_processed ? 'success' : 'warning'}
+                            variant="outlined"
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="caption">
@@ -619,6 +658,13 @@ function DatasetManagement() {
           <ListItemIcon><Visibility fontSize="small" /></ListItemIcon>
           <ListItemText>View Data</ListItemText>
         </MenuItem>
+        {selectedDatasetForMenu?.dataset_type === 'image' &&
+         selectedDatasetForMenu?.processing_errors?.toLowerCase().includes('failed') && (
+          <MenuItem onClick={() => selectedDatasetForMenu && handleRetryExtraction(selectedDatasetForMenu.id)}>
+            <ListItemIcon><Refresh fontSize="small" /></ListItemIcon>
+            <ListItemText>Retry Extraction</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem onClick={handleMenuClose}>
           <ListItemIcon><Edit fontSize="small" /></ListItemIcon>
           <ListItemText>Edit Metadata</ListItemText>

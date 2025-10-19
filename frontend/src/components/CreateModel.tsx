@@ -59,13 +59,29 @@ export default function CreateModelPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!datasetId) {
       setError("Please select a dataset");
       return;
     }
 
-    if (!targetColumn) {
+    // Get selected dataset to check if it's an image dataset
+    const selectedDataset = datasets.find(d => d.id == datasetId);
+    const isImageDataset = selectedDataset?.is_image_dataset || selectedDataset?.dataset_type === 'image';
+
+    // Validate dataset type matches model type
+    if (modelType === 'cnn' && !isImageDataset) {
+      setError("CNN models require an image dataset. Please select an image dataset or choose a different model type.");
+      return;
+    }
+
+    if (modelType !== 'cnn' && isImageDataset) {
+      setError("This model type requires a tabular dataset (CSV). Please select a CSV dataset or use CNN for image data.");
+      return;
+    }
+
+    // Only require target column for non-image datasets
+    if (!isImageDataset && !targetColumn) {
       setError("Please select a target column");
       return;
     }
@@ -74,7 +90,7 @@ export default function CreateModelPage() {
       name,
       model_type: modelType,
       dataset: datasetId,
-      target_column: targetColumn,
+      target_column: targetColumn || 'class',  // Default to 'class' for image datasets
       config: configValues,
     };
     
@@ -144,6 +160,10 @@ export default function CreateModelPage() {
 
   const fields: ConfigField[] = modelType ? modelConfigSchemas[modelType] || [] : [];
 
+  // Check if selected dataset is an image dataset
+  const selectedDataset = datasets.find(d => d.id == datasetId);
+  const isImageDataset = selectedDataset?.is_image_dataset || selectedDataset?.dataset_type === 'image';
+
   return (
     <Container maxWidth="md">
       <Box
@@ -197,7 +217,7 @@ export default function CreateModelPage() {
             </Select>
           </FormControl>
 
-          {datasetColumns.length > 0 && (
+          {!isImageDataset && datasetColumns.length > 0 && (
             <FormControl fullWidth margin="normal">
               <InputLabel id="target-column-label">Target Column</InputLabel>
               <Select
@@ -213,6 +233,14 @@ export default function CreateModelPage() {
                 ))}
               </Select>
             </FormControl>
+          )}
+
+          {isImageDataset && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                <strong>Image Dataset Selected:</strong> Labels will be automatically extracted from folder names. No target column selection needed.
+              </Typography>
+            </Alert>
           )}
 
           <FormControl fullWidth margin="normal">

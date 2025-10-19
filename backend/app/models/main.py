@@ -58,17 +58,77 @@ class Dataset(BaseModel):
     is_image_dataset = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"[DATASET SAVE] Starting save for dataset. PK: {self.pk}, has image_folder: {bool(self.image_folder)}")
+
         # Set dataset type based on file type
         if self.image_folder and not self.dataset_type:
             self.dataset_type = DatasetType.IMAGE
             self.is_image_dataset = True
+            logger.info(f"[DATASET SAVE] Set dataset_type to IMAGE")
         elif self.csv_file and not self.dataset_type:
             self.dataset_type = DatasetType.TABULAR
+            logger.info(f"[DATASET SAVE] Set dataset_type to TABULAR")
 
-        super().save(*args, **kwargs)
+        # Check if this is a new image folder upload that needs extraction
+        # Use _state.adding because pk is auto-generated UUID (never None)
+        is_new_image_upload = False
+        if self._state.adding and self.image_folder and self.image_folder.name.endswith(".zip"):
+            is_new_image_upload = True
+            self.processing_errors = "Queued for extraction..."
+            self.is_processed = False
+            logger.info(f"[DATASET SAVE] Detected NEW image upload. Will trigger extraction after save.")
 
-        # Handle image dataset extraction
-        if self.image_folder and self.image_folder.name.endswith(".zip"):
+        try:
+            super().save(*args, **kwargs)
+        except OSError as e:
+            logger.error(f"File system error while saving dataset: {e}")
+            # Try to create the media directory if it doesn't exist
+            if 'MEDIA_ROOT' in dir(settings):
+                media_root = settings.MEDIA_ROOT
+                logger.info(f"Ensuring media root exists: {media_root}")
+                os.makedirs(media_root, exist_ok=True)
+                if self.image_folder:
+                    os.makedirs(os.path.join(media_root, "image_zips"), exist_ok=True)
+                if self.csv_file:
+                    os.makedirs(os.path.join(media_root, "csv_datasets"), exist_ok=True)
+            raise
+
+        # Handle image dataset extraction asynchronously with Celery
+        if is_new_image_upload:
+            import logging
+            logger = logging.getLogger(__name__)
+
+            try:
+                # Import the celery task
+                from app.functions.celery_tasks import extract_image_dataset_task
+
+                # Queue the extraction task
+                logger.info(f"Queuing Celery task for dataset {self.id} extraction")
+                extract_image_dataset_task.delay(self.id)
+                logger.info(f"Successfully queued extraction task for dataset {self.id}")
+
+            except Exception as e:
+                logger.warning(f"Celery not available, using fallback threading: {e}")
+                # Fallback to threading if Celery is not available
+                import threading
+                thread = threading.Thread(target=self._extract_sync)
+                thread.daemon = True
+                thread.start()
+                logger.info(f"Started fallback thread extraction for dataset {self.id}")
+
+        # Analyze CSV file
+        if self.csv_file and not self.is_processed:
+            self.analyze_dataset()
+
+    def _extract_sync(self):
+        """Fallback synchronous extraction method"""
+        if not self.image_folder or not self.image_folder.name.endswith(".zip"):
+            return
+
+        try:
             extract_to = os.path.join(
                 settings.MEDIA_ROOT, "image_datasets", str(self.id)
             )
@@ -79,7 +139,7 @@ class Dataset(BaseModel):
                 zip_ref.extractall(temp_dir)
 
             top = next(Path(temp_dir).iterdir(), None)
-            if top and top.is_dir():
+            if top and top.is_dir() and len(list(Path(temp_dir).iterdir())) == 1:
                 for item in top.iterdir():
                     shutil.move(str(item), extract_to)
                 shutil.rmtree(temp_dir)
@@ -88,12 +148,31 @@ class Dataset(BaseModel):
                     shutil.move(str(item), extract_to)
                 shutil.rmtree(temp_dir)
 
-            self.extracted_path = extract_to
-            super().save(update_fields=["extracted_path"])
+            # Count images and calculate total size (limit search depth to avoid slow recursion on huge datasets)
+            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
+            image_count = 0
+            total_size = 0
+            for root, dirs, files in os.walk(extract_to):
+                # Limit depth to 3 levels
+                level = root.replace(extract_to, '').count(os.sep)
+                if level < 3:
+                    for f in files:
+                        file_path = Path(root) / f
+                        if file_path.suffix.lower() in image_extensions:
+                            image_count += 1
+                            total_size += file_path.stat().st_size
+                else:
+                    del dirs[:]  # Don't recurse deeper
 
-        # Analyze CSV file
-        if self.csv_file and not self.is_processed:
-            self.analyze_dataset()
+            self.extracted_path = extract_to
+            self.row_count = image_count
+            self.file_size = total_size
+            self.is_processed = True
+            self.processing_errors = None
+            super().save(update_fields=["extracted_path", "row_count", "file_size", "is_processed", "processing_errors"])
+        except Exception as e:
+            self.processing_errors = f"Extraction failed: {str(e)}"
+            super().save(update_fields=["processing_errors"])
 
     def analyze_dataset(self):
         """Comprehensive dataset analysis"""
@@ -320,6 +399,11 @@ class MLModel(BaseModel):
     random_state = models.IntegerField(default=42)
     max_iter = models.IntegerField(default=1000)
     accuracy = models.FloatField(null=True, blank=True, help_text="Model accuracy score")
+    prediction_schema = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Schema describing required input fields for prediction"
+    )
 
     def __str__(self):
         return self.name

@@ -66,11 +66,7 @@ const httpfetch = {
     if (accessToken) {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
-    
-    console.log("Fetch request - Access token:", accessToken);
-    console.log("Fetch request - Auth header:", headers["Authorization"]);
-    console.log("Fetch request - URL:", `${baseURL}${url}`);
-    
+
     const config: RequestInit = {
       ...options,
       headers,
@@ -92,7 +88,6 @@ const httpfetch = {
     
     // If 401 and not already retrying, try to refresh token
     if (response.status === 401 && !isRetry && accessToken) {
-      console.log("Token expired, attempting refresh...");
       const newToken = await refreshAccessToken();
       if (newToken) {
         // Retry the request with new token

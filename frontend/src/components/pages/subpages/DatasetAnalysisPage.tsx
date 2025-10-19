@@ -51,8 +51,10 @@ import {
   Timeline,
   BugReport,
   CleaningServices,
+  Image as ImageIcon,
 } from '@mui/icons-material';
 import httpfetch from '../../../utils/axios';
+import ImageDatasetViewer from '../../ImageDatasetViewer';
 import {
   ResponsiveContainer,
   BarChart as RechartsBarChart,
@@ -319,38 +321,69 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
               </Box>
 
               <Grid container spacing={3}>
-                <Grid item xs={6} sm={3}>
-                  <Typography variant="caption" color="text.secondary">
-                    Rows
-                  </Typography>
-                  <Typography variant="h6" fontWeight={600}>
-                    {dataset.row_count?.toLocaleString() || 'N/A'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} sm={3}>
-                  <Typography variant="caption" color="text.secondary">
-                    Columns
-                  </Typography>
-                  <Typography variant="h6" fontWeight={600}>
-                    {dataset.column_count || 'N/A'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} sm={3}>
-                  <Typography variant="caption" color="text.secondary">
-                    File Size
-                  </Typography>
-                  <Typography variant="h6" fontWeight={600}>
-                    {dataset.file_size_formatted || 'N/A'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} sm={3}>
-                  <Typography variant="caption" color="text.secondary">
-                    Type
-                  </Typography>
-                  <Typography variant="h6" fontWeight={600}>
-                    {dataset.dataset_type}
-                  </Typography>
-                </Grid>
+                {dataset.dataset_type === 'image' ? (
+                  <>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary">
+                        Total Images
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {dataset.row_count?.toLocaleString() || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary">
+                        File Size
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {dataset.file_size_formatted || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary">
+                        Type
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {dataset.dataset_type}
+                      </Typography>
+                    </Grid>
+                  </>
+                ) : (
+                  <>
+                    <Grid item xs={6} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        Rows
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {dataset.row_count?.toLocaleString() || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        Columns
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {dataset.column_count || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        File Size
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {dataset.file_size_formatted || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        Type
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {dataset.dataset_type}
+                      </Typography>
+                    </Grid>
+                  </>
+                )}
               </Grid>
             </Grid>
 
@@ -391,99 +424,171 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
             }
             icon={<Assessment />}
           />
-          <Tab label="Data Preview" icon={<TableChart />} />
-          <Tab label="Statistics" icon={<BarChartIcon />} />
-          <Tab label="Distributions" icon={<Timeline />} />
+          {dataset.dataset_type === 'image' ? (
+            <Tab label="Image Gallery" icon={<ImageIcon />} />
+          ) : (
+            <>
+              <Tab label="Data Preview" icon={<TableChart />} />
+              <Tab label="Statistics" icon={<BarChartIcon />} />
+              <Tab label="Distributions" icon={<Timeline />} />
+            </>
+          )}
         </Tabs>
       </Paper>
 
       {/* Tab Content */}
       {activeTab === 0 && (
         <Grid container spacing={3}>
-          {/* Basic Statistics */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Dataset Statistics
-                </Typography>
-                {previewData?.statistics && (
-                  <Stack spacing={2}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Numeric Columns
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {previewData.statistics.numeric_columns}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Categorical Columns
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {previewData.statistics.categorical_columns}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Completeness
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {previewData.statistics.completeness?.toFixed(1)}%
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Duplicate Rows
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {previewData.statistics.duplicate_rows}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+          {dataset.dataset_type === 'image' ? (
+            /* Image Dataset Overview */
+            <>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      Image Dataset Summary
+                    </Typography>
+                    <Stack spacing={2}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Images
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                          {dataset.row_count?.toLocaleString() || 'N/A'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Dataset Size
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                          {dataset.file_size_formatted || 'N/A'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Processing Status
+                        </Typography>
+                        <Chip
+                          label={dataset.is_processed ? 'Processed' : 'Processing'}
+                          color={dataset.is_processed ? 'success' : 'warning'}
+                          size="small"
+                        />
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Last Analyzed
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                          {dataset.last_analyzed ? new Date(dataset.last_analyzed).toLocaleDateString() : 'Never'}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent sx={{ textAlign: 'center' }}>
+                    <ImageIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
+                    <Typography variant="h4" fontWeight={700}>
+                      {dataset.row_count?.toLocaleString() || '0'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Images in Dataset
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </>
+          ) : (
+            /* CSV/Tabular Dataset Overview */
+            <>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      Dataset Statistics
+                    </Typography>
+                    {previewData?.statistics && (
+                      <Stack spacing={2}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Numeric Columns
+                          </Typography>
+                          <Typography variant="body2" fontWeight={500}>
+                            {previewData.statistics.numeric_columns}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Categorical Columns
+                          </Typography>
+                          <Typography variant="body2" fontWeight={500}>
+                            {previewData.statistics.categorical_columns}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Completeness
+                          </Typography>
+                          <Typography variant="body2" fontWeight={500}>
+                            {previewData.statistics.completeness?.toFixed(1)}%
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Duplicate Rows
+                          </Typography>
+                          <Typography variant="body2" fontWeight={500}>
+                            {previewData.statistics.duplicate_rows}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
 
-          {/* Column Types Distribution */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Column Types
-                </Typography>
-                {previewData?.column_info && (
-                  <Box sx={{ height: 300, pt: 2 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie
-                          data={Object.entries(
-                            Object.values(previewData.column_info).reduce((acc: any, col: any) => {
-                              acc[col.type] = (acc[col.type] || 0) + 1;
-                              return acc;
-                            }, {})
-                          ).map(([type, count]) => ({ type, count }))}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="count"
-                          label={({ type, percent }) => `${type}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {Object.keys(previewData.column_info).map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+              {/* Column Types Distribution */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      Column Types
+                    </Typography>
+                    {previewData?.column_info && (
+                      <Box sx={{ height: 300, pt: 2 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={Object.entries(
+                                Object.values(previewData.column_info).reduce((acc: any, col: any) => {
+                                  acc[col.type] = (acc[col.type] || 0) + 1;
+                                  return acc;
+                                }, {})
+                              ).map(([type, count]) => ({ type, count }))}
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="count"
+                              label={({ type, percent }) => `${type}: ${(percent * 100).toFixed(0)}%`}
+                            >
+                              {Object.keys(previewData.column_info).map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            </>
+          )}
         </Grid>
       )}
 
@@ -561,7 +666,13 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
         </Grid>
       )}
 
-      {activeTab === 2 && previewData && (
+      {/* Image Gallery Tab - Only for image datasets */}
+      {activeTab === 2 && dataset.dataset_type === 'image' && datasetId && (
+        <ImageDatasetViewer datasetId={typeof datasetId === 'string' ? datasetId : datasetId} />
+      )}
+
+      {/* Data Preview Tab - Only for non-image datasets */}
+      {activeTab === 2 && dataset.dataset_type !== 'image' && previewData && (
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -604,7 +715,8 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
         </Card>
       )}
 
-      {activeTab === 3 && previewData?.column_info && (
+      {/* Statistics Tab - Only for non-image datasets */}
+      {activeTab === 3 && dataset.dataset_type !== 'image' && previewData?.column_info && (
         <Grid container spacing={3}>
           {/* Column Information */}
           <Grid item xs={12}>
@@ -670,7 +782,8 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
         </Grid>
       )}
 
-      {activeTab === 4 && previewData?.distributions && (
+      {/* Distributions Tab - Only for non-image datasets */}
+      {activeTab === 4 && dataset.dataset_type !== 'image' && previewData?.distributions && (
         <Grid container spacing={3}>
           {Object.entries(previewData.distributions).slice(0, 6).map(([col, dist]: [string, any]) => (
             <Grid item xs={12} md={6} key={col}>

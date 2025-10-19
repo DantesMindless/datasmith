@@ -75,6 +75,7 @@ services:
             - 6379
   celery:
     build:
+      context: ./backend
       dockerfile: Dockerfile
     command: poetry run celery -A datasmith worker --loglevel=info
     volumes:

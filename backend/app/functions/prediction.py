@@ -65,6 +65,7 @@ def predict_cnn(model_obj, image_path):
     fc_layers = config.get("fc_layers", [{"units": 128}])
     input_size = config.get("input_size", 64)
     num_classes = config.get("num_classes", 2)
+    class_names = config.get("class_names", [])
 
     model = ConfigurableCNN(3, conv_layers, fc_layers, num_classes, input_size)
 
@@ -88,4 +89,8 @@ def predict_cnn(model_obj, image_path):
         output = model(image_tensor)
         predicted_idx = output.argmax(dim=1).item()
 
-    return predicted_idx
+    # Return class name if available, otherwise return index
+    if class_names and predicted_idx < len(class_names):
+        return class_names[predicted_idx]
+    else:
+        return predicted_idx

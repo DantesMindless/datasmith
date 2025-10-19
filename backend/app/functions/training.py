@@ -117,6 +117,18 @@ def train_sklearn_model(obj, X_train, y_train, X_test, y_test):
 
     model_path = f"trained_models/{obj.id}.joblib"
     upload_to_minio(buffer.read(), model_path, content_type="application/octet-stream")
+
+    # Save prediction schema
+    feature_names = X_train.columns.tolist()
+    obj.prediction_schema = {
+        "input_features": feature_names,
+        "feature_count": len(feature_names),
+        "target_column": obj.target_column,
+        "example": {col: "numeric_value" for col in feature_names},
+        "description": f"Provide values for these {len(feature_names)} features to make a prediction"
+    }
+    obj.save(update_fields=["prediction_schema"])
+
     return model_path, acc
 
 
@@ -178,7 +190,19 @@ def train_nn(obj, X_train, y_train, X_test, y_test):
 
     obj.training_config["output_dim"] = output_dim
     obj.training_config["class_names"] = le.classes_.tolist()
-    obj.save(update_fields=["training_config"])
+
+    # Save prediction schema
+    feature_names = X_train.columns.tolist()
+    obj.prediction_schema = {
+        "input_features": feature_names,
+        "feature_count": len(feature_names),
+        "target_column": obj.target_column,
+        "output_classes": le.classes_.tolist(),
+        "example": {col: "numeric_value" for col in feature_names},
+        "description": f"Provide values for these {len(feature_names)} features to predict one of {output_dim} classes"
+    }
+
+    obj.save(update_fields=["training_config", "prediction_schema"])
 
     return model_path, acc
 
@@ -255,6 +279,19 @@ def train_cnn(obj):
 
     obj.training_config["num_classes"] = num_classes
     obj.training_config["class_names"] = list(dataset.class_to_idx.keys())
-    obj.save(update_fields=["training_config"])
+
+    # Save prediction schema for image models
+    class_names = list(dataset.class_to_idx.keys())
+    obj.prediction_schema = {
+        "input_type": "image",
+        "input_size": input_size,
+        "supported_formats": ["jpg", "jpeg", "png", "bmp", "gif"],
+        "output_classes": class_names,
+        "num_classes": num_classes,
+        "example": "Upload an image file",
+        "description": f"Upload an image to classify into one of {num_classes} categories: {', '.join(class_names)}"
+    }
+
+    obj.save(update_fields=["training_config", "prediction_schema"])
 
     return model_path, accuracy

@@ -191,7 +191,13 @@ export default function CreateDatasetPage() {
       });
 
       console.log('Dataset created successfully:', response.data);
-      setSuccess('Dataset created successfully!');
+
+      // Different success message for image datasets
+      if (formData.dataset_type === 'image') {
+        setSuccess('Dataset uploaded successfully! The image extraction is processing in the background. Check the Dataset Management page to see progress.');
+      } else {
+        setSuccess('Dataset created and analyzed successfully!');
+      }
 
       // Reset form
       setFormData({

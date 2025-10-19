@@ -13,6 +13,8 @@ from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import AnonymousUser
+from django.http import FileResponse, Http404
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 
 from .models.main import Dataset, MLModel, TrainingRun
 from .models.choices import ModelStatus
@@ -112,8 +114,26 @@ class DatasetViewSet(viewsets.ModelViewSet):
         """
         dataset = self.get_object()
 
-        if not dataset.is_processed:
+        if not dataset.is_processed and dataset.dataset_type != 'image':
             dataset.analyze_dataset()
+
+        # Different response for image datasets
+        if dataset.dataset_type == 'image':
+            return Response({
+                'preview_data': [],
+                'column_info': {},
+                'statistics': {
+                    'total_images': dataset.row_count or 0,
+                    'dataset_size': dataset.file_size or 0
+                },
+                'data_quality': dataset.data_quality or 'Good',
+                'dataset_type': dataset.dataset_type,
+                'dataset_purpose': dataset.dataset_purpose,
+                'row_count': dataset.row_count,
+                'column_count': 0,
+                'file_size': dataset.file_size,
+                'last_analyzed': dataset.last_analyzed
+            })
 
         return Response({
             'preview_data': dataset.preview_data,
@@ -138,8 +158,22 @@ class DatasetViewSet(viewsets.ModelViewSet):
         """
         dataset = self.get_object()
 
-        if not dataset.is_processed:
+        if not dataset.is_processed and dataset.dataset_type != 'image':
             dataset.analyze_dataset()
+
+        # Different response for image datasets
+        if dataset.dataset_type == 'image':
+            return Response({
+                'quality_report': {
+                    'total_images': dataset.row_count or 0,
+                    'total_size': dataset.file_size or 0,
+                    'extracted_path': dataset.extracted_path,
+                    'completeness_score': 100.0 if dataset.is_processed else 0.0
+                },
+                'data_quality': dataset.data_quality or 'Good',
+                'processing_errors': dataset.processing_errors,
+                'recommendations': []
+            })
 
         return Response({
             'quality_report': dataset.quality_report,
@@ -158,8 +192,21 @@ class DatasetViewSet(viewsets.ModelViewSet):
         """
         dataset = self.get_object()
 
-        if not dataset.is_processed:
+        if not dataset.is_processed and dataset.dataset_type != 'image':
             dataset.analyze_dataset()
+
+        # Different response for image datasets
+        if dataset.dataset_type == 'image':
+            return Response({
+                'basic_stats': {
+                    'total_images': dataset.row_count or 0,
+                    'total_size': dataset.file_size or 0,
+                    'avg_image_size': (dataset.file_size / dataset.row_count) if dataset.row_count else 0,
+                },
+                'column_stats': {},
+                'correlations': {},
+                'distributions': {}
+            })
 
         return Response({
             'basic_stats': dataset.statistics,
@@ -230,6 +277,166 @@ class DatasetViewSet(viewsets.ModelViewSet):
             'data_quality': dataset.data_quality,
             'last_analyzed': dataset.last_analyzed
         })
+
+    @action(detail=True, methods=['get'])
+    def extraction_status(self, request, pk=None) -> Response:
+        """
+        Get the extraction status for an image dataset.
+
+        Returns:
+            Response with extraction status, progress, and any errors
+        """
+        dataset = self.get_object()
+
+        if dataset.dataset_type != 'image':
+            return Response(
+                {"error": "This endpoint is only for image datasets"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response({
+            'dataset_id': dataset.id,
+            'dataset_name': dataset.name,
+            'is_processed': dataset.is_processed,
+            'extracted_path': dataset.extracted_path,
+            'row_count': dataset.row_count,  # Image count
+            'processing_errors': dataset.processing_errors,
+            'last_analyzed': dataset.last_analyzed,
+            'status': 'completed' if dataset.is_processed else (
+                'error' if dataset.processing_errors and 'failed' in dataset.processing_errors.lower()
+                else 'processing'
+            )
+        })
+
+    @action(detail=True, methods=['post'])
+    def retry_extraction(self, request, pk=None) -> Response:
+        """
+        Retry extraction for a failed image dataset.
+
+        Returns:
+            Response indicating extraction retry status
+        """
+        from .functions.celery_tasks import extract_image_dataset_task
+
+        dataset = self.get_object()
+
+        if dataset.dataset_type != 'image':
+            return Response(
+                {"error": "This endpoint is only for image datasets"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not dataset.image_folder:
+            return Response(
+                {"error": "No image folder file found"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Reset status
+            dataset.processing_errors = "Retrying extraction..."
+            dataset.is_processed = False
+            dataset.save(update_fields=['processing_errors', 'is_processed'])
+
+            # Queue extraction task
+            extract_image_dataset_task.delay(dataset.id)
+
+            return Response({
+                'message': 'Extraction retry queued successfully',
+                'dataset_id': dataset.id,
+                'status': 'processing'
+            })
+
+        except Exception as e:
+            logger.error(f"Error retrying extraction for dataset {pk}: {e}", exc_info=True)
+            return Response(
+                {"error": f"Failed to retry extraction: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get'])
+    def images(self, request, pk=None) -> Response:
+        """
+        Get list of images in an image dataset.
+
+        Query params:
+            - page: page number (default: 1)
+            - page_size: images per page (default: 50)
+
+        Returns:
+            Response with image file list and metadata
+        """
+        dataset = self.get_object()
+
+        if dataset.dataset_type != 'image':
+            return Response(
+                {"error": "This endpoint is only for image datasets"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not dataset.extracted_path:
+            return Response(
+                {"error": "Image dataset has not been extracted yet"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            import os
+            from pathlib import Path
+
+            # Get pagination parameters
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 50))
+
+            # Supported image extensions
+            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
+
+            # Get all image files
+            image_files = []
+            extracted_path = Path(dataset.extracted_path)
+
+            if extracted_path.exists():
+                for file_path in extracted_path.rglob('*'):
+                    if file_path.is_file() and file_path.suffix.lower() in image_extensions:
+                        relative_path = file_path.relative_to(extracted_path)
+
+                        # Get the parent directory (classification label/class)
+                        parent_dir = file_path.parent.name if file_path.parent != extracted_path else None
+
+                        image_files.append({
+                            'filename': file_path.name,
+                            'path': str(relative_path).replace('\\', '/'),  # Ensure forward slashes for URLs
+                            'size': file_path.stat().st_size,
+                            'extension': file_path.suffix.lower(),
+                            'class': parent_dir  # Add classification label
+                        })
+
+            # Sort by filename
+            image_files.sort(key=lambda x: x['filename'])
+
+            # Paginate
+            total_images = len(image_files)
+            total_pages = (total_images + page_size - 1) // page_size
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_images = image_files[start_idx:end_idx]
+
+            return Response({
+                'images': paginated_images,
+                'total_images': total_images,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': total_pages,
+                'dataset_id': dataset.id,
+                'dataset_name': dataset.name
+            })
+
+        except Exception as e:
+            logger.error(f"Error listing images for dataset {pk}: {e}", exc_info=True)
+            return Response(
+                {"error": f"Failed to list images: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def _get_quality_recommendations(self, dataset):
         """Generate data quality recommendations"""
@@ -421,10 +628,27 @@ class MLModelViewSet(viewsets.ModelViewSet):
         
         if model.status == ModelStatus.TRAINING:
             return Response(
-                {"error": "Model is already training"}, 
+                {"error": "Model is already training"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # Validate dataset type matches model type
+        is_cnn = model.model_type == ModelType.CNN
+        is_image_dataset = model.dataset.is_image_dataset or bool(model.dataset.image_folder)
+        has_csv = bool(model.dataset.csv_file and model.dataset.csv_file.name)
+
+        if is_cnn and not is_image_dataset:
+            return Response(
+                {"error": "CNN models require an image dataset. The selected dataset appears to be a tabular dataset."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not is_cnn and not has_csv:
+            return Response(
+                {"error": "This model type requires a tabular dataset with a CSV file. The selected dataset appears to be an image dataset."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             model.status = ModelStatus.TRAINING
             model.save()
@@ -435,7 +659,7 @@ class MLModelViewSet(viewsets.ModelViewSet):
 
             # Try to queue task with Celery, fallback to synchronous execution
             try:
-                if model.dataset.is_image_dataset:
+                if is_image_dataset:
                     train_cnn_task.delay(model.id)
                 elif model.model_type == ModelType.NEURAL_NETWORK:
                     train_nn_task.delay(model.id)
@@ -565,6 +789,78 @@ class MLModelViewSet(viewsets.ModelViewSet):
             "history": training_run.history if training_run else []
         })
 
+    @action(detail=True, methods=['get'])
+    def prediction_info(self, request, pk=None) -> Response:
+        """
+        Get prediction schema and tips for making predictions with this model.
+
+        Args:
+            request: The HTTP request
+            pk: Primary key of the model
+
+        Returns:
+            Response with prediction schema, tips, and example usage
+        """
+        model = self.get_object()
+
+        if model.status != ModelStatus.COMPLETE:
+            return Response(
+                {
+                    "error": "Model is not ready for predictions",
+                    "status": model.status,
+                    "message": "Please wait for the model to complete training"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Build comprehensive prediction info
+        prediction_info = {
+            "model_id": model.id,
+            "model_name": model.name,
+            "model_type": model.model_type,
+            "schema": model.prediction_schema,
+            "tips": []
+        }
+
+        # Add model-specific tips
+        if model.dataset.is_image_dataset:
+            prediction_info["tips"] = [
+                "Upload an image file in one of the supported formats",
+                f"Image will be automatically resized to {model.prediction_schema.get('input_size', 64)}x{model.prediction_schema.get('input_size', 64)}",
+                f"Model will classify the image into one of these categories: {', '.join(model.prediction_schema.get('output_classes', []))}",
+                "Supported formats: JPG, PNG, BMP, GIF"
+            ]
+            prediction_info["example_request"] = {
+                "data": "path/to/image.jpg or upload image file"
+            }
+        else:
+            # Tabular data model
+            input_features = model.prediction_schema.get('input_features', [])
+            prediction_info["tips"] = [
+                f"Provide values for all {len(input_features)} required features",
+                "You can send a single record (dict) or multiple records (list of dicts)",
+                "Feature names must match exactly as shown in the schema",
+                "Missing features will cause an error"
+            ]
+
+            if 'output_classes' in model.prediction_schema:
+                prediction_info["tips"].append(
+                    f"Model will predict one of: {', '.join(model.prediction_schema.get('output_classes', []))}"
+                )
+
+            # Create example with proper structure
+            example_single = {feature: 0.0 for feature in input_features}
+            prediction_info["example_request"] = {
+                "single_prediction": {
+                    "data": example_single
+                },
+                "batch_prediction": {
+                    "data": [example_single, example_single]
+                }
+            }
+
+        return Response(prediction_info)
+
     @action(detail=True, methods=['post'])
     def predict(self, request, pk=None) -> Response:
         """
@@ -590,6 +886,59 @@ class MLModelViewSet(viewsets.ModelViewSet):
             )
 
         try:
+            # Check for uploaded image file first
+            if 'image' in request.FILES:
+                # Handle image file upload
+                # Check if this is an image model (CNN) or dataset is marked as image dataset
+                is_image_model = (
+                    model.model_type == ModelType.CNN or
+                    model.dataset.is_image_dataset or
+                    bool(model.dataset.image_folder)
+                )
+
+                if not is_image_model:
+                    return Response(
+                        {"error": "This model does not support image predictions"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                import tempfile
+                import os
+                from PIL import Image
+
+                # Save uploaded file temporarily
+                uploaded_file = request.FILES['image']
+
+                # Validate it's an image
+                try:
+                    img = Image.open(uploaded_file)
+                    img.verify()
+                    uploaded_file.seek(0)  # Reset file pointer after verify
+                except Exception:
+                    return Response(
+                        {"error": "Invalid image file"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # Save to temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
+                    for chunk in uploaded_file.chunks():
+                        tmp_file.write(chunk)
+                    tmp_path = tmp_file.name
+
+                try:
+                    # Make prediction
+                    prediction = predict_cnn(model, tmp_path)
+
+                    return Response({
+                        "prediction": prediction,
+                        "filename": uploaded_file.name
+                    })
+                finally:
+                    # Clean up temporary file
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+
             # Get prediction data from request
             data = request.data.get('data')
             if not data:
@@ -1042,3 +1391,241 @@ class TrainingRunViewSet(viewsets.ReadOnlyModelViewSet):
             QuerySet of training runs for models owned by the current user
         """
         return TrainingRun.objects.filter(model__created_by=self.request.user).order_by('id')
+
+
+# Standalone view for serving images (not part of ViewSet)
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def serve_image(request, dataset_id, image_path):
+    """
+    Standalone view to serve image files from datasets.
+
+    Args:
+        request: HTTP request
+        dataset_id: Dataset UUID
+        image_path: Relative path to image within dataset
+
+    Query params:
+        thumbnail: if 'true', serve thumbnail version
+
+    Returns:
+        FileResponse with image data
+    """
+    from pathlib import Path
+    from urllib.parse import unquote
+
+    try:
+        # Get the dataset
+        dataset = Dataset.objects.get(id=dataset_id, deleted=False)
+
+        # Check permissions
+        if not request.user.is_authenticated:
+            return Response({"error": "Authentication required"}, status=401)
+
+        # URL decode the image path
+        image_path = unquote(image_path)
+
+        # Check if thumbnail is requested
+        use_thumbnail = request.query_params.get('thumbnail', 'false').lower() == 'true'
+
+        # Construct full path
+        extracted_path = Path(dataset.extracted_path)
+
+        if use_thumbnail:
+            # Serve thumbnail from thumbnails directory
+            thumbnail_path = extracted_path / "thumbnails" / Path(image_path).with_suffix('.jpg')
+
+            # Security check
+            if not str(thumbnail_path.resolve()).startswith(str(extracted_path.resolve())):
+                return Response({"error": "Invalid path"}, status=400)
+
+            if thumbnail_path.exists() and thumbnail_path.is_file():
+                full_image_path = thumbnail_path
+            else:
+                # Fallback to original if thumbnail doesn't exist
+                full_image_path = extracted_path / image_path
+        else:
+            # Serve original image
+            full_image_path = extracted_path / image_path
+
+        # Security check
+        if not str(full_image_path.resolve()).startswith(str(extracted_path.resolve())):
+            return Response({"error": "Invalid path"}, status=400)
+
+        # Check if file exists
+        if not full_image_path.exists() or not full_image_path.is_file():
+            raise Http404("Image not found")
+
+        # Determine content type
+        content_types = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.bmp': 'image/bmp',
+            '.tiff': 'image/tiff',
+            '.webp': 'image/webp'
+        }
+        content_type = content_types.get(full_image_path.suffix.lower(), 'application/octet-stream')
+
+        # Serve the file with cache headers
+        response = FileResponse(open(full_image_path, 'rb'), content_type=content_type)
+        response['Content-Disposition'] = f'inline; filename="{full_image_path.name}"'
+        # Add cache headers for better performance
+        response['Cache-Control'] = 'public, max-age=3600'  # Cache for 1 hour
+        return response
+
+    except Dataset.DoesNotExist:
+        raise Http404("Dataset not found")
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def batch_serve_images(request, dataset_id):
+    """
+    Batch serve multiple images in a single request for better performance.
+
+    Args:
+        request: HTTP request with JSON body containing image paths
+        dataset_id: Dataset UUID
+
+    Request body:
+        {
+            "image_paths": ["path/to/image1.jpg", "path/to/image2.png"],
+            "thumbnail": true/false (optional, default: false)
+        }
+
+    Returns:
+        JSON response with base64-encoded images
+    """
+    import base64
+    from pathlib import Path
+    from urllib.parse import unquote
+
+    try:
+        # Get the dataset
+        dataset = Dataset.objects.get(id=dataset_id, deleted=False)
+
+        # Check permissions
+        if not request.user.is_authenticated:
+            return Response({"error": "Authentication required"}, status=401)
+
+        # Get request data
+        image_paths = request.data.get('image_paths', [])
+        use_thumbnail = request.data.get('thumbnail', False)
+
+        if not image_paths or not isinstance(image_paths, list):
+            return Response(
+                {"error": "image_paths must be a non-empty array"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Limit to 50 images per request
+        if len(image_paths) > 50:
+            return Response(
+                {"error": "Maximum 50 images per request"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        extracted_path = Path(dataset.extracted_path)
+        results = []
+
+        for img_path in image_paths:
+            try:
+                # URL decode the image path
+                img_path = unquote(img_path)
+
+                if use_thumbnail:
+                    # Serve thumbnail
+                    thumbnail_path = extracted_path / "thumbnails" / Path(img_path).with_suffix('.jpg')
+
+                    # Security check
+                    if not str(thumbnail_path.resolve()).startswith(str(extracted_path.resolve())):
+                        results.append({
+                            'path': img_path,
+                            'error': 'Invalid path',
+                            'data': None
+                        })
+                        continue
+
+                    if thumbnail_path.exists() and thumbnail_path.is_file():
+                        full_image_path = thumbnail_path
+                    else:
+                        # Fallback to original
+                        full_image_path = extracted_path / img_path
+                else:
+                    # Serve original
+                    full_image_path = extracted_path / img_path
+
+                # Security check
+                if not str(full_image_path.resolve()).startswith(str(extracted_path.resolve())):
+                    results.append({
+                        'path': img_path,
+                        'error': 'Invalid path',
+                        'data': None
+                    })
+                    continue
+
+                # Check if file exists
+                if not full_image_path.exists() or not full_image_path.is_file():
+                    results.append({
+                        'path': img_path,
+                        'error': 'Image not found',
+                        'data': None
+                    })
+                    continue
+
+                # Read and encode image
+                with open(full_image_path, 'rb') as f:
+                    image_data = f.read()
+                    encoded_data = base64.b64encode(image_data).decode('utf-8')
+
+                # Determine content type
+                content_types = {
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.png': 'image/png',
+                    '.gif': 'image/gif',
+                    '.bmp': 'image/bmp',
+                    '.tiff': 'image/tiff',
+                    '.webp': 'image/webp'
+                }
+                content_type = content_types.get(full_image_path.suffix.lower(), 'image/jpeg')
+
+                results.append({
+                    'path': img_path,
+                    'data': f'data:{content_type};base64,{encoded_data}',
+                    'content_type': content_type,
+                    'size': len(image_data)
+                })
+
+            except Exception as e:
+                logger.error(f"Error loading image {img_path}: {e}")
+                results.append({
+                    'path': img_path,
+                    'error': str(e),
+                    'data': None
+                })
+
+        return Response({
+            'dataset_id': dataset_id,
+            'images': results,
+            'total': len(results),
+            'thumbnail': use_thumbnail
+        })
+
+    except Dataset.DoesNotExist:
+        return Response(
+            {"error": "Dataset not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error in batch_serve_images: {e}", exc_info=True)
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

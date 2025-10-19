@@ -9,15 +9,15 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = [
-            'id', 'name', 'description', 'csv_file', 'image_folder',
+            'id', 'name', 'description', 'csv_file', 'image_folder', 'extracted_path',
             'dataset_type', 'dataset_purpose', 'data_quality',
             'row_count', 'column_count', 'file_size', 'file_size_formatted',
-            'encoding', 'is_processed', 'last_analyzed', 'quality_score',
+            'encoding', 'is_processed', 'processing_errors', 'last_analyzed', 'quality_score',
             'is_image_dataset', 'created_at', 'created_by'
         ]
         read_only_fields = [
             'id', 'created_at', 'created_by', 'row_count', 'column_count',
-            'file_size', 'is_processed', 'last_analyzed'
+            'file_size', 'is_processed', 'processing_errors', 'last_analyzed', 'extracted_path'
         ]
 
     def get_file_size_formatted(self, obj):
@@ -41,16 +41,16 @@ class DatasetSerializer(serializers.ModelSerializer):
 
 class MLModelSerializer(serializers.ModelSerializer):
     dataset_name = serializers.CharField(source='dataset.name', read_only=True)
-    
+
     class Meta:
         model = MLModel
         fields = [
             'id', 'name', 'dataset', 'dataset_name', 'target_column',
             'training_config', 'status', 'model_type', 'test_size',
             'random_state', 'max_iter', 'accuracy', 'training_log',
-            'created_at', 'created_by'
+            'prediction_schema', 'created_at', 'created_by'
         ]
-        read_only_fields = ['id', 'created_at', 'created_by', 'status', 'accuracy', 'training_log']
+        read_only_fields = ['id', 'created_at', 'created_by', 'status', 'accuracy', 'training_log', 'prediction_schema']
 
 
 class TrainingRunSerializer(serializers.ModelSerializer):
