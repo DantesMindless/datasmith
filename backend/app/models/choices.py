@@ -9,14 +9,33 @@ class ModelStatus(models.TextChoices):
 
 
 class ModelType(models.TextChoices):
+    # Traditional ML Models
     LOGISTIC_REGRESSION = "logistic_regression", "Logistic Regression"
+    DECISION_TREE = "decision_tree", "Decision Tree"
     RANDOM_FOREST = "random_forest", "Random Forest"
     SVM = "svm", "Support Vector Machine"
     NAIVE_BAYES = "naive_bayes", "Naive Bayes"
     KNN = "knn", "k-Nearest Neighbours"
-    GRADIENT_BOOSTING = "GRADIENT_BOOSTING", "Gradient Boosting"
+
+    # Ensemble Models
+    GRADIENT_BOOSTING = "gradient_boosting", "Gradient Boosting (sklearn)"
+    XGBOOST = "xgboost", "XGBoost"
+    LIGHTGBM = "lightgbm", "LightGBM"
+    ADABOOST = "adaboost", "AdaBoost"
+
+    # Deep Learning - General
     NEURAL_NETWORK = "neural_network", "Neural Network (PyTorch)"
+
+    # Deep Learning - Computer Vision
     CNN = "cnn", "Convolutional Neural Network (CNN)"
+    RESNET = "resnet", "ResNet (Transfer Learning)"
+    VGG = "vgg", "VGG (Transfer Learning)"
+    EFFICIENTNET = "efficientnet", "EfficientNet (Transfer Learning)"
+
+    # Deep Learning - Sequential Data
+    RNN = "rnn", "Recurrent Neural Network (RNN)"
+    LSTM = "lstm", "Long Short-Term Memory (LSTM)"
+    GRU = "gru", "Gated Recurrent Unit (GRU)"
 
 
 class ActivationFunction(models.TextChoices):

@@ -21,6 +21,7 @@ from .models.choices import ModelStatus
 from .serializers import DatasetSerializer, MLModelSerializer, TrainingRunSerializer
 from .functions.celery_tasks import train_cnn_task, train_nn_task, train_sklearn_task
 from .models.choices import ModelType
+from .validators.model_compatibility import ModelCompatibilityValidator
 
 logger = logging.getLogger(__name__)
 
@@ -572,6 +573,92 @@ class DatasetViewSet(viewsets.ModelViewSet):
             logger.error(f"Error calculating distributions: {e}")
             return {}
 
+    @action(detail=True, methods=['get'])
+    def compatible_models(self, request, pk=None) -> Response:
+        """
+        Get list of compatible model types for this dataset.
+
+        Returns:
+            Response with compatible models and their details
+        """
+        dataset = self.get_object()
+
+        try:
+            compatible = ModelCompatibilityValidator.get_compatible_models_for_dataset_type(
+                dataset.dataset_type
+            )
+
+            model_details = []
+            for model_type in compatible:
+                info = ModelCompatibilityValidator.get_model_info(model_type)
+                model_details.append({
+                    'model_type': model_type,
+                    'complexity': info.get('complexity'),
+                    'training_speed': info.get('training_speed'),
+                    'interpretability': info.get('interpretability'),
+                    'min_samples': info.get('min_samples'),
+                    'compatible_purposes': info.get('compatible_purposes', [])
+                })
+
+            return Response({
+                'dataset_id': dataset.id,
+                'dataset_name': dataset.name,
+                'dataset_type': dataset.dataset_type,
+                'compatible_models': model_details,
+                'total_compatible': len(model_details)
+            })
+
+        except Exception as e:
+            logger.error(f"Error getting compatible models for dataset {pk}: {e}")
+            return Response(
+                {"error": f"Failed to get compatible models: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get'])
+    def recommended_models(self, request, pk=None) -> Response:
+        """
+        Get AI-recommended model types for this dataset based on characteristics.
+
+        Returns:
+            Response with ranked model recommendations
+        """
+        dataset = self.get_object()
+
+        try:
+            recommendations = ModelCompatibilityValidator.get_recommended_models(dataset, top_n=5)
+
+            formatted_recommendations = []
+            for model_type, score, validation in recommendations:
+                model_info = ModelCompatibilityValidator.get_model_info(model_type)
+                formatted_recommendations.append({
+                    'model_type': model_type,
+                    'compatibility_score': score,
+                    'is_compatible': validation['is_compatible'],
+                    'warnings': validation['warnings'],
+                    'recommendations': validation['recommendations'],
+                    'complexity': model_info.get('complexity'),
+                    'training_speed': model_info.get('training_speed'),
+                    'interpretability': model_info.get('interpretability')
+                })
+
+            return Response({
+                'dataset_id': dataset.id,
+                'dataset_name': dataset.name,
+                'dataset_type': dataset.dataset_type,
+                'dataset_purpose': dataset.dataset_purpose,
+                'row_count': dataset.row_count,
+                'column_count': dataset.column_count,
+                'recommendations': formatted_recommendations
+            })
+
+        except Exception as e:
+            logger.error(f"Error getting model recommendations for dataset {pk}: {e}")
+            return Response(
+                {"error": f"Failed to get model recommendations: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class MLModelViewSet(viewsets.ModelViewSet):
     """
@@ -602,7 +689,7 @@ class MLModelViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Filter ML models based on user authentication status.
-        
+
         Returns:
             QuerySet of ML models accessible to the current user
         """
@@ -611,6 +698,89 @@ class MLModelViewSet(viewsets.ModelViewSet):
             return MLModel.objects.filter(deleted=False).order_by('id')
         else:
             return MLModel.objects.none()
+
+    @action(detail=True, methods=['get'])
+    def validate_compatibility(self, request, pk=None) -> Response:
+        """
+        Validate if the model type is compatible with its dataset.
+
+        Returns:
+            Response with validation results, warnings, and recommendations
+        """
+        model = self.get_object()
+
+        try:
+            validation = ModelCompatibilityValidator.validate_compatibility(
+                model.model_type,
+                model.dataset
+            )
+
+            return Response({
+                'model_id': model.id,
+                'model_name': model.name,
+                'model_type': model.model_type,
+                'dataset_id': model.dataset.id,
+                'dataset_name': model.dataset.name,
+                'dataset_type': model.dataset.dataset_type,
+                'validation': validation
+            })
+
+        except Exception as e:
+            logger.error(f"Error validating compatibility for model {pk}: {e}")
+            return Response(
+                {"error": f"Failed to validate compatibility: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def check_compatibility(self, request) -> Response:
+        """
+        Check compatibility before creating a model.
+
+        Request body:
+            {
+                "model_type": "random_forest",
+                "dataset_id": "uuid-here"
+            }
+
+        Returns:
+            Response with validation results
+        """
+        model_type = request.data.get('model_type')
+        dataset_id = request.data.get('dataset_id')
+
+        if not model_type or not dataset_id:
+            return Response(
+                {"error": "Both model_type and dataset_id are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            dataset = Dataset.objects.get(id=dataset_id)
+            validation = ModelCompatibilityValidator.validate_compatibility(
+                model_type,
+                dataset
+            )
+
+            return Response({
+                'model_type': model_type,
+                'dataset_id': dataset.id,
+                'dataset_name': dataset.name,
+                'dataset_type': dataset.dataset_type,
+                'validation': validation
+            })
+
+        except Dataset.DoesNotExist:
+            return Response(
+                {"error": "Dataset not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error checking compatibility: {e}")
+            return Response(
+                {"error": f"Failed to check compatibility: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['post'])
     def train(self, request, pk=None) -> Response:

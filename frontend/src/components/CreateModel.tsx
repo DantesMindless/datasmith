@@ -14,8 +14,13 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Chip,
+  Stack,
+  Paper,
+  Divider
 } from "@mui/material";
+import { Warning, CheckCircle, Info, TrendingUp } from "@mui/icons-material";
 import { modelConfigSchemas, ConfigField } from "../utils/modelSchema";
 import httpfetch from "../utils/axios";
 
@@ -32,6 +37,8 @@ export default function CreateModelPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [compatibilityInfo, setCompatibilityInfo] = useState<any>(null);
+  const [loadingCompatibility, setLoadingCompatibility] = useState(false);
 
   const [dialogOpenKey, setDialogOpenKey] = useState<string | null>(null);
   const [layerDraft, setLayerDraft] = useState<Record<string, any>>({});
@@ -144,6 +151,27 @@ export default function CreateModelPage() {
     }
   };
 
+  const checkCompatibility = async (modelTypeToCheck: string, datasetIdToCheck: string) => {
+    if (!modelTypeToCheck || !datasetIdToCheck) {
+      setCompatibilityInfo(null);
+      return;
+    }
+
+    try {
+      setLoadingCompatibility(true);
+      const response = await httpfetch.post('models/check_compatibility/', {
+        model_type: modelTypeToCheck,
+        dataset_id: datasetIdToCheck
+      });
+      setCompatibilityInfo(response.data);
+    } catch (err: any) {
+      console.error('Error checking compatibility:', err);
+      setCompatibilityInfo(null);
+    } finally {
+      setLoadingCompatibility(false);
+    }
+  };
+
   const handleDatasetChange = (newDatasetId: string) => {
     setDatasetId(newDatasetId);
     setTargetColumn(""); // Reset target column when dataset changes
@@ -151,6 +179,32 @@ export default function CreateModelPage() {
 
     if (newDatasetId) {
       fetchDatasetColumns(newDatasetId);
+      // Check compatibility if model type is already selected
+      if (modelType) {
+        checkCompatibility(modelType, newDatasetId);
+      }
+    } else {
+      setCompatibilityInfo(null);
+    }
+  };
+
+  const handleModelTypeChange = (newModelType: string) => {
+    setModelType(newModelType);
+
+    // build initial config with defaults
+    const defaults: Record<string, any> = {};
+    const schema = modelConfigSchemas[newModelType] || [];
+    schema.forEach((field) => {
+      if (field.default !== undefined) {
+        defaults[field.key] = field.default;
+      }
+    });
+
+    setConfigValues(defaults);
+
+    // Check compatibility if dataset is already selected
+    if (datasetId) {
+      checkCompatibility(newModelType, datasetId);
     }
   };
 
@@ -248,33 +302,115 @@ export default function CreateModelPage() {
             <Select
                 labelId="model-type-label"
                 value={modelType}
-                onChange={(e) => {
-                    const newType = e.target.value;
-                    setModelType(newType);
-
-                    // build initial config with defaults
-                    const defaults: Record<string, any> = {};
-                    const schema = modelConfigSchemas[newType] || [];
-                    schema.forEach((field) => {
-                    if (field.default !== undefined) {
-                        defaults[field.key] = field.default;
-                    }
-                    });
-
-                    setConfigValues(defaults);
-                }}
+                onChange={(e) => handleModelTypeChange(e.target.value)}
                 required
                >
+              <MenuItem disabled><em>Traditional ML</em></MenuItem>
               <MenuItem value="logistic_regression">Logistic Regression</MenuItem>
+              <MenuItem value="decision_tree">Decision Tree</MenuItem>
               <MenuItem value="random_forest">Random Forest</MenuItem>
               <MenuItem value="svm">Support Vector Machine</MenuItem>
               <MenuItem value="naive_bayes">Naive Bayes</MenuItem>
               <MenuItem value="knn">k-Nearest Neighbours</MenuItem>
-              <MenuItem value="gradient_boosting">Gradient Boosting</MenuItem>
+
+              <MenuItem disabled><em>Ensemble Methods</em></MenuItem>
+              <MenuItem value="gradient_boosting">Gradient Boosting (sklearn)</MenuItem>
+              <MenuItem value="xgboost">XGBoost</MenuItem>
+              <MenuItem value="lightgbm">LightGBM</MenuItem>
+              <MenuItem value="adaboost">AdaBoost</MenuItem>
+
+              <MenuItem disabled><em>Deep Learning - General</em></MenuItem>
               <MenuItem value="neural_network">Neural Network (PyTorch)</MenuItem>
+
+              <MenuItem disabled><em>Deep Learning - Computer Vision</em></MenuItem>
               <MenuItem value="cnn">Convolutional Neural Network (CNN)</MenuItem>
+              <MenuItem value="resnet">ResNet (Transfer Learning)</MenuItem>
+              <MenuItem value="vgg">VGG (Transfer Learning)</MenuItem>
+              <MenuItem value="efficientnet">EfficientNet (Transfer Learning)</MenuItem>
+
+              <MenuItem disabled><em>Deep Learning - Sequential Data</em></MenuItem>
+              <MenuItem value="rnn">Recurrent Neural Network (RNN)</MenuItem>
+              <MenuItem value="lstm">Long Short-Term Memory (LSTM)</MenuItem>
+              <MenuItem value="gru">Gated Recurrent Unit (GRU)</MenuItem>
             </Select>
           </FormControl>
+
+          {/* Compatibility Info Display */}
+          {loadingCompatibility && (
+            <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" color="text.secondary">
+                Checking compatibility...
+              </Typography>
+            </Box>
+          )}
+
+          {compatibilityInfo && compatibilityInfo.validation && (
+            <Paper elevation={0} sx={{ mt: 2, p: 2, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
+              <Stack spacing={1.5}>
+                {/* Compatibility Status */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {compatibilityInfo.validation.is_compatible ? (
+                    <CheckCircle color="success" fontSize="small" />
+                  ) : (
+                    <Warning color="error" fontSize="small" />
+                  )}
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Compatibility: {compatibilityInfo.validation.is_compatible ? 'Compatible' : 'Not Compatible'}
+                  </Typography>
+                  <Chip
+                    label={`Score: ${compatibilityInfo.validation.score}/100`}
+                    size="small"
+                    color={compatibilityInfo.validation.score >= 80 ? 'success' : compatibilityInfo.validation.score >= 50 ? 'warning' : 'error'}
+                    sx={{ ml: 'auto' }}
+                  />
+                </Box>
+
+                {/* Errors */}
+                {compatibilityInfo.validation.errors && compatibilityInfo.validation.errors.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" fontWeight={600} color="error.main" sx={{ display: 'block', mb: 0.5 }}>
+                      Errors:
+                    </Typography>
+                    {compatibilityInfo.validation.errors.map((err: string, idx: number) => (
+                      <Alert key={idx} severity="error" sx={{ py: 0.5, fontSize: '0.813rem' }}>
+                        {err}
+                      </Alert>
+                    ))}
+                  </Box>
+                )}
+
+                {/* Warnings */}
+                {compatibilityInfo.validation.warnings && compatibilityInfo.validation.warnings.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" fontWeight={600} color="warning.main" sx={{ display: 'block', mb: 0.5 }}>
+                      Warnings:
+                    </Typography>
+                    {compatibilityInfo.validation.warnings.map((warn: string, idx: number) => (
+                      <Alert key={idx} severity="warning" sx={{ py: 0.5, fontSize: '0.813rem' }}>
+                        {warn}
+                      </Alert>
+                    ))}
+                  </Box>
+                )}
+
+                {/* Recommendations */}
+                {compatibilityInfo.validation.recommendations && compatibilityInfo.validation.recommendations.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" fontWeight={600} color="info.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                      <TrendingUp fontSize="small" />
+                      Recommendations:
+                    </Typography>
+                    {compatibilityInfo.validation.recommendations.map((rec: string, idx: number) => (
+                      <Alert key={idx} severity="info" sx={{ py: 0.5, fontSize: '0.813rem' }}>
+                        {rec}
+                      </Alert>
+                    ))}
+                  </Box>
+                )}
+              </Stack>
+            </Paper>
+          )}
 
           {fields.length > 0 && (
             <Box sx={{ mt: 3 }}>

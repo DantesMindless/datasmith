@@ -52,6 +52,7 @@ import {
   BugReport,
   CleaningServices,
   Image as ImageIcon,
+  TrendingUp,
 } from '@mui/icons-material';
 import httpfetch from '../../../utils/axios';
 import ImageDatasetViewer from '../../ImageDatasetViewer';
@@ -141,6 +142,8 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   const fetchDatasetData = async (id: string | number) => {
     try {
@@ -157,6 +160,9 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
       setDataset(datasetResponse.data);
       setPreviewData(previewResponse.data);
       setQualityReport(qualityResponse.data);
+
+      // Fetch model recommendations
+      fetchModelRecommendations(id);
 
     } catch (err: any) {
       console.error('Error fetching dataset data:', err);
@@ -186,6 +192,19 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
       setError('Failed to reanalyze dataset');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const fetchModelRecommendations = async (id: string | number) => {
+    try {
+      setLoadingRecommendations(true);
+      const response = await httpfetch.get(`datasets/${id}/recommended_models/`);
+      setRecommendations(response.data.recommendations || []);
+    } catch (err: any) {
+      console.error('Error fetching model recommendations:', err);
+      setRecommendations([]);
+    } finally {
+      setLoadingRecommendations(false);
     }
   };
 
@@ -589,6 +608,112 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
               </Grid>
             </>
           )}
+
+          {/* Model Recommendations */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="h6" fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TrendingUp color="primary" />
+                    Recommended Models for this Dataset
+                  </Typography>
+                  {loadingRecommendations && <CircularProgress size={20} />}
+                </Box>
+
+                {recommendations.length > 0 ? (
+                  <Grid container spacing={2}>
+                    {recommendations.map((rec, index) => (
+                      <Grid item xs={12} sm={6} md={4} key={index}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            height: '100%',
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              borderColor: 'primary.main',
+                              boxShadow: 2,
+                            }
+                          }}
+                        >
+                          <Stack spacing={1.5}>
+                            {/* Rank Badge */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Chip
+                                label={`#${index + 1}`}
+                                size="small"
+                                color={index === 0 ? 'success' : index === 1 ? 'primary' : 'default'}
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Chip
+                                label={`${rec.compatibility_score}/100`}
+                                size="small"
+                                color={
+                                  rec.compatibility_score >= 80 ? 'success' :
+                                  rec.compatibility_score >= 60 ? 'primary' : 'warning'
+                                }
+                              />
+                            </Box>
+
+                            {/* Model Name */}
+                            <Typography variant="subtitle1" fontWeight={600}>
+                              {rec.model_type.split('_').map((word: string) =>
+                                word.charAt(0).toUpperCase() + word.slice(1)
+                              ).join(' ')}
+                            </Typography>
+
+                            {/* Model Properties */}
+                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                              <Chip label={`Speed: ${rec.training_speed}`} size="small" variant="outlined" />
+                              <Chip label={`Complexity: ${rec.complexity}`} size="small" variant="outlined" />
+                            </Stack>
+
+                            {/* Compatibility Status */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              {rec.is_compatible ? (
+                                <CheckCircle fontSize="small" color="success" />
+                              ) : (
+                                <Warning fontSize="small" color="warning" />
+                              )}
+                              <Typography variant="caption" fontWeight={500}>
+                                {rec.is_compatible ? 'Compatible' : 'Partial Compatibility'}
+                              </Typography>
+                            </Box>
+
+                            {/* Warnings */}
+                            {rec.warnings && rec.warnings.length > 0 && (
+                              <Alert severity="warning" sx={{ py: 0.5, fontSize: '0.75rem' }}>
+                                {rec.warnings[0]}
+                              </Alert>
+                            )}
+
+                            {/* Recommendation */}
+                            {rec.recommendations && rec.recommendations.length > 0 && (
+                              <Alert severity="info" icon={<Info fontSize="small" />} sx={{ py: 0.5, fontSize: '0.75rem' }}>
+                                {rec.recommendations[0]}
+                              </Alert>
+                            )}
+                          </Stack>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : loadingRecommendations ? (
+                  <Box sx={{ textAlign: 'center', py: 3 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <Alert severity="info">
+                    No model recommendations available for this dataset type.
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
       )}
 
