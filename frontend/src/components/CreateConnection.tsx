@@ -172,14 +172,23 @@ const CreateConnection: React.FC = () => {
     const connectionData = getConnectionData();
     if (connectionData) {
       try {
-        showInfo("Connection saved successfully");
-        await saveConnection(connectionData, test);
+        const response = await saveConnection(connectionData, test);
         if (test) {
           setConnectionsSuccess(true);
+          showInfo("Connection test successful!");
         } else {
           // Update the connections list after successful save
           await updateConnections();
-          showInfo("Connection saved successfully");
+          showInfo("Connection saved successfully!");
+
+          // Reset form after successful save
+          if (formRef.current) {
+            formRef.current.reset();
+          }
+          setSelectedConnectionType("all");
+          setCredentialsForm({});
+          setConnectionsSuccess(null);
+          setIsFormValid(false);
         }
       } catch (error: unknown) {
         if (error instanceof AxiosError && error?.response?.data?.credentials) {
@@ -192,7 +201,7 @@ const CreateConnection: React.FC = () => {
           });
         }
         setConnectionsSuccess(false);
-        showAlert("Error submitting connection");
+        showAlert(test ? "Connection test failed" : "Error saving connection");
       }
     } else {
       showAlert("Some connection credentials are missing");

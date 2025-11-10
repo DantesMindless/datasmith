@@ -8,7 +8,8 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import numpy as np
-from sklearn.metrics import accuracy_score
+import time
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
@@ -17,6 +18,7 @@ from sklearn.svm import SVC
 from sklearn.preprocessing import LabelEncoder
 from app.models.choices import ActivationFunction, ModelType
 from core.storage_utils import upload_to_minio
+from app.utils.training_logger import TrainingLogger
 
 ACTIVATION_MAP = {
     ActivationFunction.RELU: nn.ReLU,
@@ -155,33 +157,190 @@ def get_model_instance(model_type, obj):
 
 
 def train_sklearn_model(obj, X_train, y_train, X_test, y_test):
-    clf = get_model_instance(obj.model_type, obj)
-    clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
+    # Initialize logger
+    logger = TrainingLogger(obj)
 
-    buffer = io.BytesIO()
-    joblib.dump(clf, buffer)
-    buffer.seek(0)
+    # Get model configuration
+    config = obj.training_config or {}
+    config['model_type'] = obj.model_type
+    config['test_size'] = obj.test_size
+    config['random_state'] = obj.random_state
 
-    model_path = f"trained_models/{obj.id}.joblib"
-    upload_to_minio(buffer.read(), model_path, content_type="application/octet-stream")
+    try:
+        # Start training
+        logger.start_training(config)
 
-    # Save prediction schema
-    feature_names = X_train.columns.tolist()
-    obj.prediction_schema = {
-        "input_features": feature_names,
-        "feature_count": len(feature_names),
-        "target_column": obj.target_column,
-        "example": {col: "numeric_value" for col in feature_names},
-        "description": f"Provide values for these {len(feature_names)} features to make a prediction"
-    }
-    obj.save(update_fields=["prediction_schema"])
+        # Log data information
+        unique_classes = len(np.unique(y_train))
+        logger.log_data_loading({
+            'Total Training Samples': len(X_train),
+            'Total Test Samples': len(X_test),
+            'Number of Features': X_train.shape[1],
+            'Number of Classes': unique_classes,
+            'Class Distribution (Train)': dict(zip(*np.unique(y_train, return_counts=True)))
+        })
 
-    return model_path, acc
+        logger.log_data_split(len(X_train), len(X_test))
+
+        # Log preprocessing
+        preprocessing_steps = [
+            f"Feature scaling/normalization (if applicable)",
+            f"Encoding categorical variables",
+            f"Handling missing values"
+        ]
+        logger.log_preprocessing(preprocessing_steps)
+
+        # Get and log model instance
+        logger.log_info("\n🔨 Initializing model...")
+        clf = get_model_instance(obj.model_type, obj)
+
+        # Log model architecture/parameters
+        model_params = clf.get_params()
+        architecture = {
+            'Algorithm': obj.model_type,
+            'Hyperparameters': {k: str(v) for k, v in model_params.items() if v is not None}
+        }
+        logger.log_model_architecture(architecture)
+
+        # Training
+        logger.log_training_start(total_epochs=1)  # sklearn is single-phase
+        logger.log_info("⏳ Fitting model to training data...")
+
+        train_start = time.time()
+
+        # Fit with progress tracking for ensemble methods
+        if hasattr(clf, 'n_estimators'):
+            n_estimators = getattr(clf, 'n_estimators', 100)
+            logger.log_info(f"Training {n_estimators} estimators...")
+
+        clf.fit(X_train, y_train)
+        train_time = time.time() - train_start
+
+        logger.log_info(f"✓ Model fitting completed in {logger._format_duration(train_time)}")
+
+        # Predictions on training set
+        logger.log_info("\n📊 Evaluating on training set...")
+        train_pred = clf.predict(X_train)
+        train_acc = accuracy_score(y_train, train_pred)
+        logger.log_info(f"  Training Accuracy: {train_acc:.4f} ({train_acc*100:.2f}%)")
+
+        # Predictions on test set
+        logger.log_validation_start()
+        y_pred = clf.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
+
+        # Detailed evaluation metrics
+        class_report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+        conf_matrix = confusion_matrix(y_test, y_pred)
+
+        # Log evaluation results
+        eval_metrics = {
+            'Test Accuracy': f"{acc:.4f} ({acc*100:.2f}%)",
+            'Training Accuracy': f"{train_acc:.4f} ({train_acc*100:.2f}%)",
+            'Precision (weighted)': f"{class_report['weighted avg']['precision']:.4f}",
+            'Recall (weighted)': f"{class_report['weighted avg']['recall']:.4f}",
+            'F1-Score (weighted)': f"{class_report['weighted avg']['f1-score']:.4f}",
+            'Training Time': logger._format_duration(train_time)
+        }
+
+        # Add per-class metrics
+        logger.log_evaluation_results(eval_metrics)
+
+        logger.log_info("\n📋 Per-Class Performance:")
+        for class_name, metrics in class_report.items():
+            if class_name not in ['accuracy', 'macro avg', 'weighted avg']:
+                logger.log_info(f"  Class '{class_name}':")
+                logger.log_info(f"    Precision: {metrics['precision']:.4f}")
+                logger.log_info(f"    Recall: {metrics['recall']:.4f}")
+                logger.log_info(f"    F1-Score: {metrics['f1-score']:.4f}")
+                logger.log_info(f"    Support: {int(metrics['support'])} samples")
+
+        # Feature importance (if available)
+        if hasattr(clf, 'feature_importances_'):
+            logger.log_info("\n🎯 Top 10 Most Important Features:")
+            feature_names = X_train.columns.tolist()
+            importances = clf.feature_importances_
+            indices = np.argsort(importances)[::-1][:10]
+
+            for i, idx in enumerate(indices, 1):
+                logger.log_info(f"  {i}. {feature_names[idx]}: {importances[idx]:.4f}")
+
+        # Save model
+        logger.log_info("\n💾 Saving model...")
+        buffer = io.BytesIO()
+        joblib.dump(clf, buffer)
+        buffer.seek(0)
+
+        model_path = f"trained_models/{obj.id}.joblib"
+        model_bytes = buffer.read()
+        upload_to_minio(model_bytes, model_path, content_type="application/octet-stream")
+
+        logger.log_model_save(model_path, len(model_bytes))
+
+        # Save prediction schema
+        feature_names = X_train.columns.tolist()
+        obj.prediction_schema = {
+            "input_features": feature_names,
+            "feature_count": len(feature_names),
+            "target_column": obj.target_column,
+            "example": {col: "numeric_value" for col in feature_names},
+            "description": f"Provide values for these {len(feature_names)} features to make a prediction",
+            "model_type": obj.model_type,
+            "num_classes": unique_classes
+        }
+
+        # Save detailed metrics for analytics
+        y_pred = clf.predict(X_test)
+        class_report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+        conf_matrix = confusion_matrix(y_test, y_pred).tolist()
+
+        # Feature importance if available
+        feature_importance_data = []
+        if hasattr(clf, 'feature_importances_'):
+            for fname, importance in zip(feature_names, clf.feature_importances_):
+                feature_importance_data.append({
+                    "feature": fname,
+                    "importance": float(importance)
+                })
+            feature_importance_data.sort(key=lambda x: x["importance"], reverse=True)
+
+        # Get class distribution from predictions
+        y_pred_all = clf.predict(X_test)
+        unique_labels, counts = np.unique(y_pred_all, return_counts=True)
+        prediction_distribution = [
+            {"label": str(label), "value": int(count)}
+            for label, count in zip(unique_labels, counts)
+        ]
+
+        obj.analytics_data = {
+            "accuracy": float(acc),
+            "precision": float(class_report['weighted avg']['precision']),
+            "recall": float(class_report['weighted avg']['recall']),
+            "f1_score": float(class_report['weighted avg']['f1-score']),
+            "confusion_matrix": conf_matrix,
+            "feature_importance": feature_importance_data,
+            "prediction_distribution": prediction_distribution,
+            "training_samples": len(X_train),
+            "test_samples": len(X_test),
+            "class_report": class_report
+        }
+
+        obj.save(update_fields=["prediction_schema", "analytics_data"])
+
+        # Training complete
+        logger.log_training_complete(acc)
+
+        return model_path, acc
+
+    except Exception as e:
+        logger.log_error(e, "during sklearn model training")
+        raise
 
 
 def train_nn(obj, X_train, y_train, X_test, y_test):
+    # Initialize logger
+    logger = TrainingLogger(obj)
+
     config = obj.training_config or {}
     layer_config = config.get(
         "layer_config", [{"units": 32, "activation": ActivationFunction.RELU}]
@@ -190,73 +349,274 @@ def train_nn(obj, X_train, y_train, X_test, y_test):
     batch_size = config.get("batch_size", 16)
     lr = config.get("learning_rate", 0.001)
 
-    le = LabelEncoder()
-    y_train_encoded = le.fit_transform(y_train)
-    y_test_encoded = le.transform(y_test)
+    try:
+        # Start training
+        training_config = {
+            'model_type': 'Neural Network (PyTorch)',
+            'epochs': epochs,
+            'batch_size': batch_size,
+            'learning_rate': lr,
+            'optimizer': 'Adam',
+            'loss_function': 'CrossEntropyLoss'
+        }
+        logger.start_training(training_config)
 
-    input_dim = X_train.shape[1]
-    output_dim = len(np.unique(y_train_encoded))
+        # Encode labels
+        logger.log_info("\n🔧 Encoding target labels...")
+        le = LabelEncoder()
+        y_train_encoded = le.fit_transform(y_train)
+        y_test_encoded = le.transform(y_test)
 
-    model = ConfigurableMLP(input_dim, output_dim, layer_config)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+        input_dim = X_train.shape[1]
+        output_dim = len(np.unique(y_train_encoded))
 
-    train_dataset = data.TensorDataset(
-        torch.tensor(X_train.values, dtype=torch.float32),
-        torch.tensor(y_train_encoded, dtype=torch.long),
-    )
-    train_loader = data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        # Log data information
+        logger.log_data_loading({
+            'Input Features': input_dim,
+            'Output Classes': output_dim,
+            'Class Names': le.classes_.tolist(),
+            'Training Samples': len(X_train),
+            'Test Samples': len(X_test),
+            'Class Distribution': dict(zip(*np.unique(y_train_encoded, return_counts=True)))
+        })
 
-    model.train()
-    for _ in range(epochs):
-        for batch_x, batch_y in train_loader:
-            optimizer.zero_grad()
-            loss = criterion(model(batch_x), batch_y)
-            loss.backward()
-            optimizer.step()
+        logger.log_data_split(len(X_train), len(X_test))
 
-    model.eval()
-    with torch.no_grad():
-        X_test_tensor = torch.tensor(X_test.values, dtype=torch.float32)
-        preds = model(X_test_tensor).argmax(dim=1).numpy()
-        acc = accuracy_score(y_test_encoded, preds)
+        # Log preprocessing
+        preprocessing_steps = [
+            "Label encoding for target variable",
+            "Convert data to PyTorch tensors",
+            f"Create DataLoader with batch size {batch_size}"
+        ]
+        logger.log_preprocessing(preprocessing_steps)
 
-    buffer = io.BytesIO()
-    torch.save(model.state_dict(), buffer)
-    buffer.seek(0)
-    model_path = f"trained_models/{obj.id}.pt"
+        # Build model
+        logger.log_info("\n🏗️ Building neural network...")
+        model = ConfigurableMLP(input_dim, output_dim, layer_config)
 
-    upload_to_minio(buffer.read(), model_path, content_type="application/octet-stream")
+        # Count parameters
+        total_params = sum(p.numel() for p in model.parameters())
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    enc_buf = io.BytesIO()
-    joblib.dump(le, enc_buf)
-    enc_buf.seek(0)
-    encoder_path = f"trained_models/{obj.id}_encoder.joblib"
+        # Log architecture
+        architecture = {
+            'Input Dimension': input_dim,
+            'Output Dimension': output_dim,
+            'Hidden Layers': len(layer_config),
+            'Layer Configuration': [
+                f"Layer {i+1}: {cfg.get('units')} units, {cfg.get('activation', 'relu')} activation"
+                for i, cfg in enumerate(layer_config)
+            ],
+            'Total Parameters': f"{total_params:,}",
+            'Trainable Parameters': f"{trainable_params:,}"
+        }
+        logger.log_model_architecture(architecture)
 
-    upload_to_minio(
-        enc_buf.read(), encoder_path, content_type="application/octet-stream"
-    )
+        # Setup training
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    obj.training_config["output_dim"] = output_dim
-    obj.training_config["class_names"] = le.classes_.tolist()
+        train_dataset = data.TensorDataset(
+            torch.tensor(X_train.values, dtype=torch.float32),
+            torch.tensor(y_train_encoded, dtype=torch.long),
+        )
+        train_loader = data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    # Save prediction schema
-    feature_names = X_train.columns.tolist()
-    obj.prediction_schema = {
-        "input_features": feature_names,
-        "feature_count": len(feature_names),
-        "target_column": obj.target_column,
-        "output_classes": le.classes_.tolist(),
-        "example": {col: "numeric_value" for col in feature_names},
-        "description": f"Provide values for these {len(feature_names)} features to predict one of {output_dim} classes"
-    }
+        # Validation dataset
+        val_dataset = data.TensorDataset(
+            torch.tensor(X_test.values, dtype=torch.float32),
+            torch.tensor(y_test_encoded, dtype=torch.long)
+        )
+        val_loader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    obj.save(update_fields=["training_config", "prediction_schema"])
+        # Training loop
+        logger.log_training_start(epochs)
 
-    return model_path, acc
+        best_val_acc = 0.0
+        best_epoch = 0
+
+        for epoch in range(1, epochs + 1):
+            epoch_start = time.time()
+            logger.log_epoch_start(epoch, epochs)
+
+            # Training phase
+            model.train()
+            running_loss = 0.0
+            train_correct = 0
+            train_total = 0
+            num_batches = len(train_loader)
+
+            for batch_idx, (batch_x, batch_y) in enumerate(train_loader, 1):
+                optimizer.zero_grad()
+                outputs = model(batch_x)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
+
+                running_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                train_total += batch_y.size(0)
+                train_correct += (predicted == batch_y).sum().item()
+
+                # Log batch progress
+                if batch_idx % max(1, num_batches // 10) == 0 or batch_idx == num_batches:
+                    logger.log_batch_progress(
+                        batch_idx, num_batches, loss.item(),
+                        {'accuracy': train_correct / train_total}
+                    )
+
+            epoch_loss = running_loss / num_batches
+            train_acc = train_correct / train_total
+
+            # Validation phase
+            model.eval()
+            val_loss = 0.0
+            val_correct = 0
+            val_total = 0
+
+            with torch.no_grad():
+                for batch_x, batch_y in val_loader:
+                    outputs = model(batch_x)
+                    loss = criterion(outputs, batch_y)
+                    val_loss += loss.item()
+
+                    _, predicted = torch.max(outputs.data, 1)
+                    val_total += batch_y.size(0)
+                    val_correct += (predicted == batch_y).sum().item()
+
+            val_loss = val_loss / len(val_loader)
+            val_acc = val_correct / val_total
+
+            # Track best model
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                best_epoch = epoch
+
+            epoch_time = time.time() - epoch_start
+
+            # Log epoch end
+            logger.log_epoch_end(
+                epoch, epochs, epoch_loss, train_acc,
+                val_loss, val_acc, lr, epoch_time
+            )
+
+        # Final evaluation
+        logger.log_validation_start()
+        model.eval()
+        with torch.no_grad():
+            X_test_tensor = torch.tensor(X_test.values, dtype=torch.float32)
+            preds = model(X_test_tensor).argmax(dim=1).numpy()
+            acc = accuracy_score(y_test_encoded, preds)
+
+            # Detailed metrics
+            class_report = classification_report(y_test_encoded, preds,
+                                                target_names=[str(c) for c in le.classes_],
+                                                output_dict=True, zero_division=0)
+
+        eval_metrics = {
+            'Final Test Accuracy': f"{acc:.4f} ({acc*100:.2f}%)",
+            'Best Validation Accuracy': f"{best_val_acc:.4f} ({best_val_acc*100:.2f}%)",
+            'Best Epoch': best_epoch,
+            'Precision (weighted)': f"{class_report['weighted avg']['precision']:.4f}",
+            'Recall (weighted)': f"{class_report['weighted avg']['recall']:.4f}",
+            'F1-Score (weighted)': f"{class_report['weighted avg']['f1-score']:.4f}"
+        }
+        logger.log_evaluation_results(eval_metrics)
+
+        # Save model
+        logger.log_info("\n💾 Saving model and encoder...")
+        buffer = io.BytesIO()
+        torch.save(model.state_dict(), buffer)
+        buffer.seek(0)
+        model_path = f"trained_models/{obj.id}.pt"
+        model_bytes = buffer.read()
+
+        upload_to_minio(model_bytes, model_path, content_type="application/octet-stream")
+        logger.log_model_save(model_path, len(model_bytes))
+
+        enc_buf = io.BytesIO()
+        joblib.dump(le, enc_buf)
+        enc_buf.seek(0)
+        encoder_path = f"trained_models/{obj.id}_encoder.joblib"
+
+        upload_to_minio(
+            enc_buf.read(), encoder_path, content_type="application/octet-stream"
+        )
+        logger.log_info(f"  • Label encoder saved: {encoder_path}")
+
+        obj.training_config["output_dim"] = output_dim
+        obj.training_config["class_names"] = le.classes_.tolist()
+
+        # Save prediction schema
+        feature_names = X_train.columns.tolist()
+        obj.prediction_schema = {
+            "input_features": feature_names,
+            "feature_count": len(feature_names),
+            "target_column": obj.target_column,
+            "output_classes": le.classes_.tolist(),
+            "example": {col: "numeric_value" for col in feature_names},
+            "description": f"Provide values for these {len(feature_names)} features to predict one of {output_dim} classes"
+        }
+
+        # Save detailed metrics for analytics
+        model.eval()
+        with torch.no_grad():
+            X_test_tensor = torch.tensor(X_test.values, dtype=torch.float32)
+            preds = model(X_test_tensor).argmax(dim=1).numpy()
+
+        class_report = classification_report(y_test_encoded, preds,
+                                            target_names=[str(c) for c in le.classes_],
+                                            output_dict=True, zero_division=0)
+        conf_matrix = confusion_matrix(y_test_encoded, preds).tolist()
+
+        # Get class distribution from predictions
+        unique_labels, counts = np.unique(preds, return_counts=True)
+        prediction_distribution = [
+            {"label": str(le.classes_[label]), "value": int(count)}
+            for label, count in zip(unique_labels, counts)
+        ]
+
+        # Training history from logger metrics
+        training_history = []
+        for i, epoch in enumerate(range(1, epochs + 1)):
+            history_entry = {"epoch": epoch}
+            if i < len(logger.metrics['losses']):
+                history_entry['loss'] = float(logger.metrics['losses'][i])
+            if i < len(logger.metrics['accuracies']):
+                history_entry['accuracy'] = float(logger.metrics['accuracies'][i])
+            if i < len(logger.metrics['val_accuracies']):
+                history_entry['val_accuracy'] = float(logger.metrics['val_accuracies'][i])
+            training_history.append(history_entry)
+
+        obj.analytics_data = {
+            "accuracy": float(acc),
+            "precision": float(class_report['weighted avg']['precision']),
+            "recall": float(class_report['weighted avg']['recall']),
+            "f1_score": float(class_report['weighted avg']['f1-score']),
+            "confusion_matrix": conf_matrix,
+            "feature_importance": [],  # Neural networks don't have direct feature importance
+            "prediction_distribution": prediction_distribution,
+            "training_samples": len(X_train),
+            "test_samples": len(X_test),
+            "training_history": training_history,
+            "class_report": class_report
+        }
+
+        obj.save(update_fields=["training_config", "prediction_schema", "analytics_data"])
+
+        logger.log_training_complete(acc)
+
+        return model_path, acc
+
+    except Exception as e:
+        logger.log_error(e, "during neural network training")
+        raise
 
 
 def train_cnn(obj):
+    # Initialize logger
+    logger = TrainingLogger(obj)
+
     image_path = None
 
     if hasattr(obj.dataset, "extracted_path") and obj.dataset.extracted_path:
@@ -275,75 +635,255 @@ def train_cnn(obj):
     lr = config.get("learning_rate", 0.001)
     epochs = config.get("epochs", 10)
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize((input_size, input_size)),
-            transforms.ToTensor(),
+    try:
+        # Start training
+        training_config = {
+            'model_type': 'Convolutional Neural Network (CNN)',
+            'epochs': epochs,
+            'batch_size': batch_size,
+            'learning_rate': lr,
+            'input_size': f'{input_size}x{input_size}',
+            'optimizer': 'Adam',
+            'loss_function': 'CrossEntropyLoss'
+        }
+        logger.start_training(training_config)
+
+        # Load dataset
+        logger.log_info(f"\n📂 Loading image dataset from: {image_path}")
+        transform = transforms.Compose(
+            [
+                transforms.Resize((input_size, input_size)),
+                transforms.ToTensor(),
+            ]
+        )
+        dataset = datasets.ImageFolder(image_path, transform=transform)
+        num_classes = len(dataset.classes)
+
+        logger.log_data_loading({
+            'Image Directory': image_path,
+            'Total Images': len(dataset),
+            'Number of Classes': num_classes,
+            'Class Names': list(dataset.class_to_idx.keys())
+        })
+
+        # Split dataset for training and validation
+        train_size = int(0.8 * len(dataset))
+        val_size = len(dataset) - train_size
+        train_dataset, val_dataset = data.random_split(dataset, [train_size, val_size])
+
+        logger.log_data_split(train_size, val_size)
+
+        train_loader = data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+        # Log preprocessing
+        preprocessing_steps = [
+            f"Resize images to {input_size}x{input_size}",
+            "Convert to tensor (normalize to [0, 1])",
+            f"Create batches of size {batch_size}"
         ]
-    )
-    dataset = datasets.ImageFolder(image_path, transform=transform)
+        logger.log_preprocessing(preprocessing_steps)
 
-    # Split dataset for training and validation
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = data.random_split(dataset, [train_size, val_size])
+        # Build model
+        logger.log_info("\n🏗️ Building CNN model...")
+        model = ConfigurableCNN(3, conv_layers, fc_layers, num_classes, input_size)
 
-    train_loader = data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+        # Count parameters
+        total_params = sum(p.numel() for p in model.parameters())
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    num_classes = len(dataset.classes)
-    model = ConfigurableCNN(3, conv_layers, fc_layers, num_classes, input_size)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+        # Log architecture
+        architecture = {
+            'Input Channels': 3,
+            'Input Size': f'{input_size}x{input_size}',
+            'Output Classes': num_classes,
+            'Convolutional Layers': len(conv_layers),
+            'Conv Layer Details': [f"Layer {i+1}: {cfg.get('out_channels', 16)} filters" for i, cfg in enumerate(conv_layers)],
+            'Fully Connected Layers': len(fc_layers),
+            'FC Layer Details': [f"Layer {i+1}: {cfg.get('units', 64)} units" for i, cfg in enumerate(fc_layers)],
+            'Total Parameters': f"{total_params:,}",
+            'Trainable Parameters': f"{trainable_params:,}"
+        }
+        logger.log_model_architecture(architecture)
 
-    # Training loop
-    model.train()
-    for epoch in range(epochs):
-        running_loss = 0.0
-        for batch_x, batch_y in train_loader:
-            optimizer.zero_grad()
-            loss = criterion(model(batch_x), batch_y)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    # Calculate validation accuracy
-    model.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for batch_x, batch_y in val_loader:
-            outputs = model(batch_x)
-            _, predicted = torch.max(outputs.data, 1)
-            total += batch_y.size(0)
-            correct += (predicted == batch_y).sum().item()
+        # Training loop
+        logger.log_training_start(epochs)
+        best_val_acc = 0.0
+        best_epoch = 0
 
-    accuracy = correct / total if total > 0 else 0.0
+        for epoch in range(1, epochs + 1):
+            epoch_start = time.time()
+            logger.log_epoch_start(epoch, epochs)
 
-    buffer = io.BytesIO()
-    torch.save(model.state_dict(), buffer)
-    buffer.seek(0)
-    model_path = f"trained_models/{obj.id}.pt"
-    upload_to_minio(buffer.read(), model_path, content_type="application/octet-stream")
+            # Training phase
+            model.train()
+            running_loss = 0.0
+            train_correct = 0
+            train_total = 0
+            num_batches = len(train_loader)
 
-    obj.training_config["num_classes"] = num_classes
-    obj.training_config["class_names"] = list(dataset.class_to_idx.keys())
+            for batch_idx, (batch_x, batch_y) in enumerate(train_loader, 1):
+                optimizer.zero_grad()
+                outputs = model(batch_x)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
 
-    # Save prediction schema for image models
-    class_names = list(dataset.class_to_idx.keys())
-    obj.prediction_schema = {
-        "input_type": "image",
-        "input_size": input_size,
-        "supported_formats": ["jpg", "jpeg", "png", "bmp", "gif"],
-        "output_classes": class_names,
-        "num_classes": num_classes,
-        "example": "Upload an image file",
-        "description": f"Upload an image to classify into one of {num_classes} categories: {', '.join(class_names)}"
-    }
+                running_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                train_total += batch_y.size(0)
+                train_correct += (predicted == batch_y).sum().item()
 
-    obj.save(update_fields=["training_config", "prediction_schema"])
+                # Log batch progress
+                if batch_idx % max(1, num_batches // 10) == 0 or batch_idx == num_batches:
+                    logger.log_batch_progress(
+                        batch_idx, num_batches, loss.item(),
+                        {'accuracy': train_correct / train_total}
+                    )
 
-    return model_path, accuracy
+            epoch_loss = running_loss / num_batches
+            train_acc = train_correct / train_total
+
+            # Validation phase
+            model.eval()
+            val_loss = 0.0
+            val_correct = 0
+            val_total = 0
+
+            with torch.no_grad():
+                for batch_x, batch_y in val_loader:
+                    outputs = model(batch_x)
+                    loss = criterion(outputs, batch_y)
+                    val_loss += loss.item()
+
+                    _, predicted = torch.max(outputs.data, 1)
+                    val_total += batch_y.size(0)
+                    val_correct += (predicted == batch_y).sum().item()
+
+            val_loss = val_loss / len(val_loader)
+            val_acc = val_correct / val_total
+
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                best_epoch = epoch
+
+            epoch_time = time.time() - epoch_start
+
+            logger.log_epoch_end(
+                epoch, epochs, epoch_loss, train_acc,
+                val_loss, val_acc, lr, epoch_time
+            )
+
+        # Calculate final accuracy
+        model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for batch_x, batch_y in val_loader:
+                outputs = model(batch_x)
+                _, predicted = torch.max(outputs.data, 1)
+                total += batch_y.size(0)
+                correct += (predicted == batch_y).sum().item()
+
+        accuracy = correct / total if total > 0 else 0.0
+
+        eval_metrics = {
+            'Final Validation Accuracy': f"{accuracy:.4f} ({accuracy*100:.2f}%)",
+            'Best Validation Accuracy': f"{best_val_acc:.4f} ({best_val_acc*100:.2f}%)",
+            'Best Epoch': best_epoch
+        }
+        logger.log_evaluation_results(eval_metrics)
+
+        # Save model
+        logger.log_info("\n💾 Saving CNN model...")
+        buffer = io.BytesIO()
+        torch.save(model.state_dict(), buffer)
+        buffer.seek(0)
+        model_path = f"trained_models/{obj.id}.pt"
+        model_bytes = buffer.read()
+        upload_to_minio(model_bytes, model_path, content_type="application/octet-stream")
+
+        logger.log_model_save(model_path, len(model_bytes))
+
+        obj.training_config["num_classes"] = num_classes
+        obj.training_config["class_names"] = list(dataset.class_to_idx.keys())
+
+        # Save prediction schema for image models
+        class_names = list(dataset.class_to_idx.keys())
+        obj.prediction_schema = {
+            "input_type": "image",
+            "input_size": input_size,
+            "supported_formats": ["jpg", "jpeg", "png", "bmp", "gif"],
+            "output_classes": class_names,
+            "num_classes": num_classes,
+            "example": "Upload an image file",
+            "description": f"Upload an image to classify into one of {num_classes} categories: {', '.join(class_names)}"
+        }
+
+        # Calculate confusion matrix and detailed metrics on validation set
+        all_preds = []
+        all_labels = []
+        model.eval()
+        with torch.no_grad():
+            for batch_x, batch_y in val_loader:
+                outputs = model(batch_x)
+                _, predicted = torch.max(outputs.data, 1)
+                all_preds.extend(predicted.numpy())
+                all_labels.extend(batch_y.numpy())
+
+        all_preds = np.array(all_preds)
+        all_labels = np.array(all_labels)
+
+        class_report = classification_report(all_labels, all_preds,
+                                            target_names=class_names,
+                                            output_dict=True, zero_division=0)
+        conf_matrix = confusion_matrix(all_labels, all_preds).tolist()
+
+        # Get class distribution from predictions
+        unique_labels, counts = np.unique(all_preds, return_counts=True)
+        prediction_distribution = [
+            {"label": class_names[int(label)], "value": int(count)}
+            for label, count in zip(unique_labels, counts)
+        ]
+
+        # Training history from logger metrics
+        training_history = []
+        for i, epoch in enumerate(range(1, epochs + 1)):
+            history_entry = {"epoch": epoch}
+            if i < len(logger.metrics['losses']):
+                history_entry['loss'] = float(logger.metrics['losses'][i])
+            if i < len(logger.metrics['accuracies']):
+                history_entry['accuracy'] = float(logger.metrics['accuracies'][i])
+            if i < len(logger.metrics['val_accuracies']):
+                history_entry['val_accuracy'] = float(logger.metrics['val_accuracies'][i])
+            training_history.append(history_entry)
+
+        obj.analytics_data = {
+            "accuracy": float(accuracy),
+            "precision": float(class_report['weighted avg']['precision']),
+            "recall": float(class_report['weighted avg']['recall']),
+            "f1_score": float(class_report['weighted avg']['f1-score']),
+            "confusion_matrix": conf_matrix,
+            "feature_importance": [],  # CNNs don't have traditional feature importance
+            "prediction_distribution": prediction_distribution,
+            "training_samples": train_size,
+            "test_samples": val_size,
+            "training_history": training_history,
+            "class_report": class_report
+        }
+
+        obj.save(update_fields=["training_config", "prediction_schema", "analytics_data"])
+
+        logger.log_training_complete(accuracy)
+
+        return model_path, accuracy
+
+    except Exception as e:
+        logger.log_error(e, "during CNN training")
+        raise
 
 
 def train_transfer_learning(obj):

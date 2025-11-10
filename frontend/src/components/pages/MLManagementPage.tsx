@@ -573,56 +573,35 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
                       model.status?.toLowerCase() === 'complete' ||
                       model.status?.toLowerCase() === 'finished' ||
                       model.status?.toLowerCase() === 'success') ? (
-                      <Stack direction="column" spacing={1} width="100%">
-                        <Stack direction="row" spacing={0.5}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            startIcon={<PlayArrow />}
-                            onClick={() => handlePredictClick(model.id, model.name)}
-                            sx={{ flex: 1 }}
-                          >
-                            Predict
-                          </Button>
+                      <Stack direction="row" spacing={1} width="100%">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<PlayArrow />}
+                          onClick={() => handlePredictClick(model.id, model.name)}
+                          sx={{ flex: 1 }}
+                        >
+                          Predict
+                        </Button>
+                        {onNavigateToAnalysis && (
                           <Button
                             size="small"
                             variant="outlined"
-                            startIcon={<Assessment />}
-                            onClick={() => handleTest(model.id)}
+                            startIcon={<Analytics />}
+                            onClick={() => onNavigateToAnalysis(model.id)}
                             sx={{ flex: 1 }}
                           >
-                            Test
+                            Analyze
                           </Button>
-                          {onNavigateToAnalysis && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<Analytics />}
-                              onClick={() => onNavigateToAnalysis(model.id)}
-                              sx={{ flex: 1 }}
-                            >
-                              Analyze
-                            </Button>
-                          )}
-                        </Stack>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="text"
-                            onClick={() => handleTrain(model.id)}
-                            sx={{ flex: 1 }}
-                          >
-                            Retrain
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="text"
-                            onClick={() => handleForceTrain(model.id)}
-                            sx={{ flex: 1, fontSize: '0.75rem' }}
-                          >
-                            Force
-                          </Button>
-                        </Stack>
+                        )}
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => handleTrain(model.id)}
+                          sx={{ flex: 1 }}
+                        >
+                          Retrain
+                        </Button>
                       </Stack>
                     ) : model.status?.toLowerCase() === 'pending' ? (
                       <Stack direction="row" spacing={1} width="100%">
@@ -635,28 +614,37 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
                         >
                           Start Training
                         </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleForceTrain(model.id)}
-                          title="Immediate synchronous training"
-                        >
-                          Force
-                        </Button>
+                        {onNavigateToAnalysis && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<Analytics />}
+                            onClick={() => onNavigateToAnalysis(model.id)}
+                            sx={{ flex: 1 }}
+                          >
+                            View
+                          </Button>
+                        )}
                       </Stack>
                     ) : (
                       <Stack direction="row" spacing={1} width="100%">
-                        <Button size="small" disabled sx={{ flex: 1 }}>
-                          Training in Progress...
-                        </Button>
-                        <Button
+                        {onNavigateToAnalysis && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<Analytics />}
+                            onClick={() => onNavigateToAnalysis(model.id)}
+                            sx={{ flex: 1 }}
+                          >
+                            Watch Training
+                          </Button>
+                        )}
+                        <Chip
+                          label="Training..."
+                          color="warning"
                           size="small"
-                          variant="outlined"
-                          onClick={() => handleForceTrain(model.id)}
-                          title="Reset and force training"
-                        >
-                          Reset & Force
-                        </Button>
+                          sx={{ flex: 1, height: 32 }}
+                        />
                       </Stack>
                     )}
                   </CardActions>

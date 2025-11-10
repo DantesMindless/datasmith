@@ -404,6 +404,11 @@ class MLModel(BaseModel):
         blank=True,
         help_text="Schema describing required input fields for prediction"
     )
+    analytics_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Detailed analytics data including metrics, confusion matrix, feature importance, etc."
+    )
 
     def __str__(self):
         return self.name

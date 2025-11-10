@@ -32,12 +32,17 @@ cachetools = "^5.5.0"
 django-cors-headers = "^4.6.0"
 pymongo = "^4.6.1"
 redis = "^5.0.0"
+django-redis = "^5.4.0"
 
 torch = "^2.7.1"
 xgboost = "^3.0.2"
 debugpy = "^1.8.14"
 celery = "^5.5.3"
 torchvision = "^0.22.1"
+lightgbm = "^4.6.0"
+channels = "^4.2.0"
+channels-redis = "^4.2.0"
+daphne = "^4.1.2"
 
 
 

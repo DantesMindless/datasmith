@@ -91,7 +91,9 @@ export default function DynamicTable() {
 
   useEffect(() => {
     console.log(tab?.activeColumns)
-    fetchData(tab);
+    if (tab) {
+      fetchData(tab);
+    }
   }, [tab?.activeColumns])
 
   const handleOpenColumns = () => {

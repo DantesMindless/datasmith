@@ -19,3 +19,4 @@ backend/mcp_server/requirements.txt
 
 # Project analysis files
 PROJECT_ANALYSIS.md
+*.md   

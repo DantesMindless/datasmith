@@ -70,6 +70,7 @@ import CreateDatasetPage from '../CreateDatasetPage';
 import CreateConnection from '../CreateConnection';
 import DataSourcesTables from '../DataSourcesTables';
 import QueryTables from '../QueryTables';
+import DatabaseBrowserSidebar from '../DatabaseBrowserSidebar';
 
 interface Dataset {
   id: number;
@@ -765,7 +766,12 @@ export default function AdvancedDatasetPage() {
         </TabPanel>
 
         <TabPanel value={activeTab} index={2}>
-          <QueryTables />
+          <Box sx={{ display: 'flex', height: '100%' }}>
+            <DatabaseBrowserSidebar open={true} />
+            <Box sx={{ flex: 1, overflow: 'auto' }}>
+              <QueryTables />
+            </Box>
+          </Box>
         </TabPanel>
 
         <TabPanel value={activeTab} index={3}>

@@ -56,7 +56,8 @@ def train_sklearn_task(model_id):
         obj.model_file.name = s3_path
         obj.status = ModelStatus.COMPLETE
         obj.accuracy = acc
-        obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
+        # Note: training_log is already set by TrainingLogger in train_sklearn_model
+        # Do not overwrite it here
         obj.save()
 
         run, _ = TrainingRun.objects.get_or_create(model=obj)
@@ -113,7 +114,8 @@ def train_nn_task(model_id):
         s3_path, acc = train_nn(obj, X_train, y_train, X_test, y_test)
         obj.status = ModelStatus.COMPLETE
         obj.accuracy = acc
-        obj.training_log = f"Training complete. Accuracy: {acc:.2f}"
+        # Note: training_log is already set by TrainingLogger in train_nn
+        # Do not overwrite it here
         obj.save()
 
         run, _ = TrainingRun.objects.get_or_create(model=obj)
@@ -158,7 +160,8 @@ def train_cnn_task(model_id):
 
         obj.status = ModelStatus.COMPLETE
         obj.accuracy = acc
-        obj.training_log = f"Training complete for CNN. Validation Accuracy: {acc:.4f}" if acc else "Training complete for CNN."
+        # Note: training_log is already set by TrainingLogger in train_cnn
+        # Do not overwrite it here
         obj.save()
 
         run.add_entry(status=ModelStatus.COMPLETE, accuracy=acc)
@@ -202,7 +205,8 @@ def train_transfer_learning_task(model_id):
 
         obj.status = ModelStatus.COMPLETE
         obj.accuracy = acc
-        obj.training_log = f"Transfer learning training complete. Validation Accuracy: {acc:.4f}" if acc else "Training complete."
+        # Note: training_log should be set by TrainingLogger in train_transfer_learning
+        # Do not overwrite it here
         obj.save()
 
         run.add_entry(status=ModelStatus.COMPLETE, accuracy=acc)
@@ -254,7 +258,8 @@ def train_rnn_task(model_id):
 
         obj.status = ModelStatus.COMPLETE
         obj.accuracy = acc
-        obj.training_log = f"RNN training complete. Validation Accuracy: {acc:.4f}" if acc else "Training complete."
+        # Note: training_log should be set by TrainingLogger in train_rnn
+        # Do not overwrite it here
         obj.save()
 
         run.add_entry(status=ModelStatus.COMPLETE, accuracy=acc)

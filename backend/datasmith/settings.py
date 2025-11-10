@@ -50,6 +50,7 @@ LOGGING = LOGGING
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",  # Must be first for ASGI
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -61,6 +62,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_extensions",
     "corsheaders",
+    "channels",
     # apps
     "app",
     "userauth",
@@ -99,6 +101,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "datasmith.wsgi.application"
+ASGI_APPLICATION = "datasmith.asgi.application"
 
 
 # Database
@@ -205,6 +208,29 @@ CORS_ALLOW_METHODS = [
 CELERY_BROKER_URL = (os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),)
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
+
+# Cache configuration for training logs (using Redis for cross-container sharing)
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://redis:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'datasmith',
+        'TIMEOUT': 3600,  # 1 hour
+    }
+}
+
+# Channels configuration for WebSockets
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [os.getenv('REDIS_URL', 'redis://redis:6379/2')],
+        },
+    },
+}
 
 # Django REST Framework settings
 REST_FRAMEWORK = {

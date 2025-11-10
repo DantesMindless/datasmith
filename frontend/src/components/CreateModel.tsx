@@ -98,7 +98,7 @@ export default function CreateModelPage() {
       model_type: modelType,
       dataset: datasetId,
       target_column: targetColumn || 'class',  // Default to 'class' for image datasets
-      config: configValues,
+      training_config: configValues,
     };
     
     try {
@@ -143,10 +143,12 @@ export default function CreateModelPage() {
         if (dataset && dataset.columns) {
           setDatasetColumns(dataset.columns);
         } else {
-          setError('Could not fetch dataset columns. Please select a different dataset.');
+          // Silently set empty columns - validation will handle compatibility
+          setDatasetColumns([]);
         }
       } catch (fallbackErr) {
-        setError('Could not fetch dataset columns. Please select a different dataset.');
+        // Silently fail - compatibility check will handle validation
+        setDatasetColumns([]);
       }
     }
   };
@@ -509,7 +511,10 @@ export default function CreateModelPage() {
                       label={field.label}
                       type={field.type}
                       value={value}
-                      onChange={(e) => handleConfigChange(field.key, e.target.value)}
+                      onChange={(e) => {
+                        const newValue = field.type === "number" ? Number(e.target.value) : e.target.value;
+                        handleConfigChange(field.key, newValue);
+                      }}
                       helperText={field.helperText}
                     />
                   );

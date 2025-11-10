@@ -47,6 +47,9 @@ import {
   ShowChart,
 } from '@mui/icons-material';
 import httpfetch from '../../../utils/axios';
+import TrainingLogsViewer from '../../TrainingLogsViewer';
+import TrainingLogsViewerWebSocket from '../../TrainingLogsViewerWebSocket';
+import { useTrainingWebSocket } from '../../../hooks/useTrainingWebSocket';
 import {
   LineChart,
   Line,
@@ -170,6 +173,81 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
   const [availableModels, setAvailableModels] = useState<ModelData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // WebSocket for live training metrics updates
+  const { logs: wsLogs } = useTrainingWebSocket({
+    modelId: String(selectedModel || modelId),
+    enabled: !!(selectedModel || modelId) && model?.status === 'training',
+    autoReconnect: true,
+    onComplete: async () => {
+      // Refresh metrics when training completes
+      if (selectedModel) {
+        await fetchModelData(selectedModel);
+      }
+    }
+  });
+
+  // Parse live metrics from WebSocket logs
+  const parseLiveMetrics = (logs: any[]): Partial<ModelMetrics> | null => {
+    if (!logs || logs.length === 0) return null;
+
+    const trainingHistory: any[] = [];
+    const epochMap = new Map();
+
+    logs.forEach(log => {
+      if (log.data && log.message.toLowerCase().includes('complete')) {
+        // Extract epoch number from message like "Round 5 of 10 Complete:"
+        const epochMatch = log.message.match(/round\s+(\d+)\s+of\s+(\d+)/i);
+        if (epochMatch) {
+          const epoch = parseInt(epochMatch[1]);
+          const data: any = { epoch };
+
+          // Parse metrics from log data
+          if (log.data.train_loss) {
+            data.loss = parseFloat(log.data.train_loss);
+          }
+          if (log.data.train_accuracy) {
+            const acc = parseFloat(log.data.train_accuracy.toString().replace('%', ''));
+            data.accuracy = acc / 100;
+          }
+          if (log.data.val_loss) {
+            data.val_loss = parseFloat(log.data.val_loss);
+          }
+          if (log.data.val_accuracy) {
+            const acc = parseFloat(log.data.val_accuracy.toString().replace('%', ''));
+            data.val_accuracy = acc / 100;
+          }
+
+          epochMap.set(epoch, data);
+        }
+      }
+    });
+
+    // Convert map to sorted array
+    if (epochMap.size > 0) {
+      const sortedEpochs = Array.from(epochMap.keys()).sort((a, b) => a - b);
+      sortedEpochs.forEach(epoch => {
+        trainingHistory.push(epochMap.get(epoch));
+      });
+
+      return { training_history: trainingHistory };
+    }
+
+    return null;
+  };
+
+  // Disabled live metrics updates - only show graphs after training completes
+  // useEffect(() => {
+  //   if (wsLogs.length > 0 && model?.status === 'training') {
+  //     const liveMetrics = parseLiveMetrics(wsLogs);
+  //     if (liveMetrics && liveMetrics.training_history && liveMetrics.training_history.length > 0) {
+  //       setMetrics(prev => ({
+  //         ...prev!,
+  //         training_history: liveMetrics.training_history
+  //       }));
+  //     }
+  //   }
+  // }, [wsLogs, model?.status]);
+
   const fetchAvailableModels = async () => {
     try {
       const response = await httpfetch.get('models/');
@@ -193,7 +271,7 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
       console.log('Model data received:', modelData);
       setModel(modelData);
 
-      // Try to fetch real analytics data, fall back to mock if needed
+      // Fetch real analytics data only - no mock fallback
       try {
         const [metricsResponse, statisticsResponse] = await Promise.all([
           httpfetch.get(`models/${id}/metrics/`),
@@ -201,12 +279,23 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
         ]);
 
         console.log('Using real analytics data from backend');
-        setMetrics(metricsResponse.data.metrics);
-        setStatistics(statisticsResponse.data.statistics);
+        const realMetrics = metricsResponse.data.metrics;
+        const realStats = statisticsResponse.data.statistics;
+
+        // Only set metrics if model is completed (not training) and has real training history data
+        if ((modelData.status === 'completed' || modelData.status === 'complete') && realMetrics.training_history && realMetrics.training_history.length > 0) {
+          setMetrics(realMetrics);
+        } else {
+          console.log('Model status:', modelData.status, 'Training history length:', realMetrics.training_history?.length);
+          console.log('Model not completed or no training history - metrics will not be displayed');
+          setMetrics(null);
+        }
+
+        setStatistics(realStats);
       } catch (analyticsError) {
-        console.warn('Real analytics endpoints not available, using mock data:', analyticsError);
-        setMetrics(generateMockMetrics(modelData));
-        setStatistics(generateMockStatistics(modelData));
+        console.warn('Analytics endpoints not available:', analyticsError);
+        setMetrics(null);
+        setStatistics(null);
       }
 
     } catch (err: any) {
@@ -556,10 +645,20 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
         </Grid>
       </Grid>
 
+      {/* No Metrics Message */}
+      {!metrics && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            📊 Training metrics will appear here after model training it's complete.
+            {model?.status === 'training' && ' Training is currently in progress - please wait for completion to view charts.'}
+          </Typography>
+        </Alert>
+      )}
+
       {/* Charts Grid */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* Training History */}
-        {metrics?.training_history && (
+        {metrics?.training_history && metrics.training_history.length > 0 && (
           <Grid item xs={12} lg={6}>
             <Card>
               <CardContent>
@@ -609,7 +708,7 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
         )}
 
         {/* Feature Importance */}
-        {metrics?.feature_importance && (
+        {metrics?.feature_importance && metrics.feature_importance.length > 0 && (
           <Grid item xs={12} lg={6}>
             <Card>
               <CardContent>
@@ -652,7 +751,7 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
         )}
 
         {/* Prediction Distribution */}
-        {metrics?.prediction_distribution && (
+        {metrics?.prediction_distribution && metrics.prediction_distribution.length > 0 && (
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -687,7 +786,7 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
         )}
 
         {/* Loss Curves */}
-        {metrics?.training_history && (
+        {metrics?.training_history && metrics.training_history.length > 0 && (
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -913,7 +1012,7 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
         </Grid>
 
         {/* Enhanced Confusion Matrix with Heatmap Visualization */}
-        {metrics?.confusion_matrix && (
+        {metrics?.confusion_matrix && metrics.confusion_matrix.length > 0 && (
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -997,6 +1096,21 @@ function ModelAnalysisPage({ modelId, onBack }: ModelAnalysisPageProps) {
           </Grid>
         )}
       </Grid>
+
+      {/* Training Logs Section */}
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Timeline /> Training Logs
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          View detailed, real-time training logs and metrics for this model (WebSocket-powered)
+        </Typography>
+        <TrainingLogsViewerWebSocket
+          modelId={String(model.id)}
+          modelName={model.name}
+          status={model.status}
+        />
+      </Box>
     </Container>
   );
 }

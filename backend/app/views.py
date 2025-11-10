@@ -942,21 +942,96 @@ class MLModelViewSet(viewsets.ModelViewSet):
     def training_status(self, request, pk=None) -> Response:
         """
         Get training status for a specific ML model.
-        
+
         Args:
             request: The HTTP request
             pk: Primary key of the model
-            
+
         Returns:
             Response with training status and log information
         """
         model = self.get_object()
         training_run = getattr(model, 'training_run', None)
-        
+
         return Response({
             "status": model.status,
             "training_log": model.training_log,
             "history": training_run.history if training_run else []
+        })
+
+    @action(detail=True, methods=['get'])
+    def training_logs(self, request, pk=None) -> Response:
+        """
+        Get real-time detailed training logs for a specific ML model.
+
+        This endpoint retrieves structured, detailed logs from the training process
+        including data loading, preprocessing, model architecture, epoch-by-epoch
+        progress, and evaluation metrics.
+
+        Args:
+            request: The HTTP request
+            pk: Primary key of the model
+
+        Returns:
+            Response with detailed training logs, metrics, and progress information
+        """
+        from django.core.cache import cache
+
+        model = self.get_object()
+        cache_key = f"training_logs_{model.id}"
+
+        # Get logs from cache (updated in real-time during training)
+        cached_logs = cache.get(cache_key, [])
+
+        # Parse metrics from logs if available
+        metrics = {
+            'epochs': [],
+            'losses': [],
+            'accuracies': [],
+            'val_accuracies': []
+        }
+
+        for log_entry in cached_logs:
+            # Extract epoch number from messages like "✓ Round 5 of 10 Complete:"
+            message = log_entry.get('message', '')
+            if 'round' in message.lower() and 'complete' in message.lower():
+                import re
+                match = re.search(r'round\s+(\d+)\s+of\s+(\d+)', message, re.IGNORECASE)
+                if match:
+                    epoch_num = int(match.group(1))
+                    if epoch_num not in metrics['epochs']:
+                        metrics['epochs'].append(epoch_num)
+
+            if log_entry.get('data'):
+                data = log_entry['data']
+                if 'train_loss' in data:
+                    try:
+                        metrics['losses'].append(float(data['train_loss']))
+                    except (ValueError, TypeError):
+                        pass
+                if 'train_accuracy' in data:
+                    try:
+                        acc_str = data['train_accuracy'].replace('%', '')
+                        metrics['accuracies'].append(float(acc_str))
+                    except (ValueError, TypeError, AttributeError):
+                        pass
+                if 'val_accuracy' in data:
+                    try:
+                        acc_str = data['val_accuracy'].replace('%', '')
+                        metrics['val_accuracies'].append(float(acc_str))
+                    except (ValueError, TypeError, AttributeError):
+                        pass
+
+        return Response({
+            "model_id": str(model.id),
+            "model_name": model.name,
+            "status": model.status,
+            "logs": cached_logs,
+            "metrics": metrics,
+            "total_logs": len(cached_logs),
+            "training_log_text": model.training_log or "No logs available yet",
+            "accuracy": model.accuracy,
+            "created_at": model.created_at.isoformat() if model.created_at else None
         })
 
     @action(detail=True, methods=['get'])
@@ -1215,220 +1290,145 @@ class MLModelViewSet(viewsets.ModelViewSet):
             )
 
     def _generate_model_metrics(self, model) -> Dict[str, Any]:
-        """Generate comprehensive mock metrics for model analysis."""
-        # Set random seed based on model ID for consistent data
-        random.seed(model.id * 42)
+        """Extract real metrics from training logs and saved analytics data."""
+        from django.core.cache import cache
+        import re
 
-        # Base accuracy from model or generate one
-        base_accuracy = model.accuracy if model.accuracy else random.uniform(0.75, 0.95)
+        # Try to use saved analytics data first
+        if model.analytics_data and model.analytics_data.get('accuracy') is not None:
+            analytics = model.analytics_data
+            return {
+                "accuracy": analytics.get('accuracy', model.accuracy or 0.0),
+                "precision": analytics.get('precision', 0.0),
+                "recall": analytics.get('recall', 0.0),
+                "f1_score": analytics.get('f1_score', 0.0),
+                "confusion_matrix": analytics.get('confusion_matrix', []),
+                "feature_importance": analytics.get('feature_importance', []),
+                "training_history": analytics.get('training_history', []),
+                "prediction_distribution": analytics.get('prediction_distribution', []),
+                "additional_metrics": {
+                    "training_samples": analytics.get('training_samples', 0),
+                    "test_samples": analytics.get('test_samples', 0),
+                }
+            }
 
-        # Generate metrics with realistic variation
-        precision = base_accuracy + random.uniform(-0.08, 0.05)
-        recall = base_accuracy + random.uniform(-0.06, 0.04)
-        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else base_accuracy
+        # Fallback: Try to get real training data from cache
+        cache_key = f"training_logs_{model.id}"
+        cached_logs = cache.get(cache_key, [])
 
-        # Ensure all metrics are within [0, 1]
-        precision = max(0.0, min(1.0, precision))
-        recall = max(0.0, min(1.0, recall))
-        f1_score = max(0.0, min(1.0, f1_score))
-
-        # Generate confusion matrix for binary classification
-        total_samples = random.randint(800, 1200)
-        true_positives = int(total_samples * 0.4 * recall)
-        false_negatives = int(total_samples * 0.4) - true_positives
-        true_negatives = int(total_samples * 0.6 * (1 - (1 - precision) * true_positives / (true_positives + (total_samples * 0.6 * (1 - precision)))))
-        false_positives = int(total_samples * 0.6) - true_negatives
-
-        confusion_matrix = [
-            [true_negatives, false_positives],
-            [false_negatives, true_positives]
-        ]
-
-        # Generate feature importance based on model type
-        num_features = random.randint(8, 15)
-        feature_importance = []
-        remaining_importance = 1.0
-
-        for i in range(num_features):
-            if i == num_features - 1:
-                importance = remaining_importance
-            else:
-                importance = random.uniform(0.02, remaining_importance * 0.4)
-                remaining_importance -= importance
-
-            feature_importance.append({
-                "feature": f"Feature_{i+1}",
-                "importance": round(importance, 3)
-            })
-
-        # Sort by importance descending
-        feature_importance.sort(key=lambda x: x["importance"], reverse=True)
-
-        # Generate training history
-        num_epochs = random.randint(15, 30)
+        # Extract real training history from logs
         training_history = []
+        epoch_data = {}  # Store data by epoch number
 
-        initial_loss = random.uniform(1.0, 2.5)
-        initial_accuracy = random.uniform(0.3, 0.5)
-        initial_val_loss = initial_loss + random.uniform(0.0, 0.3)
-        initial_val_accuracy = initial_accuracy - random.uniform(0.0, 0.1)
+        for log_entry in cached_logs:
+            message = log_entry.get('message', '')
+            data = log_entry.get('data', {})
 
-        for epoch in range(1, num_epochs + 1):
-            # Simulate learning curves with some noise
-            progress = epoch / num_epochs
+            # Look for "Round X of Y Complete:" messages
+            match = re.search(r'round\s+(\d+)\s+of\s+(\d+)\s+complete', message, re.IGNORECASE)
+            if match and data:
+                epoch_num = int(match.group(1))
 
-            # Training metrics improve over time with diminishing returns
-            loss_improvement = (1 - progress) * initial_loss + progress * random.uniform(0.1, 0.4)
-            acc_improvement = initial_accuracy + progress * (base_accuracy - initial_accuracy) + random.uniform(-0.02, 0.02)
+                # Extract metrics from this epoch
+                epoch_metrics = {"epoch": epoch_num}
 
-            # Validation metrics with some overfitting towards the end
-            val_loss_factor = 1.0 + (progress * 0.3) if progress > 0.7 else 1.0
-            val_loss = loss_improvement * val_loss_factor + random.uniform(-0.05, 0.1)
-            val_acc = acc_improvement - (progress * 0.05) + random.uniform(-0.03, 0.02)
+                if 'train_loss' in data:
+                    try:
+                        epoch_metrics['loss'] = float(data['train_loss'])
+                    except (ValueError, TypeError):
+                        pass
 
-            training_history.append({
-                "epoch": epoch,
-                "loss": round(max(0.05, loss_improvement), 4),
-                "accuracy": round(min(1.0, max(0.0, acc_improvement)), 4),
-                "val_loss": round(max(0.05, val_loss), 4),
-                "val_accuracy": round(min(1.0, max(0.0, val_acc)), 4)
-            })
+                if 'train_accuracy' in data:
+                    try:
+                        acc_str = data['train_accuracy'].replace('%', '')
+                        epoch_metrics['accuracy'] = float(acc_str) / 100.0
+                    except (ValueError, TypeError, AttributeError):
+                        pass
 
-        # Generate prediction distribution
-        num_classes = random.choice([2, 3, 4])
-        if num_classes == 2:
-            classes = ["Negative", "Positive"]
-        elif num_classes == 3:
-            classes = ["Class_A", "Class_B", "Class_C"]
+                if 'val_loss' in data:
+                    try:
+                        epoch_metrics['val_loss'] = float(data['val_loss'])
+                    except (ValueError, TypeError):
+                        pass
+
+                if 'val_accuracy' in data:
+                    try:
+                        acc_str = data['val_accuracy'].replace('%', '')
+                        epoch_metrics['val_accuracy'] = float(acc_str) / 100.0
+                    except (ValueError, TypeError, AttributeError):
+                        pass
+
+                epoch_data[epoch_num] = epoch_metrics
+
+        # Convert epoch_data dict to sorted list
+        if epoch_data:
+            training_history = [epoch_data[epoch] for epoch in sorted(epoch_data.keys())]
+
+        # If no real training history data, return None - no mock data
+        if not training_history:
+            return {
+                "accuracy": model.accuracy if model.accuracy else 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "confusion_matrix": [],
+                "feature_importance": [],
+                "training_history": [],
+                "prediction_distribution": [],
+                "additional_metrics": {}
+            }
+
+        # Use real base accuracy from last epoch
+        if training_history and 'val_accuracy' in training_history[-1]:
+            base_accuracy = training_history[-1]['val_accuracy']
+        elif model.accuracy:
+            base_accuracy = model.accuracy
         else:
-            classes = ["Class_1", "Class_2", "Class_3", "Class_4"]
-
-        prediction_distribution = []
-        total_predictions = random.randint(1000, 5000)
-        remaining = total_predictions
-
-        for i, class_name in enumerate(classes):
-            if i == len(classes) - 1:
-                count = remaining
-            else:
-                count = random.randint(int(remaining * 0.15), int(remaining * 0.6))
-                remaining -= count
-
-            prediction_distribution.append({
-                "label": class_name,
-                "value": count
-            })
+            base_accuracy = 0.0
 
         return {
             "accuracy": round(base_accuracy, 4),
-            "precision": round(precision, 4),
-            "recall": round(recall, 4),
-            "f1_score": round(f1_score, 4),
-            "confusion_matrix": confusion_matrix,
-            "feature_importance": feature_importance,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1_score": 0.0,
+            "confusion_matrix": [],
+            "feature_importance": [],
             "training_history": training_history,
-            "prediction_distribution": prediction_distribution,
-            "additional_metrics": {
-                "auc_roc": round(random.uniform(0.8, 0.98), 4),
-                "log_loss": round(random.uniform(0.1, 0.5), 4),
-                "matthews_corr_coef": round(random.uniform(0.6, 0.9), 4)
-            }
+            "prediction_distribution": [],
+            "additional_metrics": {}
         }
 
     def _generate_model_statistics(self, model) -> Dict[str, Any]:
-        """Generate comprehensive mock statistics for model analysis."""
-        # Set random seed based on model ID for consistent data
-        random.seed(model.id * 123)
+        """Return only real model statistics - no mock data."""
 
-        # Usage statistics
-        total_predictions = random.randint(500, 10000)
-        avg_prediction_time = round(random.uniform(5.0, 150.0), 2)
-
-        # Model size calculation based on type
-        if model.model_type in ['neural_network', 'cnn']:
-            model_size_mb = round(random.uniform(10.0, 200.0), 1)
-        else:
-            model_size_mb = round(random.uniform(0.5, 15.0), 1)
-
-        # Training time based on model complexity
-        if model.model_type == 'cnn':
-            training_minutes = random.randint(30, 300)
-        elif model.model_type == 'neural_network':
-            training_minutes = random.randint(10, 120)
-        else:
-            training_minutes = random.randint(1, 30)
-
-        # Dataset statistics
-        total_rows = random.randint(5000, 100000)
-        total_features = random.randint(5, 50)
-
-        # Target distribution
-        if random.choice([True, False]):  # Binary classification
-            positive_ratio = random.uniform(0.3, 0.7)
-            target_distribution = [
-                {"label": "Negative", "count": int(total_rows * (1 - positive_ratio))},
-                {"label": "Positive", "count": int(total_rows * positive_ratio)}
-            ]
-        else:  # Multi-class
-            num_classes = random.randint(3, 5)
-            remaining_rows = total_rows
-            target_distribution = []
-
-            for i in range(num_classes):
-                if i == num_classes - 1:
-                    count = remaining_rows
-                else:
-                    count = random.randint(int(remaining_rows * 0.1), int(remaining_rows * 0.4))
-                    remaining_rows -= count
-
-                target_distribution.append({
-                    "label": f"Class_{i+1}",
-                    "count": count
-                })
-
-        # Performance over time (last 30 days)
-        performance_history = []
-        base_date = datetime.now() - timedelta(days=30)
-
-        for day in range(30):
-            date = base_date + timedelta(days=day)
-            daily_predictions = random.randint(0, int(total_predictions / 15))
-            avg_confidence = random.uniform(0.75, 0.95)
-
-            performance_history.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "predictions_count": daily_predictions,
-                "avg_confidence": round(avg_confidence, 3),
-                "avg_response_time": round(avg_prediction_time + random.uniform(-20, 20), 2)
-            })
-
+        # Return minimal real data only
         return {
             "usage_metrics": {
-                "total_predictions": total_predictions,
-                "avg_prediction_time": avg_prediction_time,
-                "predictions_last_24h": random.randint(0, 200),
-                "predictions_last_week": random.randint(0, 1000),
-                "unique_users": random.randint(1, 50)
+                "total_predictions": 0,
+                "avg_prediction_time": 0.0,
+                "predictions_last_24h": 0,
+                "predictions_last_week": 0,
+                "unique_users": 0
             },
             "model_info": {
-                "model_size": f"{model_size_mb} MB",
-                "training_time": f"{training_minutes} minutes",
-                "last_trained": model.updated_at.isoformat() if model.updated_at else datetime.now().isoformat(),
+                "model_size": "N/A",
+                "training_time": "N/A",
+                "last_trained": model.updated_at.isoformat() if model.updated_at else None,
                 "version": "1.0.0",
-                "framework": "scikit-learn" if model.model_type not in ['neural_network', 'cnn'] else "PyTorch"
+                "framework": "scikit-learn" if model.model_type not in ['neural_network', 'cnn', 'rnn', 'lstm', 'gru'] else "PyTorch"
             },
             "dataset_info": {
-                "total_rows": total_rows,
-                "total_features": total_features,
-                "target_distribution": target_distribution,
-                "data_quality_score": round(random.uniform(0.85, 0.98), 3),
-                "missing_values_pct": round(random.uniform(0.0, 5.0), 2)
+                "total_rows": 0,
+                "total_features": 0,
+                "target_distribution": [],
+                "data_quality_score": 0.0,
+                "missing_values_pct": 0.0
             },
-            "performance_history": performance_history,
+            "performance_history": [],
             "resource_usage": {
-                "avg_cpu_usage": round(random.uniform(15.0, 75.0), 1),
-                "avg_memory_usage": round(random.uniform(100.0, 2000.0), 1),
-                "disk_usage": f"{random.randint(50, 500)} MB"
+                "avg_cpu_usage": 0.0,
+                "avg_memory_usage": 0.0,
+                "disk_usage": "N/A"
             }
         }
 
