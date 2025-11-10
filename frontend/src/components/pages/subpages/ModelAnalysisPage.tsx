@@ -47,7 +47,6 @@ import {
   ShowChart,
 } from '@mui/icons-material';
 import httpfetch from '../../../utils/axios';
-import TrainingLogsViewer from '../../TrainingLogsViewer';
 import TrainingLogsViewerWebSocket from '../../TrainingLogsViewerWebSocket';
 import { useTrainingWebSocket } from '../../../hooks/useTrainingWebSocket';
 import {
