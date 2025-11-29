@@ -167,39 +167,17 @@ export default function DynamicTable() {
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%", height: "100%" }}>
+    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
       {tabs != null && tab ? (
         <>
           <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns} />
-          <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start' }}>
-            <Button
-              onClick={handleOpenColumns}
-              variant="outlined"
-              sx={{
-                minWidth: 48,
-                height: 48,
-                borderRadius: 0,
-                borderTop: 0,
-                borderBottom: 0,
-                borderLeft: 0,
-                borderColor: "divider",
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                  borderColor: "divider",
-                }
-              }}
-            >
+          <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
+            <Button onClick={handleOpenColumns} sx={{ height: "37px" }}>
               <KeyboardDoubleArrowRightIcon
-                sx={{
-                  rotate: tab?.openedColumns ? "180deg" : "0deg",
-                  transition: "rotate 0.2s ease-in-out",
-                  color: "text.secondary"
-                }}
+                sx={{ rotate: tab?.openedColumns ? "180deg" : "0deg", transition: "rotate 0.1s ease-in-out" }}
               />
             </Button>
-            <Box sx={{ borderRight: 1, borderColor: "divider" }}>
-              {renderIndexesMemo}
-            </Box>
+            {renderIndexesMemo}
           </Box>
         </>
       ) : activeTab}

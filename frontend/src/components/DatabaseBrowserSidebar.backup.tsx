@@ -3,13 +3,14 @@ import {
   Box,
   Typography,
   CircularProgress,
+  IconButton,
+  Divider,
+  Collapse,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
   ListItemIcon,
-  Collapse,
-  Paper,
 } from "@mui/material";
 import {
   ExpandMore,
@@ -17,6 +18,7 @@ import {
   Storage,
   Folder,
   TableChart,
+  Refresh,
 } from "@mui/icons-material";
 import { useAppContext } from "../providers/useAppContext";
 import { getDatabasesList, getSchemaTablesList } from "../utils/requests";
@@ -44,10 +46,12 @@ export default function DatabaseBrowserSidebar({ open }: DatabaseBrowserSidebarP
     const connectionKey = connection.id;
 
     if (expandedConnections.has(connectionKey)) {
+      // Collapse
       const newExpanded = new Set(expandedConnections);
       newExpanded.delete(connectionKey);
       setExpandedConnections(newExpanded);
     } else {
+      // Expand and fetch schemas if not already loaded
       const newExpanded = new Set(expandedConnections);
       newExpanded.add(connectionKey);
       setExpandedConnections(newExpanded);
@@ -71,10 +75,12 @@ export default function DatabaseBrowserSidebar({ open }: DatabaseBrowserSidebarP
     const schemaKey = `${connection.id}_${schema}`;
 
     if (expandedSchemas.has(schemaKey)) {
+      // Collapse
       const newExpanded = new Set(expandedSchemas);
       newExpanded.delete(schemaKey);
       setExpandedSchemas(newExpanded);
     } else {
+      // Expand and fetch tables if not already loaded
       const newExpanded = new Set(expandedSchemas);
       newExpanded.add(schemaKey);
       setExpandedSchemas(newExpanded);
@@ -98,39 +104,36 @@ export default function DatabaseBrowserSidebar({ open }: DatabaseBrowserSidebarP
     addTableViewTab(connection, schema, tableName);
   };
 
+  const handleRefresh = () => {
+    updateConnections();
+    setExpandedConnections(new Set());
+    setExpandedSchemas(new Set());
+    setConnectionSchemas({});
+    setSchemaTables({});
+  };
+
   if (!open) return null;
 
   return (
-    <Box
-      sx={{
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: "background.paper",
-      }}
-    >
+    <>
       {/* Sidebar Header */}
-      <Box
-        sx={{
-          p: 3,
-          borderBottom: 1,
-          borderColor: "divider",
-          bgcolor: "grey.50",
-        }}
-      >
-        <Typography variant="h6" fontWeight={600} color="text.primary">
+      <Box sx={{
+        px: 2.5,
+        py: 2,
+        borderBottom: 1,
+        borderColor: 'divider',
+        bgcolor: 'grey.50'
+      }}>
+        <Typography variant="overline" fontWeight={700} color="text.secondary" letterSpacing={1}>
           Connections
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Browse your databases
         </Typography>
       </Box>
 
       {/* Connections List */}
-      <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+      <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", pt: 1.5 }}>
         {!connections || connections.length === 0 ? (
           <Box sx={{ p: 4, textAlign: "center" }}>
-            <Storage sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
+            <Storage sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
             <Typography variant="body2" color="text.secondary" gutterBottom>
               No database connections found.
             </Typography>
@@ -139,7 +142,7 @@ export default function DatabaseBrowserSidebar({ open }: DatabaseBrowserSidebarP
             </Typography>
           </Box>
         ) : (
-          <List disablePadding>
+          <List disablePadding sx={{ py: 0.5 }}>
             {connections.map((connection) => {
               const connectionKey = connection.id;
               const isExpanded = expandedConnections.has(connectionKey);
@@ -147,154 +150,158 @@ export default function DatabaseBrowserSidebar({ open }: DatabaseBrowserSidebarP
               const schemas = connectionSchemas[connectionKey] || [];
 
               return (
-                <Box key={connectionKey} sx={{ mb: 2 }}>
+                <React.Fragment key={connectionKey}>
                   {/* Connection Item */}
-                  <Paper elevation={0} variant="outlined" sx={{ mb: 1 }}>
+                  <ListItem disablePadding sx={{ mb: 0.5 }}>
                     <ListItemButton
                       onClick={() => handleConnectionClick(connection)}
                       sx={{
-                        py: 2,
-                        px: 2,
+                        pl: 1.5,
+                        py: 1,
                         borderRadius: 1,
+                        mx: 1,
                         "&:hover": {
                           bgcolor: "action.hover",
                         },
+                        ...(isExpanded && {
+                          bgcolor: "action.selected",
+                        })
                       }}
                     >
-                      <ListItemIcon sx={{ minWidth: 40 }}>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
                         {isExpanded ? (
-                          <ExpandMore fontSize="medium" />
+                          <ExpandMore fontSize="small" />
                         ) : (
-                          <ChevronRight fontSize="medium" />
+                          <ChevronRight fontSize="small" />
                         )}
                       </ListItemIcon>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Storage fontSize="medium" color="primary" />
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Storage fontSize="small" color="primary" />
                       </ListItemIcon>
                       <ListItemText
                         primary={
-                          <Typography variant="body1" fontWeight={600}>
+                          <Typography variant="body2" fontWeight={500} noWrap>
                             {connection.name}
                           </Typography>
                         }
                         secondary={
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" noWrap>
                             {connection.type}
                           </Typography>
                         }
                       />
                     </ListItemButton>
-                  </Paper>
+                  </ListItem>
 
                   {/* Schemas */}
                   <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                     {isLoading ? (
-                      <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                        <CircularProgress size={24} />
+                      <Box sx={{ display: "flex", justifyContent: "center", py: 2, pl: 4 }}>
+                        <CircularProgress size={20} />
                       </Box>
                     ) : (
-                      <Box sx={{ pl: 3 }}>
-                        <List disablePadding>
-                          {schemas.map((schema) => {
-                            const schemaKey = `${connectionKey}_${schema}`;
-                            const isSchemaExpanded = expandedSchemas.has(schemaKey);
-                            const isSchemaLoading = loading[schemaKey];
-                            const tables = schemaTables[schemaKey] || [];
+                      <List disablePadding sx={{ pl: 1 }}>
+                        {schemas.map((schema) => {
+                          const schemaKey = `${connectionKey}_${schema}`;
+                          const isSchemaExpanded = expandedSchemas.has(schemaKey);
+                          const isSchemaLoading = loading[schemaKey];
+                          const tables = schemaTables[schemaKey] || [];
 
-                            return (
-                              <Box key={schemaKey} sx={{ mb: 1.5 }}>
-                                {/* Schema Item */}
+                          return (
+                            <React.Fragment key={schemaKey}>
+                              {/* Schema Item */}
+                              <ListItem disablePadding sx={{ mb: 0.5 }}>
                                 <ListItemButton
                                   onClick={() => handleSchemaClick(connection, schema)}
                                   sx={{
-                                    py: 1.5,
-                                    px: 2,
+                                    pl: 3,
+                                    py: 0.75,
                                     borderRadius: 1,
-                                    bgcolor: "grey.50",
-                                    "&:hover": {
-                                      bgcolor: "action.hover",
-                                    },
+                                    mx: 1,
+                                    "&:hover": { bgcolor: "action.hover" },
+                                    ...(isSchemaExpanded && {
+                                      bgcolor: "action.selected",
+                                    })
                                   }}
                                 >
-                                  <ListItemIcon sx={{ minWidth: 36 }}>
+                                  <ListItemIcon sx={{ minWidth: 28 }}>
                                     {isSchemaExpanded ? (
                                       <ExpandMore fontSize="small" />
                                     ) : (
                                       <ChevronRight fontSize="small" />
                                     )}
                                   </ListItemIcon>
-                                  <ListItemIcon sx={{ minWidth: 36 }}>
+                                  <ListItemIcon sx={{ minWidth: 28 }}>
                                     <Folder fontSize="small" color="secondary" />
                                   </ListItemIcon>
                                   <ListItemText
                                     primary={
-                                      <Typography variant="body2" fontWeight={500}>
+                                      <Typography variant="body2" fontSize="0.875rem" noWrap>
                                         {schema}
                                       </Typography>
                                     }
                                   />
                                 </ListItemButton>
+                              </ListItem>
 
-                                {/* Tables */}
-                                <Collapse in={isSchemaExpanded} timeout="auto" unmountOnExit>
-                                  {isSchemaLoading ? (
-                                    <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-                                      <CircularProgress size={20} />
-                                    </Box>
-                                  ) : tables.length === 0 ? (
-                                    <Box sx={{ pl: 6, py: 2 }}>
-                                      <Typography variant="caption" color="text.secondary" fontStyle="italic">
-                                        No tables found
-                                      </Typography>
-                                    </Box>
-                                  ) : (
-                                    <Box sx={{ pl: 4, mt: 1 }}>
-                                      <List disablePadding>
-                                        {tables.map((table) => (
-                                          <ListItem key={table.table_name} disablePadding sx={{ mb: 0.5 }}>
-                                            <ListItemButton
-                                              onClick={() =>
-                                                handleTableClick(connection, schema, table.table_name)
-                                              }
-                                              sx={{
-                                                py: 1,
-                                                px: 2,
-                                                borderRadius: 1,
-                                                "&:hover": {
-                                                  bgcolor: "action.hover",
-                                                },
-                                              }}
-                                            >
-                                              <ListItemIcon sx={{ minWidth: 36 }}>
-                                                <TableChart fontSize="small" />
-                                              </ListItemIcon>
-                                              <ListItemText
-                                                primary={
-                                                  <Typography variant="body2">
-                                                    {table.table_name}
-                                                  </Typography>
-                                                }
-                                              />
-                                            </ListItemButton>
-                                          </ListItem>
-                                        ))}
-                                      </List>
-                                    </Box>
-                                  )}
-                                </Collapse>
-                              </Box>
-                            );
-                          })}
-                        </List>
-                      </Box>
+                              {/* Tables */}
+                              <Collapse in={isSchemaExpanded} timeout="auto" unmountOnExit>
+                                {isSchemaLoading ? (
+                                  <Box sx={{ display: "flex", justifyContent: "center", py: 2, pl: 6 }}>
+                                    <CircularProgress size={16} />
+                                  </Box>
+                                ) : tables.length === 0 ? (
+                                  <Box sx={{ pl: 8, py: 1.5 }}>
+                                    <Typography variant="caption" color="text.secondary" fontStyle="italic">
+                                      No tables found
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  <List disablePadding sx={{ pl: 2 }}>
+                                    {tables.map((table) => (
+                                      <ListItem key={table.table_name} disablePadding sx={{ mb: 0.25 }}>
+                                        <ListItemButton
+                                          onClick={() =>
+                                            handleTableClick(connection, schema, table.table_name)
+                                          }
+                                          sx={{
+                                            pl: 5,
+                                            py: 0.5,
+                                            borderRadius: 1,
+                                            mx: 1,
+                                            "&:hover": {
+                                              bgcolor: "action.hover",
+                                            },
+                                          }}
+                                        >
+                                          <ListItemIcon sx={{ minWidth: 28 }}>
+                                            <TableChart fontSize="small" sx={{ fontSize: '1.1rem' }} />
+                                          </ListItemIcon>
+                                          <ListItemText
+                                            primary={
+                                              <Typography variant="body2" fontSize="0.8125rem" noWrap>
+                                                {table.table_name}
+                                              </Typography>
+                                            }
+                                          />
+                                        </ListItemButton>
+                                      </ListItem>
+                                    ))}
+                                  </List>
+                                )}
+                              </Collapse>
+                            </React.Fragment>
+                          );
+                        })}
+                      </List>
                     )}
                   </Collapse>
-                </Box>
+                </React.Fragment>
               );
             })}
           </List>
         )}
       </Box>
-    </Box>
+    </>
   );
 }

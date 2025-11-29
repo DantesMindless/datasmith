@@ -8,15 +8,21 @@ services:
       MYSQL_PASSWORD: password
     ports:
       - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql_test/init:/docker-entrypoint-initdb.d
 
   postgres:
-    image: postgres:13
+    image: postgres:14
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
       - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres_test/init:/docker-entrypoint-initdb.d
 
   mongodb:
     image: mongo:latest

@@ -95,7 +95,12 @@ class MySQLConnection(VerifyInputsMixin):
             cursor.execute(query, params)
             if cursor.with_rows:
                 result = cursor.fetchall()
-                return True, result, "Query executed successfully."
+                # Normalize column names to lowercase for consistency with PostgreSQL
+                normalized_result = [
+                    {key.lower(): value for key, value in row.items()}
+                    for row in result
+                ]
+                return True, normalized_result, "Query executed successfully."
             self.connection.commit()
             return True, None, "Query executed successfully, no rows returned."
         except Error as e:
@@ -120,9 +125,10 @@ class MySQLConnection(VerifyInputsMixin):
         """
         query = "SELECT schema_name FROM information_schema.schemata;"
         try:
-            result = self.query(query)
-            if result:
-                schemas = [row["schema_name"] for row in json.loads(result[1])]
+            success, result, message = self.query(query)
+            if success and result:
+                # Column names are now normalized to lowercase in query() method
+                schemas = [row["schema_name"] for row in result]
                 return True, schemas, "Schemas retrieved successfully."
             return False, None, "No schemas found."
         except Exception as e:
@@ -155,6 +161,55 @@ class MySQLConnection(VerifyInputsMixin):
             return False, None, f"No tables found in schema '{schema}'."
         else:
             return False, None, message
+
+    def get_table_rows(self, query) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+        """
+        Retrieve rows from a table with pagination support.
+
+        Args:
+            query (dict): Query parameters containing:
+                - activeColumns: List of columns to select (may contain level indicators)
+                - schema: Schema name
+                - table: Table name
+                - page: Page number
+                - perPage: Rows per page
+
+        Returns:
+            Tuple[bool, Optional[List[Dict[str, Any]]], str]: Success status, rows, and message.
+        """
+        columns = query.get("activeColumns")
+        schema = query.get("schema")
+        table = query.get("table")
+        page = query.get("page", 1)
+        per_page = query.get("perPage", 10)
+        offset = (page - 1) * per_page
+
+        # Parse column names - they come in format like:
+        # "level_1^-^table_name.column_name" or "parent_level_1^-^table_name"
+        # Extract just the actual column names
+        parsed_columns = []
+        if columns:
+            for col in columns:
+                if "." in col:
+                    # Format: "level_1^-^table_name.column_name"
+                    column_name = col.split(".")[-1]  # Get the part after the last dot
+                    parsed_columns.append(f"`{column_name}`")
+
+        # If no parsed columns, select all
+        if not parsed_columns:
+            column_list = "*"
+        else:
+            column_list = ", ".join(parsed_columns)
+
+        # Build query with count
+        sql_query = f"""
+            SELECT {column_list},
+                   (SELECT COUNT(*) FROM `{schema}`.`{table}`) AS total_rows_number
+            FROM `{schema}`.`{table}`
+            LIMIT {per_page} OFFSET {offset};
+        """
+
+        return self.query(sql_query)
 
     def related_tables(
         self, table_name: str
@@ -206,16 +261,20 @@ class MySQLConnection(VerifyInputsMixin):
         except Exception as e:
             return False, None, f"Error retrieving related tables: {str(e)}"
 
-    def get_table_columns(self, table_name: str) -> Optional[List[Dict[str, Any]]]:
+    def get_table_columns(self, table_name: str, schema: str = None) -> Optional[List[Dict[str, Any]]]:
         """
         Retrieve a list of columns for the specified table.
 
         Args:
             table_name (str): The name of the table.
+            schema (str, optional): The schema/database name. If not provided, uses default database.
 
         Returns:
             Optional[List[Dict[str, Any]]]: A list of column details or None if the query fails.
         """
+        if schema is None:
+            schema = self.database
+
         query = """
         SELECT
             column_name,
@@ -225,24 +284,32 @@ class MySQLConnection(VerifyInputsMixin):
         FROM
             information_schema.columns
         WHERE
-            table_name = %s;
+            table_name = %s
+            AND table_schema = %s;
         """
-        result = self.query(query, (table_name,))
-        if result:
-            return json.loads(result)
+        success, result, message = self.query(query, (table_name, schema))
+        if success and result:
+            return result
         return None
 
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self, schema: str = None) -> Dict[str, Any]:
         """
-        Retrieve metadata for all tables in the current schema.
+        Retrieve metadata for all tables in the specified schema.
+
+        Args:
+            schema (str, optional): Schema name. If not provided, uses default database.
 
         Returns:
             Dict[str, Any]: Metadata for tables.
         """
+        # Use the provided schema or fall back to the default database
+        if schema is None:
+            schema = self.database
+
         # cache: LFUCache[str, Any] = LFUCache(maxsize=1024)
         tables: Dict[str, Any] = {}
         tables_relations: Dict[str, List[Dict[str, Any]]] = {}
-        tables_list = self.get_tables()
+        success, tables_list, message = self.get_tables(schema)
 
         def get_relationships(
             table_name: str, scanned_tables: Optional[Set[str]] = None
@@ -272,19 +339,21 @@ class MySQLConnection(VerifyInputsMixin):
             # cache[table_name] = table_relations
             return table_relations
 
-        if tables_list:
+        if success and tables_list:
             for table in tables_list:
-                table_name = table["table_name"]
-                tables.update(
-                    {
-                        table_name: {
-                            "fields": self.get_table_columns(table_name),
-                            "relations": [],
+                # Column names are now normalized to lowercase in query() method
+                table_name = table.get("table_name")
+                if table_name:
+                    tables.update(
+                        {
+                            table_name: {
+                                "fields": self.get_table_columns(table_name, schema),
+                                "relations": [],
+                            }
                         }
-                    }
-                )
-                if relations := self.related_tables(table_name)[1]:
-                    tables_relations[table_name] = relations
+                    )
+                    if relations := self.related_tables(table_name)[1]:
+                        tables_relations[table_name] = relations
 
         for table_name in tables:
             if tables_relations.get(table_name):

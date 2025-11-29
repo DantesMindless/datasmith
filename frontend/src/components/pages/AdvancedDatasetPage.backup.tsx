@@ -69,7 +69,8 @@ import DatasetAnalysisPage from './subpages/DatasetAnalysisPage';
 import CreateDatasetPage from '../CreateDatasetPage';
 import CreateConnection from '../CreateConnection';
 import DataSourcesTables from '../DataSourcesTables';
-import DatabaseBrowser from '../DatabaseBrowser';
+import QueryTables from '../QueryTables';
+import DatabaseBrowserSidebar from '../DatabaseBrowserSidebar';
 
 interface Dataset {
   id: number;
@@ -765,8 +766,49 @@ export default function AdvancedDatasetPage() {
         </TabPanel>
 
         <TabPanel value={activeTab} index={2}>
-          <Box sx={{ height: 'calc(100vh - 180px)' }}>
-            <DatabaseBrowser />
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)' }}>
+            {/* Top Bar - Full Width Header */}
+            <Box sx={{
+              px: 4,
+              py: 2,
+              borderBottom: 2,
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+            }}>
+              <Typography variant="h4" fontWeight={700}>
+                Database Browser
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Browse and query your connected databases
+              </Typography>
+            </Box>
+
+            {/* Main Content Area - Sidebar + Tables */}
+            <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', bgcolor: 'background.default' }}>
+              {/* Left Sidebar - Connections (col-3) */}
+              <Box sx={{
+                width: '25%',
+                minWidth: 280,
+                maxWidth: 350,
+                borderRight: 2,
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <DatabaseBrowserSidebar open={true} />
+              </Box>
+
+              {/* Right Content - Tables Viewer (col-9) */}
+              <Box sx={{
+                flex: 1,
+                overflow: 'auto',
+                bgcolor: 'background.default',
+                p: 3
+              }}>
+                <QueryTables />
+              </Box>
+            </Box>
           </Box>
         </TabPanel>
 
