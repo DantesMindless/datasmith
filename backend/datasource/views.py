@@ -1,8 +1,13 @@
 from typing import Optional
 from uuid import UUID
+import csv
+import os
+from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest
+from django.conf import settings
+from django.core.files.base import ContentFile
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -19,7 +24,7 @@ from .permissions import IsOwnerOrReadOnly, CanAccessDatasource
 
 # Import permission utilities
 from userauth.permissions import (
-    require_permission, require_role, PermissionManager, 
+    require_permission, require_role, PermissionManager,
     DataSourcePermissionMixin
 )
 from userauth.models import UserRole, AccessType
@@ -317,3 +322,148 @@ class DataSourceConnectionTypesFormFieldsView(BaseAuthApiView):
         if datasource := DatasourceTypeChoices.get_adapter(id):
             return Response(datasource.get_initial_params(), status=status.HTTP_200_OK)
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class DataSourceExportView(BaseAuthApiView, DataSourcePermissionMixin):
+    """
+    View for exporting database query results to CSV and creating ML datasets.
+    """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated, CanAccessDatasource]
+
+    def post(self, request: HttpRequest, id: UUID) -> Response:
+        """
+        Export query results to CSV and create a Dataset.
+
+        Expected request body:
+        {
+            "schema": "public",
+            "table": "users",
+            "columns": ["id", "name", "email"],  // optional, defaults to all
+            "filters": "WHERE age > 18",  // optional
+            "limit": 10000,  // optional, defaults to 100000
+            "dataset_name": "User Export",  // optional
+            "dataset_description": "Exported user data"  // optional
+        }
+        """
+        # Check datasource access permission
+        if not PermissionManager.can_user_access_resource(
+            request.user, 'datasource', str(id), AccessType.READ
+        ):
+            return Response(
+                "Insufficient permissions to export from this datasource",
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        datasource = DataSource.objects.filter(id=id, deleted=False).first()
+        if not datasource:
+            return Response(
+                DatasourceResponses.DS_NOT_FOUND,
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Parse request data
+        data = request.data
+        schema = data.get("schema")
+        table = data.get("table")
+        columns = data.get("columns", [])
+        filters = data.get("filters", "")
+        limit = min(data.get("limit", 100000), 1000000)  # Cap at 1M rows
+        dataset_name = data.get("dataset_name", f"{table} Export - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        dataset_description = data.get("dataset_description", f"Exported from {datasource.name}/{schema}/{table}")
+
+        if not schema or not table:
+            return Response(
+                "Schema and table are required",
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Build query
+            column_list = ", ".join(f'"{col}"' for col in columns) if columns else "*"
+            query = f'SELECT {column_list} FROM "{schema}"."{table}"'
+
+            if filters:
+                query += f" {filters}"
+
+            query += f" LIMIT {limit}"
+
+            # Execute query
+            datasource.connection.connect()
+            success, result, message = datasource.connection.query(query)
+            datasource.connection.close()
+
+            if not success or not result:
+                return Response(
+                    f"Query failed: {message}",
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if we got any data
+            if len(result) == 0:
+                return Response(
+                    "Query returned no results",
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create CSV in memory
+            import io
+            csv_buffer = io.StringIO()
+
+            # Get column names from first row
+            fieldnames = list(result[0].keys())
+            writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
+
+            # Write header and rows
+            writer.writeheader()
+            writer.writerows(result)
+
+            # Get CSV content
+            csv_content = csv_buffer.getvalue()
+            csv_buffer.close()
+
+            # Create Dataset
+            from app.models.main import Dataset
+            dataset = Dataset(
+                name=dataset_name,
+                description=dataset_description,
+                created_by=request.user,
+            )
+
+            # Save CSV file
+            filename = f"{schema}_{table}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            dataset.csv_file.save(
+                filename,
+                ContentFile(csv_content.encode('utf-8')),
+                save=False
+            )
+
+            # Set metadata
+            dataset.row_count = len(result)
+            dataset.column_count = len(fieldnames)
+            dataset.file_size = len(csv_content.encode('utf-8'))
+
+            # Save dataset (this will trigger analysis)
+            dataset.save()
+
+            # Return response with dataset info
+            return Response({
+                "success": True,
+                "message": "Export completed successfully",
+                "dataset": {
+                    "id": str(dataset.id),
+                    "name": dataset.name,
+                    "rows": dataset.row_count,
+                    "columns": dataset.column_count,
+                    "file_size": dataset.file_size,
+                },
+                "rows_exported": len(result)
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            import logging
+            logging.error(f"Export error: {str(e)}", exc_info=True)
+            return Response(
+                f"Export failed: {str(e)}",
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

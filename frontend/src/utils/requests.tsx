@@ -49,3 +49,21 @@ export const queryTab = (tab: TableViewTab) => {
 export const getJoins = (tab: TableViewTab) => {
   return getData(`datasource-metadata/tables/${tab.ID}/${tab.schema}/${tab.table}/`,)
 }
+
+export const exportTableToCSV = async (connectionId: string, exportParams: {
+  schema: string;
+  table: string;
+  columns?: string[];
+  filters?: string;
+  limit?: number;
+  dataset_name?: string;
+  dataset_description?: string;
+}) => {
+  try {
+    const response = await httpfetch.post(`datasource/export/${connectionId}/`, exportParams);
+    return response.data;
+  } catch (error) {
+    console.error("Error exporting table:", error);
+    throw error;
+  }
+}

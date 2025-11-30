@@ -34,6 +34,11 @@ import {
   Tab,
   Tabs,
   Badge,
+  TextField,
+  TablePagination,
+  InputAdornment,
+  Checkbox,
+  ListItemText,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -53,6 +58,9 @@ import {
   CleaningServices,
   Image as ImageIcon,
   TrendingUp,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  ViewColumn as ViewColumnIcon,
 } from '@mui/icons-material';
 import httpfetch from '../../../utils/axios';
 import ImageDatasetViewer from '../../ImageDatasetViewer';
@@ -145,6 +153,12 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
+  // Data preview state
+  const [previewPage, setPreviewPage] = useState(0);
+  const [previewRowsPerPage, setPreviewRowsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+
   const fetchDatasetData = async (id: string | number) => {
     try {
       setLoading(true);
@@ -213,6 +227,13 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
       fetchDatasetData(datasetId);
     }
   }, [datasetId]);
+
+  // Initialize selected columns when preview data loads
+  useEffect(() => {
+    if (previewData?.preview_data?.[0] && selectedColumns.length === 0) {
+      setSelectedColumns(Object.keys(previewData.preview_data[0]));
+    }
+  }, [previewData]);
 
   const getQualityColor = (quality: string) => {
     switch (quality.toLowerCase()) {
@@ -443,14 +464,17 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
             }
             icon={<Assessment />}
           />
-          {dataset.dataset_type === 'image' ? (
+          {dataset.dataset_type === 'image' && (
             <Tab label="Image Gallery" icon={<ImageIcon />} />
-          ) : (
-            <>
-              <Tab label="Data Preview" icon={<TableChart />} />
-              <Tab label="Statistics" icon={<BarChartIcon />} />
-              <Tab label="Distributions" icon={<Timeline />} />
-            </>
+          )}
+          {dataset.dataset_type !== 'image' && (
+            <Tab label="Data Preview" icon={<TableChart />} />
+          )}
+          {dataset.dataset_type !== 'image' && (
+            <Tab label="Statistics" icon={<BarChartIcon />} />
+          )}
+          {dataset.dataset_type !== 'image' && (
+            <Tab label="Distributions" icon={<Timeline />} />
           )}
         </Tabs>
       </Paper>
@@ -797,47 +821,199 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
       )}
 
       {/* Data Preview Tab - Only for non-image datasets */}
-      {activeTab === 2 && dataset.dataset_type !== 'image' && previewData && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              Data Preview ({previewData.preview_data?.length || 0} rows)
-            </Typography>
+      {activeTab === 2 && dataset.dataset_type !== 'image' && (
+        <>
+          {!previewData || !previewData.preview_data || previewData.preview_data.length === 0 ? (
+            <Card>
+              <CardContent>
+                <Box sx={{ textAlign: 'center', py: 8 }}>
+                  <TableChart sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No Preview Data Available
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    The dataset preview is empty or hasn't been processed yet.
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Refresh />}
+                    onClick={handleReanalyze}
+                    sx={{ mt: 3 }}
+                  >
+                    Reanalyze Dataset
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent>
+                {/* Preview Header with Controls */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+              <Typography variant="h6" fontWeight={600}>
+                Data Preview
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  size="small"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ width: 250 }}
+                />
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel>Columns</InputLabel>
+                  <Select
+                    multiple
+                    value={selectedColumns}
+                    onChange={(e) => setSelectedColumns(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+                    renderValue={(selected) => `${selected.length} selected`}
+                    label="Columns"
+                  >
+                    {previewData.preview_data?.[0] && Object.keys(previewData.preview_data[0]).map((col) => (
+                      <MenuItem key={col} value={col}>
+                        <Checkbox checked={selectedColumns.indexOf(col) > -1} />
+                        <ListItemText
+                          primary={col}
+                          secondary={previewData.column_info?.[col]?.type || 'unknown'}
+                        />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+            </Box>
+
+            {/* Preview Stats */}
+            <Box sx={{ display: 'flex', gap: 3, mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Total Rows
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {dataset.row_count?.toLocaleString() || 'N/A'}
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Showing
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {previewData.preview_data?.length || 0} rows
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Selected Columns
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {selectedColumns.length} / {Object.keys(previewData.preview_data?.[0] || {}).length}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Data Table */}
             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600 }}>
-              <Table stickyHeader>
+              <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    {previewData.preview_data?.[0] && Object.keys(previewData.preview_data[0]).map((col) => (
-                      <TableCell key={col} sx={{ fontWeight: 600, bgcolor: 'grey.50' }}>
-                        <Box>
-                          <Typography variant="body2" fontWeight={600}>{col}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {previewData.column_info?.[col]?.type || 'unknown'}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                    ))}
+                    <TableCell sx={{ fontWeight: 600, bgcolor: 'primary.50', minWidth: 60 }}>
+                      #
+                    </TableCell>
+                    {previewData.preview_data?.[0] && selectedColumns
+                      .filter(col => Object.keys(previewData.preview_data[0]).includes(col))
+                      .map((col) => (
+                        <TableCell key={col} sx={{ fontWeight: 600, bgcolor: 'primary.50', minWidth: 150 }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>{col}</Typography>
+                            <Chip
+                              label={previewData.column_info?.[col]?.type || 'unknown'}
+                              size="small"
+                              sx={{ mt: 0.5, height: 20, fontSize: '0.65rem' }}
+                            />
+                          </Box>
+                        </TableCell>
+                      ))}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {previewData.preview_data?.map((row, index) => (
-                    <TableRow key={index}>
-                      {Object.values(row).map((value: any, cellIndex) => (
-                        <TableCell key={cellIndex}>
-                          {value !== null && value !== undefined ? String(value) : (
-                            <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                              null
-                            </Typography>
-                          )}
+                  {previewData.preview_data
+                    ?.filter((row) => {
+                      if (!searchTerm) return true;
+                      return Object.values(row).some(val =>
+                        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+                      );
+                    })
+                    .slice(previewPage * previewRowsPerPage, previewPage * previewRowsPerPage + previewRowsPerPage)
+                    .map((row, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell sx={{ bgcolor: 'grey.50', fontWeight: 500 }}>
+                          {previewPage * previewRowsPerPage + index + 1}
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
+                        {selectedColumns
+                          .filter(col => Object.keys(row).includes(col))
+                          .map((col) => {
+                            const value = row[col];
+                            const columnType = previewData.column_info?.[col]?.type;
+
+                            return (
+                              <TableCell key={col}>
+                                {value !== null && value !== undefined ? (
+                                  <Box>
+                                    <Typography variant="body2">
+                                      {String(value)}
+                                    </Typography>
+                                    {columnType === 'numeric' && (
+                                      <Typography variant="caption" color="primary">
+                                        {typeof value === 'number' ? value.toLocaleString() : value}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                ) : (
+                                  <Typography variant="body2" color="text.disabled" fontStyle="italic">
+                                    null
+                                  </Typography>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </TableContainer>
+
+            {/* Pagination */}
+            <TablePagination
+              component="div"
+              count={previewData.preview_data?.filter((row) => {
+                if (!searchTerm) return true;
+                return Object.values(row).some(val =>
+                  String(val).toLowerCase().includes(searchTerm.toLowerCase())
+                );
+              }).length || 0}
+              page={previewPage}
+              onPageChange={(e, newPage) => setPreviewPage(newPage)}
+              rowsPerPage={previewRowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setPreviewRowsPerPage(parseInt(e.target.value, 10));
+                setPreviewPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+            />
           </CardContent>
         </Card>
+          )}
+        </>
       )}
 
       {/* Statistics Tab - Only for non-image datasets */}

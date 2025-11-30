@@ -7,6 +7,7 @@ from .views import (
     DataSourceDetailMetadataView,
     DataSourceConnectionTypesView,
     DataSourceConnectionTypesFormFieldsView,
+    DataSourceExportView,
 )
 
 urlpatterns = [
@@ -60,5 +61,10 @@ urlpatterns = [
         "datasource/connection-type-form/<str:id>",
         DataSourceConnectionTypesFormFieldsView.as_view(),
         name="datasource-connection-types",
+    ),
+    path(
+        "datasource/export/<uuid:id>/",
+        DataSourceExportView.as_view(),
+        name="datasource-export",
     ),
 ]

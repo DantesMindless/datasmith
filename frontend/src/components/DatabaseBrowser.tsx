@@ -30,6 +30,11 @@ import {
   Checkbox,
   Collapse,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from "@mui/material";
 import {
   Refresh,
@@ -40,9 +45,10 @@ import {
   ViewColumn,
   ExpandMore,
   ChevronRight,
+  FileDownload,
 } from "@mui/icons-material";
 import { useAppContext } from "../providers/useAppContext";
-import { getDatabasesList, getSchemaTablesList, queryTab, getJoins } from "../utils/requests";
+import { getDatabasesList, getSchemaTablesList, queryTab, getJoins, exportTableToCSV } from "../utils/requests";
 import { Connection } from "../providers/constants";
 
 interface TableTab {
@@ -82,6 +88,13 @@ export default function DatabaseBrowser() {
 
   // Column selector state
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set(['parent_level_1']));
+
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportLimit, setExportLimit] = useState(10000);
+  const [exportDatasetName, setExportDatasetName] = useState("");
+  const [exportDatasetDescription, setExportDatasetDescription] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (connections === null) {
@@ -304,6 +317,39 @@ export default function DatabaseBrowser() {
     }
   };
 
+  const handleExport = async () => {
+    if (!activeTab) return;
+
+    setExporting(true);
+    try {
+      const result = await exportTableToCSV(activeTab.connection.id, {
+        schema: activeTab.schema,
+        table: activeTab.table,
+        columns: activeTab.activeColumns.length > 0
+          ? activeTab.activeColumns
+              .filter((col: string) => !col.startsWith("parent_"))
+              .map((col: string) => col.split(".").pop() || col)
+          : undefined,
+        limit: exportLimit,
+        dataset_name: exportDatasetName || `${activeTab.table} Export`,
+        dataset_description: exportDatasetDescription || `Exported from ${activeTab.connection.name}/${activeTab.schema}/${activeTab.table}`,
+      });
+
+      showAlert(`Export successful! Dataset "${result.dataset.name}" created with ${result.rows_exported} rows.`, "success");
+      setExportDialogOpen(false);
+
+      // Reset export form
+      setExportDatasetName("");
+      setExportDatasetDescription("");
+      setExportLimit(10000);
+    } catch (error: any) {
+      console.error("Export error:", error);
+      showAlert(error.response?.data || "Failed to export table", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const activeTab = openTabs[activeTabIndex];
 
   return (
@@ -463,6 +509,14 @@ export default function DatabaseBrowser() {
                     {activeTab.connection.name} / {activeTab.schema} / {activeTab.table}
                   </Typography>
                   <Box sx={{ flex: 1 }} />
+                  <Button
+                    size="small"
+                    startIcon={<FileDownload />}
+                    onClick={() => setExportDialogOpen(true)}
+                    variant="outlined"
+                  >
+                    Export to CSV
+                  </Button>
                   <IconButton
                     size="small"
                     onClick={() => {
@@ -665,6 +719,78 @@ export default function DatabaseBrowser() {
           )
         )}
       </Box>
+
+      {/* Export Dialog */}
+      <Dialog
+        open={exportDialogOpen}
+        onClose={() => !exporting && setExportDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Export Table to CSV Dataset
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 2 }}>
+            <Alert severity="info">
+              {activeTab
+                ? `Exporting from: ${activeTab.connection.name} / ${activeTab.schema} / ${activeTab.table}`
+                : "No table selected"}
+            </Alert>
+
+            <TextField
+              label="Dataset Name"
+              value={exportDatasetName}
+              onChange={(e) => setExportDatasetName(e.target.value)}
+              placeholder={activeTab ? `${activeTab.table} Export` : ""}
+              fullWidth
+              helperText="Leave empty to use default name"
+            />
+
+            <TextField
+              label="Dataset Description"
+              value={exportDatasetDescription}
+              onChange={(e) => setExportDatasetDescription(e.target.value)}
+              placeholder={activeTab ? `Exported from ${activeTab.connection.name}` : ""}
+              fullWidth
+              multiline
+              rows={3}
+              helperText="Optional description for the dataset"
+            />
+
+            <TextField
+              label="Row Limit"
+              type="number"
+              value={exportLimit}
+              onChange={(e) => setExportLimit(Math.min(parseInt(e.target.value) || 10000, 1000000))}
+              fullWidth
+              helperText="Maximum rows to export (up to 1,000,000)"
+              InputProps={{
+                inputProps: { min: 1, max: 1000000 }
+              }}
+            />
+
+            {activeTab && activeTab.activeColumns.length > 0 && (
+              <Alert severity="success">
+                {activeTab.activeColumns.filter((col: string) => !col.startsWith("parent_")).length} columns selected for export
+              </Alert>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={() => setExportDialogOpen(false)} disabled={exporting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleExport}
+            variant="contained"
+            disabled={exporting || !activeTab}
+            startIcon={exporting ? <CircularProgress size={20} /> : <FileDownload />}
+          >
+            {exporting ? "Exporting..." : "Export & Create Dataset"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 
