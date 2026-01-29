@@ -90,8 +90,9 @@ export default function DynamicTable() {
   }, [activeTab])
 
   useEffect(() => {
-    console.log(tab?.activeColumns)
-    fetchData(tab);
+    if (tab) {
+      fetchData(tab);
+    }
   }, [tab?.activeColumns])
 
   const handleOpenColumns = () => {
@@ -139,7 +140,10 @@ export default function DynamicTable() {
     });
   };
 
-  const visibleRows = data
+  const visibleRows = useMemo(
+    () => rowsPerPage === -1 ? data : data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [data, page, rowsPerPage]
+  )
 
   const renderIndexes = () => {
     const indexes = []
@@ -165,17 +169,39 @@ export default function DynamicTable() {
 
   const renderIndexesMemo = useMemo(() => renderIndexes(), [data]);
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%"}}>
+    <Box sx={{ display: 'flex', flexDirection: 'row', width: "100%", height: "100%" }}>
       {tabs != null && tab ? (
         <>
           <JoinsSidebar tab={tab} tabs={tabs} setTabs={setTabs} openedColumns={tab.openedColumns} />
-          <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start', border: "1px solid gray" }}>
-            <Button onClick={handleOpenColumns} sx={{ height: "37px" }}>
+          <Box sx={{ display: 'flex', flexDirection: "column", justifyContent: 'flex-start' }}>
+            <Button
+              onClick={handleOpenColumns}
+              variant="outlined"
+              sx={{
+                minWidth: 48,
+                height: 48,
+                borderRadius: 0,
+                borderTop: 0,
+                borderBottom: 0,
+                borderLeft: 0,
+                borderColor: "divider",
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                  borderColor: "divider",
+                }
+              }}
+            >
               <KeyboardDoubleArrowRightIcon
-                sx={{ rotate: tab?.openedColumns ? "180deg" : "0deg", transition: "rotate 0.1s ease-in-out" }}
+                sx={{
+                  rotate: tab?.openedColumns ? "180deg" : "0deg",
+                  transition: "rotate 0.2s ease-in-out",
+                  color: "text.secondary"
+                }}
               />
             </Button>
-            {renderIndexesMemo}
+            <Box sx={{ borderRight: 1, borderColor: "divider" }}>
+              {renderIndexesMemo}
+            </Box>
           </Box>
         </>
       ) : activeTab}
@@ -226,7 +252,7 @@ export default function DynamicTable() {
             </Table>
           </TableContainer>
           <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
+            rowsPerPageOptions={[5, 10, 25, 50, 100, { label: 'All', value: -1 }]}
             component="div"
             count={data.length}
             rowsPerPage={rowsPerPage}

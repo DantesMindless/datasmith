@@ -337,24 +337,60 @@ class PostgresConnection(VerifyInputsMixin):
         per_page = query.get("perPage")
         offset = (page - 1) * per_page
 
+        if not columns or len(columns) == 0:
+            return False, None, "No columns provided"
+
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"get_table_rows - columns: {columns}")
+        logger.info(f"get_table_rows - schema: {schema}, table: {table}, page: {page}, per_page: {per_page}")
+
         selects_string, joins_conditions_string = self.joins_engine(table, columns)
-        if not columns:
-            return "success", [], "No columns provided"
-        else:
-            columns = [column.split(".")[1] for column in columns if "." in column]
-        query = f"SELECT {selects_string}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} {joins_conditions_string}LIMIT {per_page} OFFSET {offset};"
-        return self.query(query)
+
+        if not selects_string:
+            return False, None, "Failed to build column selection"
+
+        query_str = f"SELECT {selects_string}, (SELECT COUNT(*) FROM {schema}.{table}) AS total_rows_number FROM {schema}.{table} {joins_conditions_string}LIMIT {per_page} OFFSET {offset};"
+        logger.info(f"Generated SQL: {query_str}")
+        return self.query(query_str)
 
     def joins_engine(self, table_name, columns) -> Tuple[str, str]:
+        import logging
+        logger = logging.getLogger(__name__)
+
         tables = set()
         scanned_columns = set()
         selects = []
+
+        logger.info(f"joins_engine - table_name: {table_name}, columns: {columns}")
+
         for column in columns:
-            clean_column = re.sub(r"^.([A-z0-9])*\^-\^", "", column)
-            if "." in column:
-                column = clean_column.split(".")
-                related_table_name = column[0]
-                related_column_name = column[1]
+            if not column or column.strip() == "":
+                continue
+
+            # Clean column name by removing level indicator prefix (e.g., "level_1^-^patients.name" -> "patients.name")
+            # Pattern matches: start of string, any characters, then ^-^
+            clean_column = re.sub(r"^.*?\^-\^", "", column)
+            logger.info(f"Column: '{column}' -> Clean: '{clean_column}'")
+
+            if not clean_column or clean_column.strip() == "":
+                logger.warning(f"Column '{column}' became empty after cleaning")
+                continue
+
+            # Skip parent table indicators (columns that don't have a dot and match the table name)
+            if "." not in clean_column and clean_column == table_name:
+                logger.info(f"Skipping parent table indicator: {column}")
+                continue
+
+            if "." in clean_column:
+                column_parts = clean_column.split(".")
+                if len(column_parts) < 2:
+                    logger.warning(f"Invalid column format: {clean_column}")
+                    continue
+
+                related_table_name = column_parts[0]
+                related_column_name = column_parts[1]
                 scanned_columns.add(related_column_name)
                 tables.add(related_table_name)
                 clean_column_value = (
@@ -364,19 +400,29 @@ class PostgresConnection(VerifyInputsMixin):
                 )
                 selects.append(clean_column_value)
             else:
-                tables.add(clean_column)
+                # Simple column name without table prefix
+                tables.add(table_name)
+                selects.append(f'"{table_name}"."{clean_column}"')
 
-        if len(tables) > 0:
+        logger.info(f"Generated selects: {selects}")
+
+        if len(selects) == 0:
+            return "", ""
+
+        if len(tables) > 1:
+            # Multiple tables, need joins
             relations = self.get_tables_relations()[1]
             joins_dict = PostgresConnection.generate_joins(table_name, relations)
             joins_list = PostgresConnection.concat_joins(
                 joins_dict, tables, set([table_name])
             )
             joins_conditions_string = " ".join(joins_list) + " "
-            selects_string = ", ".join(selects) + " "
+        else:
+            joins_conditions_string = ""
 
-            return selects_string, joins_conditions_string
-        return "", ""
+        selects_string = ", ".join(selects)
+
+        return selects_string, joins_conditions_string
 
     def filters_engine(self, filters) -> Tuple[str, str]:
         return "PostgreSQL"

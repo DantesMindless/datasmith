@@ -28,6 +28,33 @@ class DatasourceViewSerializer(serializers.ModelSerializer):
         return obj.created_by.username or "System"
 
 
+class DatasourceEditSerializer(serializers.ModelSerializer):
+    """Serializer for editing datasource - includes credentials."""
+    user = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DataSource
+        fields = [
+            "id",
+            "name",
+            "description",
+            "type",
+            "credentials",
+            "user",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_user(self, obj: DataSource) -> str:
+        return obj.user.username or "System"
+
+    def get_created_by(self, obj: DataSource) -> str:
+        return obj.created_by.username or "System"
+
+
 class DataSourceSerializer(serializers.ModelSerializer):
     """
     Serializer for the DataSource model.

@@ -7,19 +7,16 @@ poetry install --no-root
 
 if [ "$ENV" = "development" ]; then
     echo "Running in development mode"
+    # Migrations are handled manually by the user
+    poetry run python manage.py makemigrations
     poetry run python manage.py migrate
     poetry run python manage.py create_superuser
 fi
 
-# No command passed → default to Django runserver or Gunicorn
+# No command passed → default to Daphne ASGI server (required for WebSocket support)
 if [ $# -eq 0 ]; then
-    if [ "$ENV" = "development" ]; then
-        echo "Starting Django development server"
-        exec poetry run python manage.py runserver 0.0.0.0:8000
-    else
-        echo "Starting Gunicorn production server"
-        exec poetry run gunicorn --bind 0.0.0.0:8000 datasmith.wsgi:application --workers 3
-    fi
+    echo "Starting Daphne ASGI server (WebSocket support)"
+    exec poetry run daphne -b 0.0.0.0 -p 8000 datasmith.asgi:application
 else
     echo "Running custom command: $@"
     exec "$@"

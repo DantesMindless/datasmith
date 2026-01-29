@@ -41,29 +41,45 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
   );
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [cudaEnabled, setCudaEnabled] = useState<boolean>(() => {
+    const stored = localStorage.getItem('cudaEnabled');
+    return stored === 'true';
+  });
+
+  // Persist CUDA preference
+  useEffect(() => {
+    localStorage.setItem('cudaEnabled', String(cudaEnabled));
+  }, [cudaEnabled]);
 
   useEffect(() => {
     const accessToken = getAccessToken();
     if (accessToken) {
-      setIsAuthenticated(true);
-      // Optional: validate token by making a test request
+      // Validate token before setting authenticated state
       httpfetch.get('test_token/')
         .then((response) => {
           setUser(response.data.user || null);
+          setIsAuthenticated(true);
           // Load connections after successful authentication
           updateConnections();
         })
         .catch(() => {
           // Token is invalid, clear it
           clearTokens();
+          setUser(null);
           setIsAuthenticated(false);
+        })
+        .finally(() => {
+          setAuthLoading(false);
         });
+    } else {
+      setAuthLoading(false);
     }
   }, []);
 
   const showAlert = (
     message: string,
-    type: "error" | "success" | "warning" = "error"
+    type: "error" | "success" | "warning" | "info" = "error"
   ) => {
     setAlert({ message, type });
     setTimeout(() => setAlert(null), 5000);
@@ -134,7 +150,6 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
       setDataStorage("connections", [...data]);
       setConnections(data);
     } catch (error) {
-      console.log(error);
       showAlert("Error updating connections", "error");
     }
   };
@@ -176,7 +191,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
     try {
       const refreshToken = localStorage.getItem('refresh_token');
       if (refreshToken) {
-        await httpfetch.post('/logout/', { refresh: refreshToken });
+        await httpfetch.post('logout/', { refresh: refreshToken });
       }
     } catch (error) {
       // Continue with logout even if request fails
@@ -199,6 +214,7 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         updateConnections,
         activeConnections,
         setActiveConnections,
+        updateActiveConnections,
         tabs,
         setTabs,
         addTableViewTab,
@@ -209,8 +225,11 @@ export const ContextProvider: React.FC<ProviderProps> = ({ children }) => {
         updateActiveTab,
         user,
         isAuthenticated,
+        authLoading,
         login,
-        logout
+        logout,
+        cudaEnabled,
+        setCudaEnabled
       }}
     >
       {children}

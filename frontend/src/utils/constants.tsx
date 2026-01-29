@@ -1,7 +1,8 @@
 import DataSourcesTables from "../components/DataSourcesTables";
 import CreateConnection from "../components/CreateConnection";
 import QueryTables from "../components/QueryTables";
-import CreateModel from "../components/CreateModel"
+import CreateModel from "../components/CreateModel";
+import AdvancedDatasetPage from "../components/pages/AdvancedDatasetPage";
 export const pageComponents = {
   createConnection: {
     skip: false,
@@ -18,7 +19,12 @@ export const pageComponents = {
     name: "Query Tab",
     component: QueryTables,
   },
-    createModel: {
+  datasetManagement: {
+    skip: false,
+    name: "Dataset Management",
+    component: AdvancedDatasetPage,
+  },
+  createModel: {
     skip: true,
     name: "Create Model",
     component: CreateModel,

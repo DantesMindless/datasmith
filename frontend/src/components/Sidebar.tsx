@@ -14,6 +14,9 @@ import Typography from "@mui/material/Typography";
 import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import PowerIcon from "@mui/icons-material/Power";
+import MemoryIcon from "@mui/icons-material/Memory";
+import Switch from "@mui/material/Switch";
+import Tooltip from "@mui/material/Tooltip";
 
 import { useAppContext } from "../providers/useAppContext";
 import { getDatabasesList, getSchemaTablesList } from "../utils/requests";
@@ -32,7 +35,7 @@ interface ActiveConnection extends Connection {
 
 
 export default function Sidebar() {
-  const { connections, activeConnections, updateActiveConnections, updateConnections, addTableViewTab } = useAppContext();
+  const { connections, activeConnections, updateActiveConnections, updateConnections, addTableViewTab, cudaEnabled, setCudaEnabled, user, logout } = useAppContext();
   const [expandedItems, setExpandedItems] = useState([])
 
   useEffect(() => {
@@ -48,7 +51,6 @@ export default function Sidebar() {
     }else{
       setExpandedItems(expandedItems.filter((element)=>element != item))
     }
-    console.log(expandedItems)
   }
 
   async function addActiveConnection(connection : Connection) {
@@ -168,19 +170,67 @@ export default function Sidebar() {
         {RenderSchemas()}
       </Box>
 
+      {/* CUDA Toggle */}
+      <Tooltip
+        title={cudaEnabled ? "CUDA GPU acceleration enabled for training" : "Enable CUDA GPU acceleration for faster training"}
+        placement="right"
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
+            bgcolor: cudaEnabled ? "rgba(76, 175, 80, 0.1)" : "grey.100",
+            border: "1px solid",
+            borderColor: cudaEnabled ? "success.light" : "grey.300",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <MemoryIcon
+              fontSize="small"
+              sx={{ color: cudaEnabled ? "success.main" : "grey.500" }}
+            />
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 500,
+                color: cudaEnabled ? "success.main" : "text.secondary",
+              }}
+            >
+              CUDA
+            </Typography>
+          </Box>
+          <Switch
+            size="small"
+            checked={cudaEnabled}
+            onChange={(e) => setCudaEnabled(e.target.checked)}
+            color="success"
+          />
+        </Box>
+      </Tooltip>
+
+      <Divider />
+
+      {/* User Info */}
       <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <Avatar
-          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=286"
-          alt="Avatar"
-        />
-        <Box>
-          <Typography variant="body1">Siriwat K.</Typography>
-          <Typography variant="body2" color="textSecondary">
-            siriwatk@test.com
+          sx={{ bgcolor: "primary.main", width: 36, height: 36 }}
+        >
+          {user?.username?.[0]?.toUpperCase() || "U"}
+        </Avatar>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Typography variant="body2" noWrap fontWeight={500}>
+            {user?.username || "User"}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" noWrap sx={{ display: "block" }}>
+            {user?.email || ""}
           </Typography>
         </Box>
-        <IconButton>
-          <LogoutRoundedIcon />
+        <IconButton size="small" onClick={logout}>
+          <LogoutRoundedIcon fontSize="small" />
         </IconButton>
       </Box>
     </Box>
