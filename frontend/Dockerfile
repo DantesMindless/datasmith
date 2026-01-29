@@ -20,5 +20,8 @@ RUN npm run build
 # Expose port 3000
 EXPOSE 3000
 
+ENV HOST 0.0.0.0
+
+
 # Start the React development server
 CMD ["npm", "start"]
