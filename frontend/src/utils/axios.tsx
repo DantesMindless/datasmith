@@ -22,6 +22,7 @@ const clearTokens = () => {
 
 interface RequestOptions extends RequestInit {
   data?: any;
+  params?: Record<string, any>;
 }
 
 const refreshAccessToken = async (): Promise<string | null> => {
@@ -56,13 +57,13 @@ const refreshAccessToken = async (): Promise<string | null> => {
 const httpfetch = {
   async request(url: string, options: RequestOptions = {}, isRetry: boolean = false) {
     const accessToken = getAccessToken();
-    
+
     const headers: HeadersInit = {
       "Content-Type": "application/json",
       "Accept": "application/json",
       ...(options.headers || {}),
     };
-    
+
     if (accessToken) {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
@@ -72,7 +73,22 @@ const httpfetch = {
       headers,
       credentials: 'omit', // Don't send browser stored credentials
     };
-    
+
+    // Handle query parameters
+    let finalUrl = url;
+    if (options.params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          searchParams.append(key, String(value));
+        }
+      });
+      const queryString = searchParams.toString();
+      if (queryString) {
+        finalUrl = `${url}${url.includes('?') ? '&' : '?'}${queryString}`;
+      }
+    }
+
     // Handle request body
     if (options.data) {
       if (options.data instanceof FormData) {
@@ -83,8 +99,8 @@ const httpfetch = {
         config.body = JSON.stringify(options.data);
       }
     }
-    
-    const response = await fetch(`${baseURL}${url}`, config);
+
+    const response = await fetch(`${baseURL}${finalUrl}`, config);
     
     // If 401 and not already retrying, try to refresh token
     if (response.status === 401 && !isRetry && accessToken) {
@@ -148,7 +164,11 @@ const httpfetch = {
   put(url: string, data?: any, options?: RequestOptions) {
     return this.request(url, { ...options, method: 'PUT', data });
   },
-  
+
+  patch(url: string, data?: any, options?: RequestOptions) {
+    return this.request(url, { ...options, method: 'PATCH', data });
+  },
+
   delete(url: string, options?: RequestOptions) {
     return this.request(url, { ...options, method: 'DELETE' });
   }

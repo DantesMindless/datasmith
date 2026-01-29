@@ -173,13 +173,17 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),  # If you have a 'static' directory in your app
 ]
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "mediafiles")
+
+# Note: MEDIA_ROOT/MEDIA_URL removed - all file storage uses MinIO (S3-compatible)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# File upload settings for large datasets
+DATA_UPLOAD_MAX_MEMORY_SIZE = 500 * 1024 * 1024  # 500MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 500 * 1024 * 1024  # 500MB
 
 AUTH_USER_MODEL = "userauth.CustomUser"
 
@@ -194,6 +198,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://localhost",
     "http://localhost",  # Local frontend
     "http://localhost:5173",
+    "https://datasmith.local",  # Nginx HTTPS frontend
+    "http://datasmith.local",   # Nginx HTTP frontend
 ]
 
 CORS_ALLOW_METHODS = [
@@ -203,6 +209,20 @@ CORS_ALLOW_METHODS = [
     "DELETE",
     "OPTIONS",
 ]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 
 CELERY_BROKER_URL = (os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),)

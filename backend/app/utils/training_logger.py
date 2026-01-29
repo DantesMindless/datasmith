@@ -42,6 +42,7 @@ class TrainingLogger:
             'epochs': [],
             'losses': [],
             'accuracies': [],
+            'val_losses': [],
             'val_accuracies': [],
             'learning_rates': [],
             'best_accuracy': 0.0,
@@ -62,12 +63,6 @@ class TrainingLogger:
             'adaboost': 'AdaBoost',
             'neural_network': 'Neural Network',
             'cnn': 'Convolutional Neural Network (Image Recognition)',
-            'resnet': 'ResNet (Deep Learning for Images)',
-            'vgg': 'VGG (Deep Learning for Images)',
-            'efficientnet': 'EfficientNet (Efficient Image Recognition)',
-            'rnn': 'Recurrent Neural Network',
-            'lstm': 'LSTM (Long Short-Term Memory)',
-            'gru': 'GRU (Gated Recurrent Unit)',
         }
         return friendly_names.get(model_type.lower(), model_type.title())
 
@@ -337,6 +332,8 @@ class TrainingLogger:
         self.metrics['losses'].append(train_loss)
         if train_acc is not None:
             self.metrics['accuracies'].append(train_acc)
+        if val_loss is not None:
+            self.metrics['val_losses'].append(val_loss)
         if val_acc is not None:
             self.metrics['val_accuracies'].append(val_acc)
         if lr is not None:

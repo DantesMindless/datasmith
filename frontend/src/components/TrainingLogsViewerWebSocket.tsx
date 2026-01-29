@@ -51,14 +51,13 @@ const TrainingLogsViewerWebSocket: React.FC<TrainingLogsViewerProps> = ({
     enabled: true,
     autoReconnect: true,
     onComplete: (data) => {
-      console.log('Training completed:', data);
       setStatus(data.status || 'complete');
       if (data.accuracy !== undefined) {
         setAccuracy(data.accuracy);
       }
     },
     onError: (error) => {
-      console.error('WebSocket error:', error);
+      // Error is already handled by the hook
     }
   });
 

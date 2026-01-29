@@ -12,6 +12,7 @@ import {
   InputAdornment,
   IconButton,
   Fade,
+  Link,
 } from '@mui/material';
 import {
   Visibility,
@@ -21,7 +22,11 @@ import {
 } from '@mui/icons-material';
 import { useAppContext } from '../providers/useAppContext';
 
-const Login: React.FC = () => {
+interface LoginProps {
+  onSwitchToSignup?: () => void;
+}
+
+const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -193,8 +198,29 @@ const Login: React.FC = () => {
                 </Button>
               </Box>
 
-              {/* Footer */}
-              <Box sx={{ textAlign: 'center', mt: 4 }}>
+              {/* Footer with Signup Link */}
+              <Box sx={{ textAlign: 'center', mt: 3 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Don't have an account?{' '}
+                  <Link
+                    component="button"
+                    variant="body2"
+                    onClick={onSwitchToSignup}
+                    sx={{
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      '&:hover': {
+                        textDecoration: 'underline',
+                      }
+                    }}
+                  >
+                    Sign Up
+                  </Link>
+                </Typography>
+              </Box>
+
+              <Box sx={{ textAlign: 'center', mt: 2 }}>
                 <Typography variant="caption" color="text.secondary">
                   Secure access to your data analytics workspace
                 </Typography>

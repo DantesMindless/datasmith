@@ -90,7 +90,6 @@ export default function DynamicTable() {
   }, [activeTab])
 
   useEffect(() => {
-    console.log(tab?.activeColumns)
     if (tab) {
       fetchData(tab);
     }
@@ -141,7 +140,10 @@ export default function DynamicTable() {
     });
   };
 
-  const visibleRows = data
+  const visibleRows = useMemo(
+    () => rowsPerPage === -1 ? data : data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [data, page, rowsPerPage]
+  )
 
   const renderIndexes = () => {
     const indexes = []
@@ -250,7 +252,7 @@ export default function DynamicTable() {
             </Table>
           </TableContainer>
           <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
+            rowsPerPageOptions={[5, 10, 25, 50, 100, { label: 'All', value: -1 }]}
             component="div"
             count={data.length}
             rowsPerPage={rowsPerPage}

@@ -194,16 +194,20 @@ class AuthenticatedTestView(APIView):
     def get(self, request: Request) -> DRFResponse:
         """
         Test endpoint to verify token validity.
-        
+
         Args:
             request: The HTTP request with authentication headers
-            
+
         Returns:
             Response with user information if token is valid
         """
         return Response({
             "message": "Token is valid",
-            "user": request.user.username
+            "user": {
+                "id": request.user.id,
+                "username": request.user.username,
+                "email": request.user.email
+            }
         })
 
 
@@ -278,17 +282,22 @@ def refresh_token(request: Request) -> DRFResponse:
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def test_token(request: Request) -> DRFResponse:
     """
-    Legacy test token endpoint. Redirects to AuthenticatedTestView.
-    
+    Test endpoint to verify token validity and return user data.
+
     Args:
         request: The HTTP request with authentication headers
-        
+
     Returns:
-        Response from AuthenticatedTestView
+        Response with user information if token is valid
     """
-    test_view = AuthenticatedTestView()
-    test_view.authentication_classes = [JWTAuthentication]
-    test_view.permission_classes = [IsAuthenticated]
-    return test_view.get(request)
+    return Response({
+        "message": "Token is valid",
+        "user": {
+            "id": request.user.id,
+            "username": request.user.username,
+            "email": request.user.email
+        }
+    })

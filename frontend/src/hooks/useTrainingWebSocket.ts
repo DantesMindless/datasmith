@@ -70,7 +70,7 @@ export interface UseTrainingWebSocketReturn {
  *   modelId: '123',
  *   enabled: true,
  *   onComplete: (data) => {
- *     console.log('Training completed:', data);
+ *     // Handle completion
  *   }
  * });
  * ```
@@ -110,12 +110,12 @@ export const useTrainingWebSocket = (
     // Determine protocol (ws:// or wss://)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
-    // Get host (use environment variable or default to localhost)
-    const host = import.meta.env.VITE_WS_HOST || window.location.hostname;
-    const port = import.meta.env.VITE_WS_PORT || '8000';
+    // Use window.location.host (includes port if non-standard) to go through nginx proxy
+    // This ensures WebSocket uses the same host:port as the page (nginx handles /ws/ routing)
+    const host = import.meta.env.VITE_WS_HOST || window.location.host;
 
-    // Construct WebSocket URL
-    let url = `${protocol}//${host}:${port}/ws/training/${modelId}/`;
+    // Construct WebSocket URL (nginx proxies /ws/ to Django/Daphne)
+    let url = `${protocol}//${host}/ws/training/${modelId}/`;
 
     // Add token as query parameter if available
     if (token) {
@@ -179,7 +179,6 @@ export const useTrainingWebSocket = (
 
         case 'training_complete':
           // Training completed notification
-          console.log('Training completed:', data);
           if (onComplete) {
             onComplete({
               model_id: data.model_id,
@@ -197,8 +196,7 @@ export const useTrainingWebSocket = (
           break;
 
         case 'pong':
-          // Pong response to ping
-          console.debug('Received pong');
+          // Pong response to ping - heartbeat
           break;
 
         default:
@@ -225,12 +223,10 @@ export const useTrainingWebSocket = (
 
     try {
       const url = getWebSocketUrl();
-      console.log('Connecting to WebSocket:', url);
 
       const ws = new WebSocket(url);
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
         setIsConnected(true);
         setError(null);
         setReconnecting(false);
@@ -259,7 +255,6 @@ export const useTrainingWebSocket = (
       };
 
       ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
 
         // Clear ping interval
@@ -276,8 +271,6 @@ export const useTrainingWebSocket = (
         if (autoReconnect && event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
           setReconnecting(true);
           setReconnectAttempts((prev) => prev + 1);
-
-          console.log(`Reconnecting in ${reconnectDelay}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
 
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();

@@ -9,8 +9,6 @@ from django.conf import settings
 from datasource.adapters import (
     PostgresConnection,
     MySQLConnection,
-    MongoDBConnection,
-    RedisConnection,
 )
 
 from .constants.choices import DatasourceTypeChoices
@@ -74,8 +72,6 @@ class DataSource(BaseModel):
         Union[
             Type[PostgresConnection],
             Type[MySQLConnection],
-            Type[MongoDBConnection],
-            Type[RedisConnection],
         ]
     ]:
         """]
@@ -92,7 +88,7 @@ class DataSource(BaseModel):
     @cached_property
     def connection(
         self,
-    ) -> Union[PostgresConnection, MySQLConnection, MongoDBConnection]:
+    ) -> Union[PostgresConnection, MySQLConnection]:
         """
         Establish a connection using the adapter and provided credentials.
 

@@ -7,6 +7,7 @@ import {
   MenuItem,
   Select,
   TextField,
+  Typography,
 } from "@mui/material";
 import CheckCircleOutlineTwoToneIcon from "@mui/icons-material/CheckCircleOutlineTwoTone";
 import ErrorTwoToneIcon from "@mui/icons-material/ErrorTwoTone";
@@ -35,6 +36,19 @@ interface CredentialField {
 }
 
 type CredentialsForm = Record<string, CredentialField>;
+
+export interface EditConnectionData {
+  id: string;
+  name: string;
+  description?: string;
+  type: string;
+  credentials: Record<string, string | number>;
+}
+
+interface CreateConnectionProps {
+  editData?: EditConnectionData | null;
+  onClose?: () => void;
+}
 
 const fetchFormFields = async (
   connectionType: string
@@ -70,17 +84,40 @@ const saveConnection = async (
   }
 };
 
-const CreateConnection: React.FC = () => {
+const updateConnection = async (
+  id: string,
+  data: ConnectionDataRequest
+): Promise<AxiosResponse> => {
+  try {
+    const response: AxiosResponse = await httpfetch.patch(
+      `datasource/detail/${id}/`,
+      data
+    );
+    return response.data;
+  } catch (error) {
+    return Promise.reject(error);
+  }
+};
+
+const CreateConnection: React.FC<CreateConnectionProps> = ({ editData, onClose }) => {
   const { showAlert, showInfo, updateConnections } = useAppContext();
   const formRef = useRef<HTMLFormElement>(null);
   const [rows, setRows] = useState<ConnectionType[]>([]);
   const [selectedConnectionType, setSelectedConnectionType] = useState<string>(
-    "all"
+    editData?.type || "all"
   );
   const [credentialsForm, setCredentialsForm] = useState<CredentialsForm>({});
   const [connectionSuccess, setConnectionsSuccess] = useState<ConnectionSuccessType>(null);
   const [isFormValid, setIsFormValid] = useState(false);
-  const [formErrors, setFormErrors] = useState({ name: "", description: "" });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({ name: "", description: "" });
+
+  // Form values for controlled inputs
+  const [formValues, setFormValues] = useState<Record<string, string>>({
+    name: editData?.name || "",
+    description: editData?.description || "",
+  });
+
+  const isEditMode = !!editData;
 
   const fetchConnectionTypes = async () => {
     const data = await getConnectionTypes();
@@ -90,6 +127,18 @@ const CreateConnection: React.FC = () => {
   useEffect(() => {
     fetchConnectionTypes();
   }, []);
+
+  // Initialize form when editing
+  useEffect(() => {
+    if (editData) {
+      setSelectedConnectionType(editData.type);
+      setFormValues({
+        name: editData.name,
+        description: editData.description || "",
+        ...editData.credentials,
+      });
+    }
+  }, [editData]);
 
   useEffect(() => {
     if (selectedConnectionType !== "all") {
@@ -101,13 +150,23 @@ const CreateConnection: React.FC = () => {
           const errorsMap = credentialsFormKeys.reduce((acc, key) => {
             acc[key] = "";
             return acc;
-          }, {});
-          setFormErrors(errorsMap);
+          }, {} as Record<string, string>);
+          setFormErrors(prev => ({ ...prev, ...errorsMap }));
+
+          // If editing, populate credential values
+          if (editData?.credentials) {
+            setFormValues(prev => ({
+              ...prev,
+              ...Object.fromEntries(
+                Object.entries(editData.credentials).map(([k, v]) => [k, String(v)])
+              ),
+            }));
+          }
         }
       };
       fetchCredentials();
     }
-  }, [selectedConnectionType]);
+  }, [selectedConnectionType, editData]);
 
   useEffect(() => {
     const handleFormChange = () => {
@@ -125,7 +184,7 @@ const CreateConnection: React.FC = () => {
         form.removeEventListener("input", handleFormChange);
       }
     };
-  }, [credentialsForm, selectedConnectionType]);
+  }, [credentialsForm, selectedConnectionType, formValues]);
 
   const handleChange = useCallback(
     (event: React.ChangeEvent<{ value: unknown }>) => {
@@ -137,16 +196,20 @@ const CreateConnection: React.FC = () => {
     []
   );
 
+  const handleInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = event.target;
+      setFormValues(prev => ({ ...prev, [name]: value }));
+    },
+    []
+  );
+
   const isFormFilled = () => {
     if (!formRef.current) return false;
     const formData = new FormData(formRef.current);
     const data = Object.fromEntries(formData.entries());
-    const isRedisConnection = selectedConnectionType === "REDIS";
 
     return Object.entries(data).every(([key, value]) => {
-      if (isRedisConnection && (key === "database" || key === "user")) {
-        return true;
-      }
       return value.toString().trim() !== "";
     });
   };
@@ -172,12 +235,18 @@ const CreateConnection: React.FC = () => {
     const connectionData = getConnectionData();
     if (connectionData) {
       try {
-        const response = await saveConnection(connectionData, test);
-        if (test) {
+        if (isEditMode && editData && !test) {
+          // Update existing connection
+          await updateConnection(editData.id, connectionData);
+          await updateConnections();
+          showInfo("Connection updated successfully!");
+          onClose?.();
+        } else if (test) {
+          await saveConnection(connectionData, true);
           setConnectionsSuccess(true);
           showInfo("Connection test successful!");
         } else {
-          // Update the connections list after successful save
+          await saveConnection(connectionData, false);
           await updateConnections();
           showInfo("Connection saved successfully!");
 
@@ -189,6 +258,7 @@ const CreateConnection: React.FC = () => {
           setCredentialsForm({});
           setConnectionsSuccess(null);
           setIsFormValid(false);
+          setFormValues({ name: "", description: "" });
         }
       } catch (error: unknown) {
         if (error instanceof AxiosError && error?.response?.data?.credentials) {
@@ -201,7 +271,8 @@ const CreateConnection: React.FC = () => {
           });
         }
         setConnectionsSuccess(false);
-        showAlert(test ? "Connection test failed" : "Error saving connection");
+        const action = isEditMode ? "updating" : test ? "testing" : "saving";
+        showAlert(`Error ${action} connection`);
       }
     } else {
       showAlert("Some connection credentials are missing");
@@ -210,30 +281,37 @@ const CreateConnection: React.FC = () => {
 
   const renderCredentialFields = useMemo(() => {
     return Object.entries(credentialsForm).map(([key, field]) => {
-      const title = key.charAt(0).toUpperCase() + key.slice(1);
       return (
         <FormControl key={key} error={!!formErrors[key]} sx={{my: 1}}>
           <TextField
             label={key}
-            id="filled-size-normal"
+            id={`field-${key}`}
             name={key}
             type={field.type === "CharField" ? "text" : "number"}
             required={field.required}
             helperText={formErrors[key]}
+            value={formValues[key] || ""}
+            onChange={handleInputChange}
           />
         </FormControl>
       );
     });
-  }, [credentialsForm, formErrors]);
+  }, [credentialsForm, formErrors, formValues, handleInputChange]);
 
   return (
-    <Box component="form" ref={formRef} sx={{ display: 'flex', flexDirection: 'column',  p: 3, bgcolor: "background.paper" }}>
+    <Box component="form" ref={formRef} sx={{ display: 'flex', flexDirection: 'column', p: 3, bgcolor: "background.paper" }}>
+      {isEditMode && (
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Edit Connection
+        </Typography>
+      )}
       <FormControl fullWidth margin="normal" sx={{my: 1}}>
         <Select
           id="filled-size-normal"
           name="type"
           value={selectedConnectionType}
           onChange={handleChange}
+          disabled={isEditMode}
         >
           <MenuItem value="all">Select Connection</MenuItem>
           {rows.map((item) => (
@@ -249,6 +327,8 @@ const CreateConnection: React.FC = () => {
         label="Connection Title"
         name="name"
         required
+        value={formValues.name || ""}
+        onChange={handleInputChange}
       />
       </FormControl>
       <FormControl fullWidth margin="normal" sx={{my: 1}}>
@@ -257,6 +337,8 @@ const CreateConnection: React.FC = () => {
         label="Description"
         name="description"
         required
+        value={formValues.description || ""}
+        onChange={handleInputChange}
       />
       </FormControl>
 
@@ -269,7 +351,7 @@ const CreateConnection: React.FC = () => {
             onClick={(e) => handleSubmit(e)}
             disabled={!isFormValid}
           >
-            Submit
+            {isEditMode ? "Update" : "Submit"}
           </Button>
           <Button
             variant="outlined"
@@ -285,6 +367,15 @@ const CreateConnection: React.FC = () => {
               <ErrorTwoToneIcon sx={{ ml: 1 }} />
             )}
           </Button>
+          {isEditMode && onClose && (
+            <Button
+              variant="text"
+              color="inherit"
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+          )}
         </ButtonGroup>
       )}
     </Box>

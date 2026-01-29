@@ -15,13 +15,14 @@ import {
   Grid,
   Chip,
   Stack,
+  Tooltip,
 } from '@mui/material';
 import {
   CloudUpload,
   InsertDriveFile,
   Image,
   DataObject,
-  Analytics,
+  Info,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import httpfetch from '../utils/axios';
@@ -59,9 +60,6 @@ const UploadArea = styled(Paper)(({ theme }) => ({
 const DATASET_TYPES = [
   { value: 'tabular', label: 'Tabular Data', icon: <DataObject /> },
   { value: 'image', label: 'Image Dataset', icon: <Image /> },
-  { value: 'text', label: 'Text Dataset', icon: <InsertDriveFile /> },
-  { value: 'time_series', label: 'Time Series', icon: <Analytics /> },
-  { value: 'mixed', label: 'Mixed Dataset', icon: <DataObject /> },
 ];
 
 const DATASET_PURPOSES = [
@@ -189,8 +187,6 @@ export default function CreateDatasetPage() {
           setUploadProgress(progress);
         },
       });
-
-      console.log('Dataset created successfully:', response.data);
 
       // Different success message for image datasets
       if (formData.dataset_type === 'image') {
@@ -406,6 +402,50 @@ export default function CreateDatasetPage() {
                         : 'Supported: CSV, Excel, JSON files'
                       }
                     </Typography>
+                    {formData.dataset_type === 'image' && (
+                      <Tooltip
+                        title={
+                          <Box sx={{ p: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                              Image Dataset Structure
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                              Your ZIP file should contain folders named after each class/category:
+                            </Typography>
+                            <Box component="pre" sx={{
+                              bgcolor: 'rgba(0,0,0,0.2)',
+                              p: 1,
+                              borderRadius: 1,
+                              fontSize: '0.75rem',
+                              fontFamily: 'monospace'
+                            }}>
+{`dataset.zip
+├── class_1/
+│   ├── image1.jpg
+│   ├── image2.png
+│   └── ...
+├── class_2/
+│   ├── image1.jpg
+│   └── ...
+└── class_3/
+    └── ...`}
+                            </Box>
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                              Supported formats: JPG, JPEG, PNG, GIF, BMP, WEBP
+                            </Typography>
+                          </Box>
+                        }
+                        arrow
+                        placement="bottom"
+                      >
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', mt: 1, cursor: 'help' }}>
+                          <Info fontSize="small" color="info" sx={{ mr: 0.5 }} />
+                          <Typography variant="caption" color="info.main">
+                            How should my ZIP be structured?
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    )}
                   </Box>
                 )}
               </UploadArea>

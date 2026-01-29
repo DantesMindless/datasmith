@@ -180,10 +180,46 @@ class TrainingLogsConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_cached_logs(self):
         """
-        Get cached logs from Redis.
+        Get cached logs from Redis, or parse from model's training_log field.
 
         Returns:
             list: List of log entries
         """
+        from app.models.main import MLModel
+
+        # First try Redis cache
         cache_key = f"training_logs_{self.model_id}"
-        return cache.get(cache_key, [])
+        logs = cache.get(cache_key, [])
+
+        if logs:
+            return logs
+
+        # If no cached logs, try to parse from model's training_log field
+        try:
+            model = MLModel.objects.get(id=self.model_id, deleted=False)
+            if model.training_log:
+                # Parse the training log text into log entries
+                parsed_logs = []
+                for line in model.training_log.split('\n'):
+                    if line.strip():
+                        # Determine log level based on content
+                        level = 'INFO'
+                        if '✓' in line or 'complete' in line.lower() or 'success' in line.lower():
+                            level = 'SUCCESS'
+                        elif '❌' in line or 'error' in line.lower() or 'failed' in line.lower():
+                            level = 'ERROR'
+                        elif '⚠' in line or 'warning' in line.lower():
+                            level = 'WARNING'
+                        elif '📊' in line or '📈' in line or 'progress' in line.lower():
+                            level = 'PROGRESS'
+
+                        parsed_logs.append({
+                            'timestamp': model.updated_at.isoformat() if model.updated_at else '',
+                            'level': level,
+                            'message': line.strip()
+                        })
+                return parsed_logs
+        except MLModel.DoesNotExist:
+            pass
+
+        return []

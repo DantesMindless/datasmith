@@ -6,7 +6,7 @@ interface ProviderProps {
 
 interface Alert {
     message: string;
-    type: 'error' | 'success' | 'warning';
+    type: 'error' | 'success' | 'warning' | 'info';
 }
 
 interface Info {
@@ -56,6 +56,7 @@ interface ContextType {
     connections: Connections | null;
     updateConnections:  ()=> void
     setActiveConnections:  React.Dispatch<React.SetStateAction<string[] | null>>
+    updateActiveConnections: (activeConnectionsObj: string[]) => void
     activeConnections: string[] | null
     tabs: TableViewTab[] | null,
     setTabs: React.Dispatch<React.SetStateAction<TableViewTab[] | null>>
@@ -67,8 +68,11 @@ interface ContextType {
     updateActiveTab: (index: number | null) => void;
     user: User | null;
     isAuthenticated: boolean;
+    authLoading: boolean;
     login: (username: string, password: string) => Promise<boolean>;
     logout: () => void;
+    cudaEnabled: boolean;
+    setCudaEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export type {ContextType, ProviderProps, Alert, Info, Connections, Connection, TableViewTab, User }

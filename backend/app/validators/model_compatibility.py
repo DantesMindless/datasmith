@@ -26,6 +26,16 @@ class ModelCompatibilityValidator:
             'training_speed': 'fast',
             'interpretability': 'high',
         },
+        ModelType.LINEAR_REGRESSION: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 30,
+            'max_features': 1000,
+            'requires_numeric': True,
+            'complexity': 'low',
+            'training_speed': 'fast',
+            'interpretability': 'high',
+        },
         ModelType.DECISION_TREE: {
             'compatible_datasets': [DatasetType.TABULAR],
             'compatible_purposes': [DatasetPurpose.CLASSIFICATION, DatasetPurpose.REGRESSION],
@@ -57,7 +67,7 @@ class ModelCompatibilityValidator:
             'interpretability': 'low',
         },
         ModelType.NAIVE_BAYES: {
-            'compatible_datasets': [DatasetType.TABULAR, DatasetType.TEXT],
+            'compatible_datasets': [DatasetType.TABULAR],
             'compatible_purposes': [DatasetPurpose.CLASSIFICATION],
             'min_samples': 50,
             'max_features': 5000,
@@ -119,6 +129,88 @@ class ModelCompatibilityValidator:
             'interpretability': 'medium',
         },
 
+        # ============ REGRESSION MODELS ============
+        ModelType.DECISION_TREE_REGRESSOR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 20,
+            'max_features': 500,
+            'requires_numeric': False,
+            'complexity': 'low',
+            'training_speed': 'fast',
+            'interpretability': 'high',
+        },
+        ModelType.RANDOM_FOREST_REGRESSOR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 100,
+            'max_features': 10000,
+            'requires_numeric': False,
+            'complexity': 'medium',
+            'training_speed': 'medium',
+            'interpretability': 'medium',
+        },
+        ModelType.SVR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 100,
+            'max_features': 200,
+            'requires_numeric': True,
+            'complexity': 'medium',
+            'training_speed': 'slow',
+            'interpretability': 'low',
+        },
+        ModelType.KNN_REGRESSOR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 30,
+            'max_features': 50,
+            'requires_numeric': True,
+            'complexity': 'low',
+            'training_speed': 'fast',
+            'interpretability': 'medium',
+        },
+        ModelType.GRADIENT_BOOSTING_REGRESSOR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 200,
+            'max_features': 5000,
+            'requires_numeric': False,
+            'complexity': 'high',
+            'training_speed': 'medium',
+            'interpretability': 'low',
+        },
+        ModelType.XGBOOST_REGRESSOR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 200,
+            'max_features': 10000,
+            'requires_numeric': False,
+            'complexity': 'high',
+            'training_speed': 'fast',
+            'interpretability': 'low',
+        },
+        ModelType.LIGHTGBM_REGRESSOR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 200,
+            'max_features': 50000,
+            'requires_numeric': False,
+            'complexity': 'high',
+            'training_speed': 'very_fast',
+            'interpretability': 'low',
+        },
+        ModelType.ADABOOST_REGRESSOR: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.REGRESSION],
+            'min_samples': 100,
+            'max_features': 1000,
+            'requires_numeric': False,
+            'complexity': 'medium',
+            'training_speed': 'medium',
+            'interpretability': 'medium',
+        },
+
         # Deep learning - general
         ModelType.NEURAL_NETWORK: {
             'compatible_datasets': [DatasetType.TABULAR],
@@ -142,67 +234,57 @@ class ModelCompatibilityValidator:
             'training_speed': 'slow',
             'interpretability': 'low',
         },
-        ModelType.RESNET: {
-            'compatible_datasets': [DatasetType.IMAGE],
-            'compatible_purposes': [DatasetPurpose.CLASSIFICATION],
-            'min_samples': 50,  # Transfer learning requires fewer samples
-            'max_features': None,
-            'requires_numeric': False,
-            'complexity': 'very_high',
-            'training_speed': 'medium',
-            'interpretability': 'very_low',
-        },
-        ModelType.VGG: {
-            'compatible_datasets': [DatasetType.IMAGE],
-            'compatible_purposes': [DatasetPurpose.CLASSIFICATION],
-            'min_samples': 50,
-            'max_features': None,
-            'requires_numeric': False,
-            'complexity': 'very_high',
-            'training_speed': 'slow',
-            'interpretability': 'very_low',
-        },
-        ModelType.EFFICIENTNET: {
-            'compatible_datasets': [DatasetType.IMAGE],
-            'compatible_purposes': [DatasetPurpose.CLASSIFICATION],
-            'min_samples': 50,
-            'max_features': None,
-            'requires_numeric': False,
-            'complexity': 'very_high',
-            'training_speed': 'medium',
-            'interpretability': 'very_low',
-        },
 
-        # Sequential models
-        ModelType.RNN: {
-            'compatible_datasets': [DatasetType.TIME_SERIES, DatasetType.TEXT],
-            'compatible_purposes': [DatasetPurpose.CLASSIFICATION, DatasetPurpose.REGRESSION],
-            'min_samples': 200,
+        # ============ CLUSTERING MODELS ============
+        ModelType.KMEANS: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.CLUSTERING],
+            'min_samples': 50,
             'max_features': 1000,
             'requires_numeric': True,
-            'complexity': 'high',
-            'training_speed': 'slow',
-            'interpretability': 'low',
+            'complexity': 'low',
+            'training_speed': 'fast',
+            'interpretability': 'high',
         },
-        ModelType.LSTM: {
-            'compatible_datasets': [DatasetType.TIME_SERIES, DatasetType.TEXT],
-            'compatible_purposes': [DatasetPurpose.CLASSIFICATION, DatasetPurpose.REGRESSION],
-            'min_samples': 300,
-            'max_features': 1000,
+        ModelType.DBSCAN: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.CLUSTERING, DatasetPurpose.ANOMALY_DETECTION],
+            'min_samples': 50,
+            'max_features': 100,
             'requires_numeric': True,
-            'complexity': 'very_high',
-            'training_speed': 'slow',
-            'interpretability': 'very_low',
+            'complexity': 'medium',
+            'training_speed': 'fast',
+            'interpretability': 'medium',
         },
-        ModelType.GRU: {
-            'compatible_datasets': [DatasetType.TIME_SERIES, DatasetType.TEXT],
-            'compatible_purposes': [DatasetPurpose.CLASSIFICATION, DatasetPurpose.REGRESSION],
-            'min_samples': 300,
-            'max_features': 1000,
+        ModelType.HIERARCHICAL: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.CLUSTERING],
+            'min_samples': 30,
+            'max_features': 500,
             'requires_numeric': True,
-            'complexity': 'high',
+            'complexity': 'medium',
             'training_speed': 'medium',
-            'interpretability': 'low',
+            'interpretability': 'high',
+        },
+        ModelType.GAUSSIAN_MIXTURE: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.CLUSTERING, DatasetPurpose.ANOMALY_DETECTION],
+            'min_samples': 100,
+            'max_features': 500,
+            'requires_numeric': True,
+            'complexity': 'medium',
+            'training_speed': 'medium',
+            'interpretability': 'medium',
+        },
+        ModelType.MEAN_SHIFT: {
+            'compatible_datasets': [DatasetType.TABULAR],
+            'compatible_purposes': [DatasetPurpose.CLUSTERING],
+            'min_samples': 100,
+            'max_features': 50,
+            'requires_numeric': True,
+            'complexity': 'medium',
+            'training_speed': 'slow',
+            'interpretability': 'medium',
         },
     }
 
@@ -293,18 +375,69 @@ class ModelCompatibilityValidator:
                 )
                 result['score'] -= 5
 
-        # Add recommendations based on complexity
-        if model_config['complexity'] in ['high', 'very_high'] and dataset.row_count and dataset.row_count < 1000:
-            result['recommendations'].append(
-                f"{model_type} is a complex model. With only {dataset.row_count} samples, "
-                f"simpler models (Decision Tree, Logistic Regression) might generalize better."
-            )
+        # Determine if this is an image model
+        is_image_model = DatasetType.IMAGE in model_config['compatible_datasets']
+        is_tabular_model = DatasetType.TABULAR in model_config['compatible_datasets']
 
-        if model_config['training_speed'] == 'slow' and dataset.row_count and dataset.row_count > 10000:
-            result['recommendations'].append(
-                f"{model_type} may take a long time to train on {dataset.row_count} samples. "
-                f"Consider using faster alternatives like LightGBM or XGBoost."
-            )
+        # Add context-appropriate recommendations
+        if is_image_model:
+            # Image model specific recommendations
+            if dataset.row_count:
+                num_classes = len(dataset.column_info) if dataset.column_info else 0
+                # For image datasets, row_count typically represents number of images
+                images_per_class = dataset.row_count / max(num_classes, 1) if num_classes > 0 else dataset.row_count
+
+                if dataset.row_count < 100:
+                    result['recommendations'].append(
+                        f"With only {dataset.row_count} images, consider using data augmentation "
+                        f"to increase effective training set size."
+                    )
+                elif dataset.row_count < 500 and model_type == ModelType.CNN:
+                    result['recommendations'].append(
+                        f"For {dataset.row_count} images, consider using data augmentation to increase "
+                        f"effective training set size and prevent overfitting."
+                    )
+
+                # GPU recommendation for image models
+                if dataset.row_count > 500:
+                    result['recommendations'].append(
+                        f"Enable GPU acceleration (CUDA) for significantly faster training on {dataset.row_count} images."
+                    )
+
+        elif is_tabular_model:
+            # Tabular model specific recommendations
+            if model_config['complexity'] in ['high', 'very_high'] and dataset.row_count and dataset.row_count < 1000:
+                result['recommendations'].append(
+                    f"{model_type} is a complex model. With only {dataset.row_count} samples, "
+                    f"simpler models (Decision Tree, Logistic Regression) might generalize better."
+                )
+
+            if model_config['training_speed'] == 'slow' and dataset.row_count and dataset.row_count > 10000:
+                # For image models, suggest GPU acceleration instead of different algorithms
+                if model_type.lower() in ['cnn', 'convolutional']:
+                    result['recommendations'].append(
+                        f"{model_type} may take a long time to train on {dataset.row_count} samples. "
+                        f"Consider enabling GPU acceleration for much faster training."
+                    )
+                else:
+                    result['recommendations'].append(
+                        f"{model_type} may take a long time to train on {dataset.row_count} samples. "
+                        f"Consider using faster alternatives like LightGBM or XGBoost."
+                    )
+
+            # Neural network specific recommendations for tabular data
+            if model_type == ModelType.NEURAL_NETWORK:
+                if dataset.row_count and dataset.row_count < 1000:
+                    result['recommendations'].append(
+                        f"Neural networks typically need more data to generalize well. "
+                        f"With {dataset.row_count} samples, ensemble methods (Random Forest, XGBoost) "
+                        f"often perform better."
+                    )
+                elif dataset.row_count and dataset.row_count > 10000:
+                    result['recommendations'].append(
+                        f"Good dataset size for neural networks. Consider enabling GPU acceleration "
+                        f"for faster training."
+                    )
 
         return result
 

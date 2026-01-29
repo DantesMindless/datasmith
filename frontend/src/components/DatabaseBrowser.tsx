@@ -35,6 +35,10 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  FormControlLabel,
+  InputLabel,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import {
   Refresh,
@@ -46,9 +50,10 @@ import {
   ExpandMore,
   ChevronRight,
   FileDownload,
+  MergeType,
 } from "@mui/icons-material";
 import { useAppContext } from "../providers/useAppContext";
-import { getDatabasesList, getSchemaTablesList, queryTab, getJoins, exportTableToCSV } from "../utils/requests";
+import { getDatabasesList, getSchemaTablesList, queryTab, getJoins, exportTableToCSV, JoinType } from "../utils/requests";
 import { Connection } from "../providers/constants";
 
 interface TableTab {
@@ -96,6 +101,19 @@ export default function DatabaseBrowser() {
   const [exportDatasetDescription, setExportDatasetDescription] = useState("");
   const [exporting, setExporting] = useState(false);
 
+  // Join options for export
+  const [enableJoin, setEnableJoin] = useState(false);
+  const [joinTable, setJoinTable] = useState("");
+  const [leftColumn, setLeftColumn] = useState("");
+  const [rightColumn, setRightColumn] = useState("");
+  const [joinColumns, setJoinColumns] = useState<string[]>([]);
+  const [joinTableColumns, setJoinTableColumns] = useState<string[]>([]);
+  const [loadingJoinColumns, setLoadingJoinColumns] = useState(false);
+  const [joinType, setJoinType] = useState<JoinType>("inner");
+
+  // Derive active tab from state
+  const activeTab = openTabs[activeTabIndex];
+
   useEffect(() => {
     if (connections === null) {
       updateConnections();
@@ -121,6 +139,45 @@ export default function DatabaseBrowser() {
       setSelectedTable("");
     }
   }, [selectedSchema]);
+
+  // Load join table columns when join table is selected
+  useEffect(() => {
+    const loadJoinTableColumns = async () => {
+      if (!joinTable || !activeTab) return;
+
+      setLoadingJoinColumns(true);
+      try {
+        const metadata = await getJoins({
+          ID: activeTab.connection.id,
+          schema: activeTab.schema,
+          table: joinTable,
+        } as any);
+        // API returns { fields: [{column_name: "...", ...}, ...], relations: [...] }
+        const columns = metadata?.fields?.map((col: any) => col.column_name || col.name || col) || [];
+        setJoinTableColumns(columns);
+      } catch (error) {
+        console.error("Error loading join table columns:", error);
+        setJoinTableColumns([]);
+      } finally {
+        setLoadingJoinColumns(false);
+      }
+    };
+
+    loadJoinTableColumns();
+  }, [joinTable, activeTab?.connection?.id, activeTab?.schema]);
+
+  // Reset join options when export dialog closes
+  useEffect(() => {
+    if (!exportDialogOpen) {
+      setEnableJoin(false);
+      setJoinTable("");
+      setLeftColumn("");
+      setRightColumn("");
+      setJoinColumns([]);
+      setJoinTableColumns([]);
+      setJoinType("inner");
+    }
+  }, [exportDialogOpen]);
 
   const loadSchemas = async (connectionId: string) => {
     setLoadingSchemas(true);
@@ -322,7 +379,8 @@ export default function DatabaseBrowser() {
 
     setExporting(true);
     try {
-      const result = await exportTableToCSV(activeTab.connection.id, {
+      // Build export params
+      const exportParams: any = {
         schema: activeTab.schema,
         table: activeTab.table,
         columns: activeTab.activeColumns.length > 0
@@ -331,11 +389,31 @@ export default function DatabaseBrowser() {
               .map((col: string) => col.split(".").pop() || col)
           : undefined,
         limit: exportLimit,
-        dataset_name: exportDatasetName || `${activeTab.table} Export`,
-        dataset_description: exportDatasetDescription || `Exported from ${activeTab.connection.name}/${activeTab.schema}/${activeTab.table}`,
-      });
+        dataset_name: exportDatasetName || (enableJoin
+          ? `${activeTab.table} + ${joinTable} Export`
+          : `${activeTab.table} Export`),
+        dataset_description: exportDatasetDescription || (enableJoin
+          ? `Joined ${activeTab.table} with ${joinTable} from ${activeTab.connection.name}`
+          : `Exported from ${activeTab.connection.name}/${activeTab.schema}/${activeTab.table}`),
+      };
 
-      showAlert(`Export successful! Dataset "${result.dataset.name}" created with ${result.rows_exported} rows.`, "success");
+      // Add join config if enabled
+      if (enableJoin && joinTable && leftColumn && rightColumn) {
+        exportParams.join = {
+          table: joinTable,
+          left_column: leftColumn,
+          right_column: rightColumn,
+          join_type: joinType,
+          columns: joinColumns.length > 0 ? joinColumns : undefined,
+        };
+      }
+
+      const result = await exportTableToCSV(activeTab.connection.id, exportParams);
+
+      const successMessage = enableJoin
+        ? `Join successful! Dataset "${result.dataset.name}" created with ${result.rows_exported} rows.`
+        : `Export successful! Dataset "${result.dataset.name}" created with ${result.rows_exported} rows.`;
+      showAlert(successMessage, "success");
       setExportDialogOpen(false);
 
       // Reset export form
@@ -349,8 +427,6 @@ export default function DatabaseBrowser() {
       setExporting(false);
     }
   };
-
-  const activeTab = openTabs[activeTabIndex];
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
@@ -458,16 +534,25 @@ export default function DatabaseBrowser() {
                 label={
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <Typography variant="body2">{tab.label}</Typography>
-                    <IconButton
-                      size="small"
+                    <Box
+                      component="span"
                       onClick={(e) => {
                         e.stopPropagation();
                         closeTab(index);
                       }}
-                      sx={{ ml: 1, p: 0.5 }}
+                      sx={{
+                        ml: 1,
+                        p: 0.5,
+                        display: 'inline-flex',
+                        cursor: 'pointer',
+                        borderRadius: '50%',
+                        '&:hover': {
+                          bgcolor: 'action.hover'
+                        }
+                      }}
                     >
                       <Close fontSize="small" />
-                    </IconButton>
+                    </Box>
                   </Box>
                 }
               />
@@ -770,6 +855,132 @@ export default function DatabaseBrowser() {
               }}
             />
 
+            {/* Join Options */}
+            <Divider />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={enableJoin}
+                  onChange={(e) => setEnableJoin(e.target.checked)}
+                  icon={<MergeType />}
+                  checkedIcon={<MergeType color="primary" />}
+                />
+              }
+              label="Join with another table"
+            />
+
+            {enableJoin && (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pl: 4, borderLeft: 2, borderColor: "primary.main" }}>
+                {/* Join Type Selector */}
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+                    Join Type
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={joinType}
+                    exclusive
+                    onChange={(_e, value) => value && setJoinType(value)}
+                    size="small"
+                    fullWidth
+                  >
+                    <ToggleButton value="inner">Inner</ToggleButton>
+                    <ToggleButton value="left">Left</ToggleButton>
+                    <ToggleButton value="right">Right</ToggleButton>
+                    <ToggleButton value="outer">Full</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+
+                <Alert severity={joinType === "inner" ? "info" : "warning"} sx={{ mb: 1 }}>
+                  {joinType === "inner" && "Inner join will combine rows where key columns match"}
+                  {joinType === "left" && "Left join keeps all rows from the main table, with nulls for unmatched rows"}
+                  {joinType === "right" && "Right join keeps all rows from the joined table, with nulls for unmatched rows"}
+                  {joinType === "outer" && "Full outer join keeps all rows from both tables, with nulls where no match"}
+                </Alert>
+
+                <FormControl fullWidth size="small">
+                  <InputLabel>Join Table</InputLabel>
+                  <Select
+                    value={joinTable}
+                    onChange={(e) => {
+                      setJoinTable(e.target.value);
+                      setRightColumn("");
+                      setJoinColumns([]);
+                    }}
+                    label="Join Table"
+                  >
+                    {tables
+                      .filter(t => t.table_name !== activeTab?.table)
+                      .map(table => (
+                        <MenuItem key={table.table_name} value={table.table_name}>{table.table_name}</MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+
+                {joinTable && (
+                  <>
+                    <Box sx={{ display: "flex", gap: 2 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Left Key ({activeTab?.table})</InputLabel>
+                        <Select
+                          value={leftColumn}
+                          onChange={(e) => setLeftColumn(e.target.value)}
+                          label={`Left Key (${activeTab?.table})`}
+                        >
+                          {/* Use metadata fields for actual column names, not aliased query result columns */}
+                          {activeTab?.joins?.fields?.map((field: any) => (
+                            <MenuItem key={field.column_name} value={field.column_name}>{field.column_name}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Right Key ({joinTable})</InputLabel>
+                        <Select
+                          value={rightColumn}
+                          onChange={(e) => setRightColumn(e.target.value)}
+                          label={`Right Key (${joinTable})`}
+                          disabled={loadingJoinColumns}
+                        >
+                          {loadingJoinColumns ? (
+                            <MenuItem disabled>Loading...</MenuItem>
+                          ) : (
+                            joinTableColumns.map((col: string) => (
+                              <MenuItem key={col} value={col}>{col}</MenuItem>
+                            ))
+                          )}
+                        </Select>
+                      </FormControl>
+                    </Box>
+
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Select Columns from {joinTable} (optional)</InputLabel>
+                      <Select
+                        multiple
+                        value={joinColumns}
+                        onChange={(e) => setJoinColumns(e.target.value as string[])}
+                        label={`Select Columns from ${joinTable} (optional)`}
+                        disabled={loadingJoinColumns}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.map((value) => (
+                              <Chip key={value} label={value} size="small" />
+                            ))}
+                          </Box>
+                        )}
+                      >
+                        {joinTableColumns.map((col: string) => (
+                          <MenuItem key={col} value={col}>
+                            <Checkbox checked={joinColumns.indexOf(col) > -1} size="small" />
+                            <ListItemText primary={col} />
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </>
+                )}
+              </Box>
+            )}
+
             {activeTab && activeTab.activeColumns.length > 0 && (
               <Alert severity="success">
                 {activeTab.activeColumns.filter((col: string) => !col.startsWith("parent_")).length} columns selected for export
@@ -784,10 +995,10 @@ export default function DatabaseBrowser() {
           <Button
             onClick={handleExport}
             variant="contained"
-            disabled={exporting || !activeTab}
-            startIcon={exporting ? <CircularProgress size={20} /> : <FileDownload />}
+            disabled={exporting || !activeTab || (enableJoin && (!joinTable || !leftColumn || !rightColumn))}
+            startIcon={exporting ? <CircularProgress size={20} /> : (enableJoin ? <MergeType /> : <FileDownload />)}
           >
-            {exporting ? "Exporting..." : "Export & Create Dataset"}
+            {exporting ? "Processing..." : (enableJoin ? "Join & Create Dataset" : "Export & Create Dataset")}
           </Button>
         </DialogActions>
       </Dialog>

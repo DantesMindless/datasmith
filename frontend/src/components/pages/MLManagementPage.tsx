@@ -80,7 +80,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId: number) => void }) {
+function ModelsList({ onNavigateToAnalysis, onNavigateToCreateModel }: { onNavigateToAnalysis?: (modelId: number) => void, onNavigateToCreateModel?: () => void }) {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -129,6 +129,21 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
   useEffect(() => {
     fetchModels();
   }, []);
+
+  // Auto-refresh models while any are training
+  useEffect(() => {
+    const hasTrainingModels = models.some((model: any) =>
+      model.status?.toLowerCase() === 'training'
+    );
+
+    if (!hasTrainingModels) return;
+
+    const interval = setInterval(() => {
+      fetchModels();
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [models]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -461,7 +476,11 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Create your first ML model to get started with analytics
             </Typography>
-            <Button variant="contained" startIcon={<Analytics />}>
+            <Button 
+              variant="contained" 
+              startIcon={<Analytics />}
+              onClick={() => onNavigateToCreateModel?.()}
+            >
               Create Model
             </Button>
           </CardContent>
@@ -602,6 +621,30 @@ function ModelsList({ onNavigateToAnalysis }: { onNavigateToAnalysis?: (modelId:
                         >
                           Retrain
                         </Button>
+                      </Stack>
+                    ) : model.status?.toLowerCase() === 'failed' ? (
+                      <Stack direction="row" spacing={1} width="100%">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          startIcon={<PlayArrow />}
+                          onClick={() => handleTrain(model.id)}
+                          sx={{ flex: 1 }}
+                        >
+                          Retry Training
+                        </Button>
+                        {onNavigateToAnalysis && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<Analytics />}
+                            onClick={() => onNavigateToAnalysis(model.id)}
+                            sx={{ flex: 1 }}
+                          >
+                            View Logs
+                          </Button>
+                        )}
                       </Stack>
                     ) : model.status?.toLowerCase() === 'pending' ? (
                       <Stack direction="row" spacing={1} width="100%">
@@ -1070,7 +1113,7 @@ export default function MLManagementPage({ onNavigateToAnalysis }: MLManagementP
       {/* Tab Content */}
       <Box sx={{ flex: 1, overflowY: 'auto' }}>
         <TabPanel value={activeTab} index={0}>
-          <ModelsList onNavigateToAnalysis={onNavigateToAnalysis} />
+          <ModelsList onNavigateToAnalysis={onNavigateToAnalysis} onNavigateToCreateModel={() => setActiveTab(1)} />
         </TabPanel>
 
         <TabPanel value={activeTab} index={1}>

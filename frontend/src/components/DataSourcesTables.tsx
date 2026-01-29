@@ -17,8 +17,13 @@ import {
   Menu,
   MenuList,
   MenuItem as MenuItemMaterial,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  CircularProgress,
 } from "@mui/material";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import EditIcon from "@mui/icons-material/Edit";
 import { v4 as uuidv4 } from "uuid";
 
 const excludeFields = ["id", "schemas"];
@@ -26,6 +31,7 @@ const excludeFields = ["id", "schemas"];
 import { useAppContext } from "../providers/useAppContext";
 import httpfetch from "../utils/axios";
 import { AxiosResponse } from "axios";
+import CreateConnection, { EditConnectionData } from "./CreateConnection";
 
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
   if (b[orderBy] < a[orderBy]) {
@@ -90,6 +96,9 @@ export default function OrderTable() {
   const [skipIndexes, setSkipIndexes] = useState<number[]>([]);
   const [headers, setHeaders] = useState<{ title: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editData, setEditData] = useState<EditConnectionData | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
   const { connections, showAlert, showInfo, updateConnections } = useAppContext();
 
   const renderFilters = () => (
@@ -127,6 +136,30 @@ export default function OrderTable() {
     }
   };
 
+  const handleEdit = async (id: string) => {
+    try {
+      setLoadingEdit(true);
+      const response: AxiosResponse = await httpfetch.get(
+        `datasource/detail/${id}/?edit=true`
+      );
+      if (response.status === 200) {
+        setEditData(response.data);
+        setEditDialogOpen(true);
+      }
+    } catch (error: any) {
+      console.error("Error fetching connection details:", error.response?.data || error.message);
+      showAlert(`Failed to fetch connection details: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
+
+  const handleEditClose = () => {
+    setEditDialogOpen(false);
+    setEditData(null);
+    updateConnections();
+  };
+
   useEffect(() => {
     if (connections && connections.length > 0) {
       const tableHeaders: Record<string, string>[] = [];
@@ -147,6 +180,7 @@ export default function OrderTable() {
   }, [connections]);
 
   return (
+    <>
       <Box
         sx={{
           border: "1px solid",
@@ -177,9 +211,12 @@ export default function OrderTable() {
                   if (skipIndexes.includes(colIndex)) {
                     return null;
                   }
-                  let value = typeof element === "string" && element.includes("2024-")
-                    ? new Date(element).toLocaleDateString()
-                    : element;
+                  // Check if element is an ISO date string (e.g., 2024-11-16T07:50:27Z)
+                  let value = element;
+                  if (typeof element === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(element)) {
+                    const date = new Date(element);
+                    value = date.toLocaleString();
+                  }
                   return <TableCell key={uuidv4()} align="center">{value}</TableCell>;
                 });
                 return (
@@ -191,19 +228,22 @@ export default function OrderTable() {
                           size="small"
                           variant="outlined"
                           color="primary"
+                          disabled={loading || loadingEdit}
+                          onClick={() => handleEdit(row.id)}
+                          startIcon={loadingEdit ? <CircularProgress size={16} /> : <EditIcon />}
                           sx={{
                             borderRadius: 2,
                             textTransform: "none",
                             fontSize: "0.75rem"
                           }}
                         >
-                          View
+                          Edit
                         </Button>
                         <Button
                           size="small"
                           variant="outlined"
                           color="error"
-                          disabled={loading}
+                          disabled={loading || loadingEdit}
                           onClick={() => handleDelete(row.id)}
                           sx={{
                             borderRadius: 2,
@@ -221,5 +261,24 @@ export default function OrderTable() {
           </TableBody>
         </Table>
       </Box>
+
+      {/* Edit Connection Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleEditClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Edit Connection</DialogTitle>
+        <DialogContent>
+          {editData && (
+            <CreateConnection
+              editData={editData}
+              onClose={handleEditClose}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

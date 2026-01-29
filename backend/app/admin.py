@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
-from .models import Dataset, MLModel, TrainingRun
+from .models import Dataset, MLModel, TrainingRun, DataSegment, RowSegmentLabel
 from app.functions.admin_actions import (
     make_prediction,
     train_model,
@@ -52,3 +52,31 @@ class TrainingRunAdmin(admin.ModelAdmin):
         return mark_safe("".join(formatted))
 
     pretty_history.short_description = "Training History"
+
+
+@admin.register(DataSegment)
+class DataSegmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "dataset",
+        "row_count",
+        "color",
+        "created_by",
+        "created_at",
+    )
+    list_filter = ("dataset", "created_at")
+    search_fields = ("name", "description")
+
+
+@admin.register(RowSegmentLabel)
+class RowSegmentLabelAdmin(admin.ModelAdmin):
+    list_display = (
+        "segment",
+        "row_index",
+        "assignment_method",
+        "confidence",
+        "assigned_by",
+        "created_at",
+    )
+    list_filter = ("segment", "assignment_method", "assigned_by")
+    search_fields = ("notes",)

@@ -1,6 +1,4 @@
-from django.conf import settings
 import pandas as pd
-import os
 import logging
 from django.http import HttpResponse
 from django.utils.html import escape
@@ -133,7 +131,6 @@ def make_prediction(self, request, queryset):
 
 @admin.action(description="Upload single image and Predict")
 def predict_single_image(self, request, queryset):
-    from django.core.files.storage import default_storage
     from app.functions.prediction import predict_cnn
 
     model = queryset.first()
@@ -145,13 +142,9 @@ def predict_single_image(self, request, queryset):
             self.message_user(request, "No image uploaded", level="error")
             return None
 
-        image_path = default_storage.save(
-            f"predict_tmp/{uploaded_file.name}", uploaded_file
-        )
-        full_path = os.path.join(settings.MEDIA_ROOT, image_path)
-
         try:
-            prediction = predict_cnn(model, full_path)
+            # Pass the uploaded file directly - predict_cnn now accepts file-like objects
+            prediction = predict_cnn(model, uploaded_file)
             return HttpResponse(f"<h3>Predicted class index: {prediction}</h3>")
         except Exception as e:
             self.message_user(request, f"Prediction failed: {e}", level="error")

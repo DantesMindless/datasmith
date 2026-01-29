@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -53,34 +53,21 @@ import {
   Info,
   TableChart,
   BarChart as BarChartIcon,
-  Timeline,
   BugReport,
-  CleaningServices,
   Image as ImageIcon,
   TrendingUp,
   Search as SearchIcon,
-  FilterList as FilterListIcon,
-  ViewColumn as ViewColumnIcon,
+  Label as LabelIcon,
 } from '@mui/icons-material';
 import httpfetch from '../../../utils/axios';
 import ImageDatasetViewer from '../../ImageDatasetViewer';
+import DataSegmentation from '../../DataSegmentation';
 import {
   ResponsiveContainer,
-  BarChart as RechartsBarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
   Tooltip as RechartsTooltip,
-  Legend,
   PieChart as RechartsPieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
-  ScatterChart,
-  Scatter,
-  Histogram,
 } from 'recharts';
 
 interface DatasetAnalysisPageProps {
@@ -100,7 +87,8 @@ interface DatasetData {
   file_size_formatted?: string;
   quality_score?: number;
   is_processed: boolean;
-  last_analyzed?: string;
+  minio_csv_key?: string;
+  is_image_dataset?: boolean;
 }
 
 interface PreviewData {
@@ -108,7 +96,6 @@ interface PreviewData {
   column_info: Record<string, any>;
   statistics: Record<string, any>;
   correlations?: any;
-  distributions?: any;
 }
 
 interface QualityReport {
@@ -119,29 +106,6 @@ interface QualityReport {
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1', '#d084d0'];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <Box sx={{
-        bgcolor: 'background.paper',
-        p: 2,
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 1,
-        boxShadow: 2
-      }}>
-        <Typography variant="body2" fontWeight={600}>{label}</Typography>
-        {payload.map((entry: any, index: number) => (
-          <Typography key={index} variant="body2" sx={{ color: entry.color }}>
-            {`${entry.dataKey}: ${entry.value}`}
-          </Typography>
-        ))}
-      </Box>
-    );
-  }
-  return null;
-};
-
 function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
   const [dataset, setDataset] = useState<DatasetData | null>(null);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -151,6 +115,8 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendationReasoning, setRecommendationReasoning] = useState<string[]>([]);
+  const [datasetCharacteristics, setDatasetCharacteristics] = useState<any>(null);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   // Data preview state
@@ -194,6 +160,31 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
     }
   };
 
+  const handleExportDataset = async () => {
+    if (!dataset || !datasetId) return;
+
+    try {
+      // Make API call to export endpoint
+      const response = await httpfetch.get(`datasets/${datasetId}/export/`, {
+        responseType: 'blob' // Important for file download
+      });
+
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${dataset.name.replace(/\s+/g, '_')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Error exporting dataset:', err);
+      setError(err.response?.data?.error || 'Failed to export dataset');
+    }
+  };
+
   const handleReanalyze = async () => {
     if (!datasetId) return;
 
@@ -214,9 +205,13 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
       setLoadingRecommendations(true);
       const response = await httpfetch.get(`datasets/${id}/recommended_models/`);
       setRecommendations(response.data.recommendations || []);
+      setRecommendationReasoning(response.data.reasoning || []);
+      setDatasetCharacteristics(response.data.dataset_characteristics || null);
     } catch (err: any) {
       console.error('Error fetching model recommendations:', err);
       setRecommendations([]);
+      setRecommendationReasoning([]);
+      setDatasetCharacteristics(null);
     } finally {
       setLoadingRecommendations(false);
     }
@@ -234,6 +229,26 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
       setSelectedColumns(Object.keys(previewData.preview_data[0]));
     }
   }, [previewData]);
+
+  // Memoize filtered data for preview
+  const filteredPreviewData = useMemo(() => {
+    if (!previewData?.preview_data) return [];
+    if (!searchTerm) return previewData.preview_data;
+
+    return previewData.preview_data.filter((row) => {
+      return Object.values(row).some(val =>
+        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
+  }, [previewData, searchTerm]);
+
+  // Memoize paginated data
+  const paginatedPreviewData = useMemo(() => {
+    return filteredPreviewData.slice(
+      previewPage * previewRowsPerPage,
+      previewPage * previewRowsPerPage + previewRowsPerPage
+    );
+  }, [filteredPreviewData, previewPage, previewRowsPerPage]);
 
   const getQualityColor = (quality: string) => {
     switch (quality.toLowerCase()) {
@@ -430,8 +445,14 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
             <Grid item xs={12} md={4}>
               <Box sx={{ textAlign: 'right' }}>
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Button variant="outlined" startIcon={<Download />} size="small">
-                    Export
+                  <Button
+                    variant="outlined"
+                    startIcon={<Download />}
+                    size="small"
+                    onClick={handleExportDataset}
+                    disabled={!dataset?.minio_csv_key}
+                  >
+                    Export CSV
                   </Button>
                   <Button variant="contained" startIcon={<TableChart />} size="small">
                     View Data
@@ -474,7 +495,7 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
             <Tab label="Statistics" icon={<BarChartIcon />} />
           )}
           {dataset.dataset_type !== 'image' && (
-            <Tab label="Distributions" icon={<Timeline />} />
+            <Tab label="Segmentation" icon={<LabelIcon />} />
           )}
         </Tabs>
       </Paper>
@@ -518,14 +539,7 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
                           size="small"
                         />
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Last Analyzed
-                        </Typography>
-                        <Typography variant="body2" fontWeight={500}>
-                          {dataset.last_analyzed ? new Date(dataset.last_analyzed).toLocaleDateString() : 'Never'}
-                        </Typography>
-                      </Box>
+
                     </Stack>
                   </CardContent>
                 </Card>
@@ -734,6 +748,64 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
                   <Alert severity="info">
                     No model recommendations available for this dataset type.
                   </Alert>
+                )}
+
+                {/* Reasoning Section */}
+                {recommendationReasoning.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Info color="primary" fontSize="small" />
+                      Analysis Reasoning
+                    </Typography>
+                    <Stack spacing={0.5}>
+                      {recommendationReasoning.map((reason, idx) => (
+                        <Typography key={idx} variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <span style={{ color: '#8884d8' }}>•</span> {reason}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* Dataset Characteristics */}
+                {datasetCharacteristics && (
+                  <Box sx={{ mt: 2 }}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <DataObject color="primary" fontSize="small" />
+                      Dataset Characteristics
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      <Chip
+                        label={`${datasetCharacteristics.rows?.toLocaleString() || 0} rows`}
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                      />
+                      <Chip
+                        label={`${datasetCharacteristics.features || 0} features`}
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                      />
+                      <Chip
+                        label={`${datasetCharacteristics.numeric_features || 0} numeric`}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        label={`${datasetCharacteristics.categorical_features || 0} categorical`}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        label={`Task: ${datasetCharacteristics.likely_task || 'unknown'}`}
+                        size="small"
+                        color="success"
+                      />
+                    </Stack>
+                  </Box>
                 )}
               </CardContent>
             </Card>
@@ -946,15 +1018,7 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {previewData.preview_data
-                    ?.filter((row) => {
-                      if (!searchTerm) return true;
-                      return Object.values(row).some(val =>
-                        String(val).toLowerCase().includes(searchTerm.toLowerCase())
-                      );
-                    })
-                    .slice(previewPage * previewRowsPerPage, previewPage * previewRowsPerPage + previewRowsPerPage)
-                    .map((row, index) => (
+                  {paginatedPreviewData.map((row, index) => (
                       <TableRow key={index} hover>
                         <TableCell sx={{ bgcolor: 'grey.50', fontWeight: 500 }}>
                           {previewPage * previewRowsPerPage + index + 1}
@@ -995,12 +1059,7 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
             {/* Pagination */}
             <TablePagination
               component="div"
-              count={previewData.preview_data?.filter((row) => {
-                if (!searchTerm) return true;
-                return Object.values(row).some(val =>
-                  String(val).toLowerCase().includes(searchTerm.toLowerCase())
-                );
-              }).length || 0}
+              count={filteredPreviewData.length}
               page={previewPage}
               onPageChange={(e, newPage) => setPreviewPage(newPage)}
               rowsPerPage={previewRowsPerPage}
@@ -1083,52 +1142,13 @@ function DatasetAnalysisPage({ datasetId, onBack }: DatasetAnalysisPageProps) {
         </Grid>
       )}
 
-      {/* Distributions Tab - Only for non-image datasets */}
-      {activeTab === 4 && dataset.dataset_type !== 'image' && previewData?.distributions && (
-        <Grid container spacing={3}>
-          {Object.entries(previewData.distributions).slice(0, 6).map(([col, dist]: [string, any]) => (
-            <Grid item xs={12} md={6} key={col}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight={600} gutterBottom>
-                    {col} Distribution
-                  </Typography>
-                  <Box sx={{ height: 300, pt: 2 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      {dist.type === 'histogram' ? (
-                        <RechartsBarChart data={
-                          dist.bins.slice(0, -1).map((bin: number, i: number) => ({
-                            bin: bin.toFixed(2),
-                            count: dist.counts[i]
-                          }))
-                        }>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="bin" />
-                          <YAxis />
-                          <RechartsTooltip content={<CustomTooltip />} />
-                          <Bar dataKey="count" fill="#8884d8" />
-                        </RechartsBarChart>
-                      ) : (
-                        <RechartsBarChart data={
-                          dist.values.map((value: string, i: number) => ({
-                            value: value.length > 15 ? value.substring(0, 15) + '...' : value,
-                            count: dist.counts[i]
-                          }))
-                        }>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="value" />
-                          <YAxis />
-                          <RechartsTooltip content={<CustomTooltip />} />
-                          <Bar dataKey="count" fill="#82ca9d" />
-                        </RechartsBarChart>
-                      )}
-                    </ResponsiveContainer>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+      {/* Segmentation Tab - Only for non-image datasets */}
+      {activeTab === 4 && dataset.dataset_type !== 'image' && previewData && (
+        <DataSegmentation
+          datasetId={String(datasetId)}
+          previewData={previewData.preview_data || []}
+          totalRows={dataset.row_count || 0}
+        />
       )}
     </Container>
   );

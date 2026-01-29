@@ -36,8 +36,8 @@ import {
   Avatar,
   ListItemIcon,
   ListItemText,
-  Checkbox,
   FormControlLabel,
+  Checkbox,
   Tabs,
   Tab,
 } from '@mui/material';
@@ -46,7 +46,6 @@ import {
   FilterList,
   Search,
   MoreVert,
-  Edit,
   Delete,
   Analytics,
   CloudUpload,
@@ -58,11 +57,10 @@ import {
   Info,
   Refresh,
   GetApp,
-  Visibility,
-  CleaningServices,
   Storage,
   Cable,
   TableView,
+  MergeType,
 } from '@mui/icons-material';
 import httpfetch from '../../utils/axios';
 import DatasetAnalysisPage from './subpages/DatasetAnalysisPage';
@@ -70,6 +68,7 @@ import CreateDatasetPage from '../CreateDatasetPage';
 import CreateConnection from '../CreateConnection';
 import DataSourcesTables from '../DataSourcesTables';
 import DatabaseBrowser from '../DatabaseBrowser';
+import DatasetJoinDialog from '../DatasetJoinDialog';
 
 interface Dataset {
   id: number;
@@ -84,8 +83,9 @@ interface Dataset {
   quality_score?: number;
   is_processed: boolean;
   processing_errors?: string;
-  last_analyzed?: string;
   created_at: string;
+  minio_csv_key?: string;
+  is_image_dataset?: boolean;
 }
 
 interface FilterState {
@@ -156,6 +156,8 @@ function DatasetManagement() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [actionMenu, setActionMenu] = useState<null | HTMLElement>(null);
   const [selectedDatasetForMenu, setSelectedDatasetForMenu] = useState<Dataset | null>(null);
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -287,6 +289,31 @@ function DatasetManagement() {
     }
   };
 
+  const handleExportDataset = async (dataset: Dataset) => {
+    try {
+      // Make API call to export endpoint
+      const response = await httpfetch.get(`datasets/${dataset.id}/export/`, {
+        responseType: 'blob' // Important for file download
+      });
+
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${dataset.name.replace(/\s+/g, '_')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      handleMenuClose();
+    } catch (err: any) {
+      console.error('Error exporting dataset:', err);
+      setError(err.response?.data?.error || 'Failed to export dataset');
+    }
+  };
+
   const getQualityIcon = (quality: string) => {
     switch (quality.toLowerCase()) {
       case 'excellent': return <CheckCircle color="success" />;
@@ -338,6 +365,14 @@ function DatasetManagement() {
         </Box>
         <Stack direction="row" spacing={2}>
           <Button
+            variant="contained"
+            startIcon={<MergeType />}
+            onClick={() => setJoinDialogOpen(true)}
+            disabled={datasets.filter(d => d.minio_csv_key).length < 2}
+          >
+            Join Datasets
+          </Button>
+          <Button
             variant="outlined"
             startIcon={<FilterList />}
             onClick={() => setFilterOpen(!filterOpen)}
@@ -356,7 +391,7 @@ function DatasetManagement() {
           <Button
             variant="outlined"
             startIcon={<Refresh />}
-            onClick={fetchDatasets}
+            onClick={() => fetchDatasets()}
             disabled={loading}
           >
             Refresh
@@ -526,12 +561,14 @@ function DatasetManagement() {
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6" fontWeight={600}>
-              Datasets ({filteredDatasets.length})
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {filteredDatasets.length !== datasets.length && `Filtered from ${datasets.length} total`}
-            </Typography>
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                Datasets ({filteredDatasets.length})
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {filteredDatasets.length !== datasets.length && `Filtered from ${datasets.length} total`}
+              </Typography>
+            </Box>
           </Box>
 
           {loading ? (
@@ -551,7 +588,6 @@ function DatasetManagement() {
                     <TableCell>Rows</TableCell>
                     <TableCell>Columns</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell>Last Analyzed</TableCell>
                     <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -620,14 +656,6 @@ function DatasetManagement() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Typography variant="caption">
-                          {dataset.last_analyzed
-                            ? new Date(dataset.last_analyzed).toLocaleDateString()
-                            : 'Never'
-                          }
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
                         <IconButton
                           size="small"
                           onClick={(e) => handleMenuOpen(e, dataset)}
@@ -654,10 +682,6 @@ function DatasetManagement() {
           <ListItemIcon><Analytics fontSize="small" /></ListItemIcon>
           <ListItemText>Analyze Dataset</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <ListItemIcon><Visibility fontSize="small" /></ListItemIcon>
-          <ListItemText>View Data</ListItemText>
-        </MenuItem>
         {selectedDatasetForMenu?.dataset_type === 'image' &&
          selectedDatasetForMenu?.processing_errors?.toLowerCase().includes('failed') && (
           <MenuItem onClick={() => selectedDatasetForMenu && handleRetryExtraction(selectedDatasetForMenu.id)}>
@@ -665,17 +689,15 @@ function DatasetManagement() {
             <ListItemText>Retry Extraction</ListItemText>
           </MenuItem>
         )}
-        <MenuItem onClick={handleMenuClose}>
-          <ListItemIcon><Edit fontSize="small" /></ListItemIcon>
-          <ListItemText>Edit Metadata</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <ListItemIcon><CleaningServices fontSize="small" /></ListItemIcon>
-          <ListItemText>Data Cleaning</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem
+          onClick={() => selectedDatasetForMenu && handleExportDataset(selectedDatasetForMenu)}
+          disabled={!selectedDatasetForMenu?.minio_csv_key}
+        >
           <ListItemIcon><GetApp fontSize="small" /></ListItemIcon>
-          <ListItemText>Export Dataset</ListItemText>
+          <ListItemText>
+            Export to CSV
+            {!selectedDatasetForMenu?.minio_csv_key && ' (No CSV available)'}
+          </ListItemText>
         </MenuItem>
         <MenuItem
           onClick={() => selectedDatasetForMenu && handleDeleteDataset(selectedDatasetForMenu.id)}
@@ -685,6 +707,20 @@ function DatasetManagement() {
           <ListItemText>Delete Dataset</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Join Datasets Dialog */}
+      <DatasetJoinDialog
+        open={joinDialogOpen}
+        onClose={() => setJoinDialogOpen(false)}
+        datasets={datasets.map(d => ({
+          id: String(d.id),
+          name: d.name,
+          row_count: d.row_count,
+          column_count: d.column_count,
+          minio_csv_key: d.minio_csv_key,
+        }))}
+        onJoinComplete={() => fetchDatasets()}
+      />
 
     </Box>
   );
@@ -703,7 +739,6 @@ export default function AdvancedDatasetPage() {
     { label: 'Query Interface', icon: <TableView /> },
     { label: 'Dataset Management', icon: <Storage /> },
     { label: 'Create Dataset', icon: <Add /> },
-    { label: 'Data Analytics', icon: <Analytics /> },
   ];
 
   return (
@@ -776,14 +811,6 @@ export default function AdvancedDatasetPage() {
 
         <TabPanel value={activeTab} index={4}>
           <CreateDatasetPage />
-        </TabPanel>
-
-        <TabPanel value={activeTab} index={5}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
-            <Typography variant="h6" color="text.secondary">
-              Data Analytics Dashboard - Coming Soon
-            </Typography>
-          </Box>
         </TabPanel>
       </Box>
     </Container>

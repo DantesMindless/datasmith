@@ -15,19 +15,11 @@ from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from datasource.models import DataSource
-from datasource.serializers import DataSourceSerializer, DatasourceViewSerializer
+from datasource.serializers import DataSourceSerializer, DatasourceViewSerializer, DatasourceEditSerializer
 from enum import StrEnum
 from core.views import BaseAuthApiView
 from django.db.models import Q
 from .constants.choices import DatasourceTypeChoices
-from .permissions import IsOwnerOrReadOnly, CanAccessDatasource
-
-# Import permission utilities
-from userauth.permissions import (
-    require_permission, require_role, PermissionManager,
-    DataSourcePermissionMixin
-)
-from userauth.models import UserRole, AccessType
 
 User = get_user_model()
 
@@ -38,51 +30,38 @@ class DatasourceResponses(StrEnum):
     DS_CONNECTIONS_FAIL = "Connection Fail"
 
 
-class DataSourceView(BaseAuthApiView, DataSourcePermissionMixin):
+class DataSourceView(BaseAuthApiView):
     """
-    ViewSet for managing data sources with proper DRF authentication and permissions.
-    
-    Uses custom permission classes to handle access control based on ownership
-    and the existing permission system.
+    ViewSet for managing data sources with proper DRF authentication.
     """
     authentication_classes = [JWTAuthentication, SessionAuthentication]
-    permission_classes = [IsAuthenticated, CanAccessDatasource]
+    permission_classes = [IsAuthenticated]
+
     def get(self, request: HttpRequest, id: Optional[UUID] = None) -> Response:
         if id:
-            # Check if user has permission to access this datasource
-            if not PermissionManager.can_user_access_resource(
-                request.user, 'datasource', str(id), AccessType.READ
-            ):
-                return Response(
-                    "Insufficient permissions", status=status.HTTP_403_FORBIDDEN
-                )
-            
             if (
-                datasource := DataSource.objects.filter(id=id, deleted=False).first()
+                datasource := DataSource.objects.filter(
+                    id=id,
+                    deleted=False,
+                    user=request.user
+                ).first()
             ):
-                serializer = DatasourceViewSerializer(datasource)
-                # Filter response based on user permissions
-                filtered_data = self.filter_datasource_response(
-                    request.user, datasource, serializer.data
-                )
-                return Response(filtered_data)
+                # Use edit serializer if 'edit' query param is present
+                if request.query_params.get('edit') == 'true':
+                    serializer = DatasourceEditSerializer(datasource)
+                else:
+                    serializer = DatasourceViewSerializer(datasource)
+                return Response(serializer.data)
             return Response(
                 DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
             )
         else:
-            # Get only datasources user can access
-            datasources = self.get_accessible_datasources(request.user)
+            datasources = DataSource.objects.filter(
+                deleted=False,
+                user=request.user
+            )
             serializer = DatasourceViewSerializer(datasources, many=True)
-            
-            # Filter each datasource response
-            filtered_data = []
-            for i, datasource in enumerate(datasources):
-                filtered_item = self.filter_datasource_response(
-                    request.user, datasource, serializer.data[i]
-                )
-                filtered_data.append(filtered_item)
-            
-            return Response(filtered_data)
+            return Response(serializer.data)
 
     def post(self, request: HttpRequest) -> Response:
         if not User.objects.first():
@@ -96,8 +75,38 @@ class DataSourceView(BaseAuthApiView, DataSourcePermissionMixin):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def patch(self, request: HttpRequest, id: UUID) -> Response:
+        """Update an existing datasource connection."""
+        datasource = DataSource.objects.filter(
+            id=id, deleted=False, user=request.user
+        ).first()
+
+        if not datasource:
+            return Response(
+                DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check permission
+        if datasource.user_id != request.user.id and datasource.created_by != request.user.id:
+            return Response(
+                "You do not have permission to update this datasource",
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = request.data.copy()
+        # Preserve user ownership
+        data["user"] = datasource.user_id
+        data["created_by"] = datasource.created_by_id
+
+        serializer = DataSourceSerializer(datasource, data=data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(DatasourceViewSerializer(datasource).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def delete(self, request: HttpRequest, id: UUID) -> Response:
-        if datasource := DataSource.objects.filter(id=id).first():
+        if datasource := DataSource.objects.filter(id=id, user=request.user).first():
             if (
                 datasource.user_id == request.user.id
                 or datasource.created_by == request.user.id
@@ -119,7 +128,7 @@ class DataSourceView(BaseAuthApiView, DataSourcePermissionMixin):
         data = request.data
         if not (query := data.get("query")):
             return Response("Query not provided", status=status.HTTP_400_BAD_REQUEST)
-        if datasource := DataSource.objects.filter(id=id).first():
+        if datasource := DataSource.objects.filter(id=id, user=request.user).first():
             success, response_data, message = datasource.query(query)
             if success and response_data is not None:
                 return Response(response_data)
@@ -131,30 +140,19 @@ class DataSourceView(BaseAuthApiView, DataSourcePermissionMixin):
         )
 
     def put(self, request: HttpRequest, id: UUID) -> Response:
-        # Check datasource access permission
-        if not PermissionManager.can_user_access_resource(
-            request.user, 'datasource', str(id), AccessType.READ
-        ):
-            return Response(
-                "Insufficient permissions", status=status.HTTP_403_FORBIDDEN
-            )
-        
         data = request.data
-        if not (query := data.get("query")):
+        # Extract query object from request data
+        query_data = data.get("query")
+        if not query_data:
             return Response("Query not provided", status=status.HTTP_400_BAD_REQUEST)
-        
+
+        # Validate required fields for table query
+        if not query_data.get("schema") or not query_data.get("table"):
+            return Response("Schema and table are required", status=status.HTTP_400_BAD_REQUEST)
+
         if datasource := DataSource.objects.filter(id=id, deleted=False).first():
-            # Filter query based on user's column permissions
-            filtered_query = PermissionManager.filter_query_columns(
-                request.user, str(id), query
-            )
-            
-            success, response_data, message = datasource.get_table_rows(filtered_query)
+            success, response_data, message = datasource.get_table_rows(query_data)
             if success and response_data is not None:
-                # Additional filtering of response data based on column permissions
-                if not request.user.has_role(UserRole.DATABASE_ADMIN):
-                    # TODO: Implement column-level filtering of response data
-                    pass
                 return Response(response_data)
             elif success:
                 return Response(message)
@@ -169,7 +167,7 @@ class DataSourceDetailMetadataView(BaseAuthApiView):
     View for retrieving datasource metadata with proper authentication.
     """
     authentication_classes = [JWTAuthentication, SessionAuthentication]
-    permission_classes = [IsAuthenticated, CanAccessDatasource]
+    permission_classes = [IsAuthenticated]
     def get(
         self,
         request: HttpRequest,
@@ -180,7 +178,7 @@ class DataSourceDetailMetadataView(BaseAuthApiView):
         """
         Retrieve metadata for a single table or tables
         """
-        if datasource := DataSource.objects.filter(id=id).first():
+        if datasource := DataSource.objects.filter(id=id, user=request.user).first():
             if schema and table_name:
                 # if datasource.metadata and (table := datasource.metadata.get(schema, {}).get(table_name, None)):
                 #     return Response(table)
@@ -200,8 +198,7 @@ class DataSourceDetailMetadataView(BaseAuthApiView):
             DatasourceResponses.DS_NOT_FOUND, status=status.HTTP_404_NOT_FOUND
         )
 
-    def put(self, request: HttpRequest, id: UUID) -> Response:
-        if datasource := DataSource.objects.filter(id=id).first():
+        if datasource := DataSource.objects.filter(id=id, user=request.user).first():
             data = datasource.update_metadata()
             return Response(data)
         return Response(
@@ -214,12 +211,9 @@ class DataSourceTablesMetadataView(BaseAuthApiView):
     View for retrieving datasource table metadata with proper authentication.
     """
     authentication_classes = [JWTAuthentication, SessionAuthentication]
-    permission_classes = [IsAuthenticated, CanAccessDatasource]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest, id: UUID, schema: str) -> Response:
-        """
-        Retrieve tables lists
-        """
-        if datasource := DataSource.objects.filter(id=id).first():
+        if datasource := DataSource.objects.filter(id=id, user=request.user).first():
             success, data, message = datasource.get_tables(schema)
             if success:
                 return Response(data)
@@ -234,12 +228,9 @@ class DataSourceSchemasMetadataView(BaseAuthApiView):
     View for retrieving datasource schema metadata with proper authentication.
     """
     authentication_classes = [JWTAuthentication, SessionAuthentication]
-    permission_classes = [IsAuthenticated, CanAccessDatasource]
+    permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest, id: UUID) -> Response:
-        """
-        Retrieve database schemas
-        """
-        if datasource := DataSource.objects.filter(id=id).first():
+        if datasource := DataSource.objects.filter(id=id, user=request.user).first():
             success, data, message = datasource.get_schemas()
             if success:
                 return Response(data)
@@ -256,10 +247,7 @@ class DataSourceTestConnectionView(BaseAuthApiView):
     authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
     def get(self, request: HttpRequest, id: UUID) -> Response:
-        """
-        Connections test for existing DS
-        """
-        if datasource := DataSource.objects.filter(id=id).first():
+        if datasource := DataSource.objects.filter(id=id, user=request.user).first():
             if datasource.test_connection():
                 return Response(DatasourceResponses.DS_CONNECTIONS_SUCCESS)
             return Response(
@@ -324,12 +312,13 @@ class DataSourceConnectionTypesFormFieldsView(BaseAuthApiView):
         return Response("Datasource not found", status=status.HTTP_404_NOT_FOUND)
 
 
-class DataSourceExportView(BaseAuthApiView, DataSourcePermissionMixin):
+class DataSourceExportView(BaseAuthApiView):
     """
     View for exporting database query results to CSV and creating ML datasets.
+    Supports optional SQL JOINs with other tables.
     """
     authentication_classes = [JWTAuthentication, SessionAuthentication]
-    permission_classes = [IsAuthenticated, CanAccessDatasource]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request: HttpRequest, id: UUID) -> Response:
         """
@@ -343,18 +332,16 @@ class DataSourceExportView(BaseAuthApiView, DataSourcePermissionMixin):
             "filters": "WHERE age > 18",  // optional
             "limit": 10000,  // optional, defaults to 100000
             "dataset_name": "User Export",  // optional
-            "dataset_description": "Exported user data"  // optional
+            "dataset_description": "Exported user data",  // optional
+            "join": {  // optional - for SQL JOIN
+                "table": "orders",
+                "left_column": "id",
+                "right_column": "user_id",
+                "join_type": "inner",  // "inner", "left", "right", or "outer"
+                "columns": ["order_date", "total"]  // columns to select from joined table
+            }
         }
         """
-        # Check datasource access permission
-        if not PermissionManager.can_user_access_resource(
-            request.user, 'datasource', str(id), AccessType.READ
-        ):
-            return Response(
-                "Insufficient permissions to export from this datasource",
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         datasource = DataSource.objects.filter(id=id, deleted=False).first()
         if not datasource:
             return Response(
@@ -369,6 +356,7 @@ class DataSourceExportView(BaseAuthApiView, DataSourcePermissionMixin):
         columns = data.get("columns", [])
         filters = data.get("filters", "")
         limit = min(data.get("limit", 100000), 1000000)  # Cap at 1M rows
+        join_config = data.get("join")  # Optional join configuration
         dataset_name = data.get("dataset_name", f"{table} Export - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
         dataset_description = data.get("dataset_description", f"Exported from {datasource.name}/{schema}/{table}")
 
@@ -378,10 +366,104 @@ class DataSourceExportView(BaseAuthApiView, DataSourcePermissionMixin):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Validate join config if provided
+        join_metadata = {}
+        if join_config:
+            required_join_fields = ['table', 'left_column', 'right_column']
+            missing_fields = [f for f in required_join_fields if not join_config.get(f)]
+            if missing_fields:
+                return Response(
+                    f"Join config missing required fields: {', '.join(missing_fields)}",
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         try:
-            # Build query
-            column_list = ", ".join(f'"{col}"' for col in columns) if columns else "*"
-            query = f'SELECT {column_list} FROM "{schema}"."{table}"'
+            # Determine quote character based on datasource type
+            from datasource.constants.choices import DatasourceTypeChoices
+            quote_char = '`' if datasource.type == DatasourceTypeChoices.MYSQL else '"'
+
+            # Build column list with table aliases if joining
+            if join_config:
+                # Main table columns with alias
+                if columns:
+                    main_cols = [f'a.{quote_char}{col}{quote_char}' for col in columns]
+                else:
+                    main_cols = ['a.*']
+
+                # Join table columns with alias
+                join_cols = join_config.get('columns', [])
+                if join_cols:
+                    join_col_list = [f'b.{quote_char}{col}{quote_char}' for col in join_cols]
+                else:
+                    join_col_list = ['b.*']
+
+                column_list = ", ".join(main_cols + join_col_list)
+
+                # Get join configuration
+                join_table = join_config['table']
+                left_col = join_config['left_column']
+                right_col = join_config['right_column']
+                join_type = join_config.get('join_type', 'inner').lower()
+
+                # Map join type to SQL keyword
+                join_type_map = {
+                    'inner': 'INNER JOIN',
+                    'left': 'LEFT OUTER JOIN',
+                    'right': 'RIGHT OUTER JOIN',
+                    'outer': 'FULL OUTER JOIN'
+                }
+
+                # Human-readable join type names
+                join_type_display_map = {
+                    'inner': 'Inner',
+                    'left': 'Left Outer',
+                    'right': 'Right Outer',
+                    'outer': 'Full Outer'
+                }
+
+                sql_join = join_type_map.get(join_type, 'INNER JOIN')
+                join_type_display = join_type_display_map.get(join_type, 'Inner')
+
+                # Note: MySQL doesn't support FULL OUTER JOIN directly
+                # For MySQL with full outer join, we'd need a UNION of LEFT and RIGHT joins
+                # For now, we'll raise an error for MySQL + full outer
+                from datasource.constants.choices import DatasourceTypeChoices
+                if join_type == 'outer' and datasource.type == DatasourceTypeChoices.MYSQL:
+                    return Response(
+                        "Full outer join is not directly supported in MySQL. Use separate left and right joins instead.",
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # Build query with appropriate JOIN type
+                query = f'''SELECT {column_list}
+                    FROM {quote_char}{schema}{quote_char}.{quote_char}{table}{quote_char} a
+                    {sql_join} {quote_char}{schema}{quote_char}.{quote_char}{join_table}{quote_char} b
+                    ON a.{quote_char}{left_col}{quote_char} = b.{quote_char}{right_col}{quote_char}'''
+
+                # Store join metadata
+                join_metadata = {
+                    'join_type': join_type,
+                    'join_type_display': join_type_display,
+                    'source_type': 'sql',
+                    'datasource_id': str(datasource.id),
+                    'datasource_name': datasource.name,
+                    'schema': schema,
+                    'left_table': table,
+                    'left_column': left_col,
+                    'right_table': join_table,
+                    'right_column': right_col,
+                    'join_columns': join_cols,
+                    'joined_at': datetime.now().isoformat()
+                }
+
+                # Update description if not provided
+                if not data.get("dataset_description"):
+                    dataset_description = f"{join_type_display} join of {table} + {join_table} from {datasource.name}/{schema}"
+
+            else:
+                # Original single-table query
+                column_list = ", ".join(f'{quote_char}{col}{quote_char}' for col in columns) if columns else "*"
+                query = f'SELECT {column_list} FROM {quote_char}{schema}{quote_char}.{quote_char}{table}{quote_char}'
 
             if filters:
                 query += f" {filters}"
@@ -422,32 +504,35 @@ class DataSourceExportView(BaseAuthApiView, DataSourcePermissionMixin):
             csv_content = csv_buffer.getvalue()
             csv_buffer.close()
 
+            # Upload to MinIO
+            from core.storage_utils import upload_to_minio
+            if join_config:
+                filename = f"{schema}_{table}_joined_{join_config['table']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            else:
+                filename = f"{schema}_{table}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            minio_key = f"datasets/{request.user.id}/{filename}"
+            csv_bytes = csv_content.encode('utf-8')
+
+            upload_to_minio(csv_bytes, minio_key, content_type='text/csv')
+
             # Create Dataset
             from app.models.main import Dataset
             dataset = Dataset(
                 name=dataset_name,
                 description=dataset_description,
                 created_by=request.user,
+                minio_csv_key=minio_key,
+                row_count=len(result),
+                column_count=len(fieldnames),
+                file_size=len(csv_bytes),
+                join_metadata=join_metadata if join_metadata else {}
             )
-
-            # Save CSV file
-            filename = f"{schema}_{table}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            dataset.csv_file.save(
-                filename,
-                ContentFile(csv_content.encode('utf-8')),
-                save=False
-            )
-
-            # Set metadata
-            dataset.row_count = len(result)
-            dataset.column_count = len(fieldnames)
-            dataset.file_size = len(csv_content.encode('utf-8'))
 
             # Save dataset (this will trigger analysis)
             dataset.save()
 
-            # Return response with dataset info
-            return Response({
+            # Build response
+            response_data = {
                 "success": True,
                 "message": "Export completed successfully",
                 "dataset": {
@@ -458,7 +543,18 @@ class DataSourceExportView(BaseAuthApiView, DataSourcePermissionMixin):
                     "file_size": dataset.file_size,
                 },
                 "rows_exported": len(result)
-            }, status=status.HTTP_201_CREATED)
+            }
+
+            if join_metadata:
+                response_data["join_info"] = {
+                    "type": join_metadata.get('join_type', 'inner'),
+                    "type_display": join_metadata.get('join_type_display', 'Inner'),
+                    "left_table": table,
+                    "right_table": join_config['table'],
+                    "on": f"{table}.{join_config['left_column']} = {join_config['table']}.{join_config['right_column']}"
+                }
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             import logging

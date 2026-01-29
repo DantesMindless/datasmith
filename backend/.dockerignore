@@ -1,0 +1,43 @@
+# Ignore media files - these should be handled by volumes or external storage
+mediafiles/
+media/
+
+# Ignore cache and temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore development files
+.env
+.env.local
+.env.development
+.env.production
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore test coverage
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Ignore node modules if any
+node_modules/
+
+# Ignore any large test files
+*.dump
+*.sql

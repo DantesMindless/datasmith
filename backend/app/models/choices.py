@@ -9,33 +9,85 @@ class ModelStatus(models.TextChoices):
 
 
 class ModelType(models.TextChoices):
-    # Traditional ML Models
+    # ============ CLASSIFICATION MODELS ============
+    # Traditional Classification
     LOGISTIC_REGRESSION = "logistic_regression", "Logistic Regression"
-    DECISION_TREE = "decision_tree", "Decision Tree"
-    RANDOM_FOREST = "random_forest", "Random Forest"
-    SVM = "svm", "Support Vector Machine"
+    DECISION_TREE = "decision_tree", "Decision Tree Classifier"
+    RANDOM_FOREST = "random_forest", "Random Forest Classifier"
+    SVM = "svm", "Support Vector Classifier (SVC)"
     NAIVE_BAYES = "naive_bayes", "Naive Bayes"
-    KNN = "knn", "k-Nearest Neighbours"
+    KNN = "knn", "K-Nearest Neighbors Classifier"
 
-    # Ensemble Models
-    GRADIENT_BOOSTING = "gradient_boosting", "Gradient Boosting (sklearn)"
-    XGBOOST = "xgboost", "XGBoost"
-    LIGHTGBM = "lightgbm", "LightGBM"
-    ADABOOST = "adaboost", "AdaBoost"
+    # Ensemble Classification
+    GRADIENT_BOOSTING = "gradient_boosting", "Gradient Boosting Classifier"
+    XGBOOST = "xgboost", "XGBoost Classifier"
+    LIGHTGBM = "lightgbm", "LightGBM Classifier"
+    ADABOOST = "adaboost", "AdaBoost Classifier"
 
-    # Deep Learning - General
+    # ============ REGRESSION MODELS ============
+    # Traditional Regression
+    LINEAR_REGRESSION = "linear_regression", "Linear Regression"
+    DECISION_TREE_REGRESSOR = "decision_tree_regressor", "Decision Tree Regressor"
+    RANDOM_FOREST_REGRESSOR = "random_forest_regressor", "Random Forest Regressor"
+    SVR = "svr", "Support Vector Regressor (SVR)"
+    KNN_REGRESSOR = "knn_regressor", "K-Nearest Neighbors Regressor"
+
+    # Ensemble Regression
+    GRADIENT_BOOSTING_REGRESSOR = "gradient_boosting_regressor", "Gradient Boosting Regressor"
+    XGBOOST_REGRESSOR = "xgboost_regressor", "XGBoost Regressor"
+    LIGHTGBM_REGRESSOR = "lightgbm_regressor", "LightGBM Regressor"
+    ADABOOST_REGRESSOR = "adaboost_regressor", "AdaBoost Regressor"
+
+    # ============ DEEP LEARNING MODELS ============
     NEURAL_NETWORK = "neural_network", "Neural Network (PyTorch)"
-
-    # Deep Learning - Computer Vision
     CNN = "cnn", "Convolutional Neural Network (CNN)"
-    RESNET = "resnet", "ResNet (Transfer Learning)"
-    VGG = "vgg", "VGG (Transfer Learning)"
-    EFFICIENTNET = "efficientnet", "EfficientNet (Transfer Learning)"
 
-    # Deep Learning - Sequential Data
-    RNN = "rnn", "Recurrent Neural Network (RNN)"
-    LSTM = "lstm", "Long Short-Term Memory (LSTM)"
-    GRU = "gru", "Gated Recurrent Unit (GRU)"
+    # ============ CLUSTERING MODELS ============
+    KMEANS = "kmeans", "K-Means Clustering"
+    DBSCAN = "dbscan", "DBSCAN Clustering"
+    HIERARCHICAL = "hierarchical", "Hierarchical Clustering"
+    GAUSSIAN_MIXTURE = "gaussian_mixture", "Gaussian Mixture Model"
+    MEAN_SHIFT = "mean_shift", "Mean Shift Clustering"
+
+
+# Helper lists for model categorization
+CLASSIFICATION_MODELS = [
+    ModelType.LOGISTIC_REGRESSION,
+    ModelType.DECISION_TREE,
+    ModelType.RANDOM_FOREST,
+    ModelType.SVM,
+    ModelType.NAIVE_BAYES,
+    ModelType.KNN,
+    ModelType.GRADIENT_BOOSTING,
+    ModelType.XGBOOST,
+    ModelType.LIGHTGBM,
+    ModelType.ADABOOST,
+]
+
+REGRESSION_MODELS = [
+    ModelType.LINEAR_REGRESSION,
+    ModelType.DECISION_TREE_REGRESSOR,
+    ModelType.RANDOM_FOREST_REGRESSOR,
+    ModelType.SVR,
+    ModelType.KNN_REGRESSOR,
+    ModelType.GRADIENT_BOOSTING_REGRESSOR,
+    ModelType.XGBOOST_REGRESSOR,
+    ModelType.LIGHTGBM_REGRESSOR,
+    ModelType.ADABOOST_REGRESSOR,
+]
+
+DEEP_LEARNING_MODELS = [
+    ModelType.NEURAL_NETWORK,
+    ModelType.CNN,
+]
+
+CLUSTERING_MODELS = [
+    ModelType.KMEANS,
+    ModelType.DBSCAN,
+    ModelType.HIERARCHICAL,
+    ModelType.GAUSSIAN_MIXTURE,
+    ModelType.MEAN_SHIFT,
+]
 
 
 class ActivationFunction(models.TextChoices):
@@ -49,9 +101,6 @@ class DatasetType(models.TextChoices):
     """Dataset type classification"""
     TABULAR = "tabular", "Tabular Data"
     IMAGE = "image", "Image Dataset"
-    TEXT = "text", "Text Dataset"
-    TIME_SERIES = "time_series", "Time Series"
-    MIXED = "mixed", "Mixed Dataset"
 
 
 class DatasetPurpose(models.TextChoices):
@@ -59,6 +108,7 @@ class DatasetPurpose(models.TextChoices):
     CLASSIFICATION = "classification", "Classification"
     REGRESSION = "regression", "Regression"
     CLUSTERING = "clustering", "Clustering"
+    SEGMENTATION = "segmentation", "Segmentation"
     ANOMALY_DETECTION = "anomaly_detection", "Anomaly Detection"
     RECOMMENDATION = "recommendation", "Recommendation"
     GENERAL = "general", "General Purpose"

@@ -22,6 +22,9 @@ RUN poetry config virtualenvs.create false \
 # Copy project files
 COPY . /app/
 
+# Create logs directory for Django logging
+RUN mkdir -p /app/logs
+
 # Collect static files
 RUN poetry run python manage.py collectstatic --noinput
 

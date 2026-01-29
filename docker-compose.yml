@@ -14,6 +14,13 @@ services:
     depends_on:
       - db
       - redis
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
@@ -87,6 +94,13 @@ services:
       - .env.development
     environment:
      ENV: development
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
   flower:
     image: mher/flower
     ports:
@@ -99,3 +113,8 @@ volumes:
   postgres_data:
   static_volume:
   minio_data:
+
+networks:
+  default:
+    name: datasmith_network
+    external: true
